@@ -19,7 +19,11 @@ Single package: `go test -race -v ./internal/formatters/...`. Single test:
 `go test -race -v -run TestJSONFormatterIdempotent ./internal/formatters`.
 
 CI ([`.github/workflows/ci.yml`](.github/workflows/ci.yml)) runs the same
-checks, plus `govulncheck`, on every push and pull request to `main`.
+checks, plus a 45% total-coverage floor (`go tool cover -func`) and
+`govulncheck`, on every push and pull request to `main`.
+
+This is the canonical command reference — [CONTRIBUTING.md](CONTRIBUTING.md)
+points here instead of repeating it.
 
 ## Architecture
 

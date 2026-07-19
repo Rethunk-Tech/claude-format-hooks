@@ -22,6 +22,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   diagnostic to `maxChars`, emitting invalid UTF-8 to stderr for non-ASCII
   formatter/linter output; it now backs off to the nearest rune boundary.
 
+### Changed
+
+- README: dropped the meta/narrative "generalizes a hand-written
+  per-project hook" framing in favor of describing what the tool does.
+- De-duplicated the build/vet/lint/test command block that had drifted
+  out of sync between AGENTS.md and CONTRIBUTING.md (CONTRIBUTING.md's
+  copy didn't mention the new coverage floor); AGENTS.md § Commands is
+  now the single canonical copy, CONTRIBUTING.md points to it.
+- Added GitHub repo topics (`claude-code`, `hooks`, `formatter`, `linter`,
+  `golang`, `developer-tools`, `cli`, `biome`, `prettier`) — previously
+  unset.
+
 ### Added (test coverage)
 
 - Unit tests for `internal/dispatch`, `internal/config`, `internal/hookio`

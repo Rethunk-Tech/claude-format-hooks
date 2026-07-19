@@ -13,11 +13,10 @@ formats/lints a file right after Write/Edit/NotebookEdit writes it
 
 ---
 
-`claude-format-hooks` generalizes a hand-written per-project hook into a
-single global Go binary (`format-dispatch`), with no per-repo setup
-required. Two formatters (JSON, shell) run natively in-process; everything
-else routes to the real project-config-aware tool (biome, prettier, taplo,
-markdownlint-cli2, sqlfluff).
+`claude-format-hooks` is a single global Go binary (`format-dispatch`),
+with no per-repo setup required. Two formatters (JSON, shell) run natively
+in-process; everything else routes to the real project-config-aware tool
+(biome, prettier, taplo, markdownlint-cli2, sqlfluff).
 
 ## Quick start
 

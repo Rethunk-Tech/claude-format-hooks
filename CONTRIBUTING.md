@@ -18,23 +18,9 @@ Thanks for helping improve **claude-format-hooks**.
 
 ## Build and test
 
-```bash
-go build ./...
-go vet ./...
-gofmt -l .
-golangci-lint run ./...
-go test -race -cover ./...
-```
-
-CI ([`.github/workflows/ci.yml`](.github/workflows/ci.yml)) runs the same
-checks, plus `govulncheck`, on every push and pull request to `main`.
-
-Single package or test:
-
-```bash
-go test -race -v ./internal/formatters/...
-go test -race -v -run TestJSONFormatterIdempotent ./internal/formatters
-```
+Build, vet, format, lint, and test commands (plus what CI runs and how to
+scope a single package/test) are canonical in
+[AGENTS.md § Commands](AGENTS.md#commands) — don't duplicate them here.
 
 ## Pull requests
 
