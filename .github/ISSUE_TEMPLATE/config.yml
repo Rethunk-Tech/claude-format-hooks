@@ -1,0 +1,8 @@
+blank_issues_enabled: true
+contact_links:
+  - name: Claude Code documentation
+    url: https://docs.claude.com/en/docs/claude-code
+    about: PostToolUse hook schema, settings.json, and general Claude Code behavior
+  - name: Operator documentation
+    url: https://github.com/Rethunk-Tech/claude-format-hooks/blob/main/HUMANS.md
+    about: Install, configuration, and troubleshooting for this hook
