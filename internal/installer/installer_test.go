@@ -167,6 +167,104 @@ func TestWirePreservesUnrelatedHooks(t *testing.T) {
 	qt.Check(t, qt.Equals(entries[1].Hooks[0].Command, binPath))
 }
 
+func TestUnwireRemovesOwnEntry(t *testing.T) {
+	dir := t.TempDir()
+	settingsPath := filepath.Join(dir, "settings.json")
+	qt.Assert(t, qt.IsNil(os.WriteFile(settingsPath, []byte(`{"theme":"dark"}`), 0o600)))
+
+	_, wired, err := Wire(settingsPath, binPath)
+	qt.Assert(t, qt.IsNil(err))
+	qt.Assert(t, qt.IsNil(os.WriteFile(settingsPath, wired, 0o600)))
+
+	before, after, err := Unwire(settingsPath, binPath)
+	qt.Assert(t, qt.IsNil(err))
+	qt.Check(t, qt.DeepEquals(before, wired))
+
+	var top map[string]json.RawMessage
+	qt.Assert(t, qt.IsNil(json.Unmarshal(after, &top)))
+	var theme string
+	qt.Assert(t, qt.IsNil(json.Unmarshal(top["theme"], &theme)))
+	qt.Check(t, qt.Equals(theme, "dark"))
+
+	entries := settingsPostToolUse(t, after)
+	qt.Check(t, qt.HasLen(entries, 0))
+}
+
+func TestUnwirePreservesOtherEntries(t *testing.T) {
+	dir := t.TempDir()
+	settingsPath := filepath.Join(dir, "settings.json")
+	existing := `{
+		"hooks": {
+			"PostToolUse": [
+				{"matcher": "Bash", "hooks": [{"type": "command", "command": "log.sh"}]},
+				{"matcher": "Write|Edit|NotebookEdit", "hooks": [{"type": "command", "command": "` + binPath + `"}]}
+			]
+		}
+	}`
+	qt.Assert(t, qt.IsNil(os.WriteFile(settingsPath, []byte(existing), 0o600)))
+
+	_, after, err := Unwire(settingsPath, binPath)
+	qt.Assert(t, qt.IsNil(err))
+
+	entries := settingsPostToolUse(t, after)
+	qt.Assert(t, qt.HasLen(entries, 1))
+	qt.Check(t, qt.Equals(entries[0].Hooks[0].Command, "log.sh"))
+}
+
+func TestUnwireNoOwnEntryIsIdempotent(t *testing.T) {
+	dir := t.TempDir()
+	settingsPath := filepath.Join(dir, "settings.json")
+	qt.Assert(t, qt.IsNil(os.WriteFile(settingsPath, []byte(`{"theme":"dark"}`), 0o600)))
+
+	_, after, err := Unwire(settingsPath, binPath)
+	qt.Assert(t, qt.IsNil(err))
+
+	entries := settingsPostToolUse(t, after)
+	qt.Check(t, qt.HasLen(entries, 0))
+}
+
+func TestUninstallDryRunDoesNotWrite(t *testing.T) {
+	dir := t.TempDir()
+	settingsPath := filepath.Join(dir, "settings.json")
+	_, wired, err := Wire(settingsPath, binPath)
+	qt.Assert(t, qt.IsNil(err))
+	qt.Assert(t, qt.IsNil(os.WriteFile(settingsPath, wired, 0o600)))
+
+	var out strings.Builder
+	qt.Assert(t, qt.IsNil(Uninstall(Options{BinPath: binPath, SettingsPath: settingsPath}, true, &out)))
+
+	raw, err := os.ReadFile(settingsPath)
+	qt.Assert(t, qt.IsNil(err))
+	qt.Check(t, qt.DeepEquals(raw, wired))
+	qt.Check(t, qt.StringContains(out.String(), "dry-run"))
+}
+
+func TestUninstallWritesSettings(t *testing.T) {
+	dir := t.TempDir()
+	settingsPath := filepath.Join(dir, "settings.json")
+	_, wired, err := Wire(settingsPath, binPath)
+	qt.Assert(t, qt.IsNil(err))
+	qt.Assert(t, qt.IsNil(os.WriteFile(settingsPath, wired, 0o600)))
+
+	var out strings.Builder
+	qt.Assert(t, qt.IsNil(Uninstall(Options{BinPath: binPath, SettingsPath: settingsPath}, false, &out)))
+
+	entries := settingsPostToolUse(t, readFile(t, settingsPath))
+	qt.Check(t, qt.HasLen(entries, 0))
+}
+
+func TestInstallNoOpWhenAlreadyWired(t *testing.T) {
+	dir := t.TempDir()
+	settingsPath := filepath.Join(dir, "settings.json")
+	_, wired, err := Wire(settingsPath, binPath)
+	qt.Assert(t, qt.IsNil(err))
+	qt.Assert(t, qt.IsNil(os.WriteFile(settingsPath, wired, 0o600)))
+
+	var out strings.Builder
+	qt.Assert(t, qt.IsNil(Install(Options{BinPath: binPath, SettingsPath: settingsPath}, false, &out)))
+	qt.Check(t, qt.StringContains(out.String(), "nothing to do"))
+}
+
 func TestInstallDryRunDoesNotWrite(t *testing.T) {
 	dir := t.TempDir()
 	settingsPath := filepath.Join(dir, "settings.json")

@@ -38,20 +38,35 @@ func main() {
 	os.Exit(run(os.Stdin))
 }
 
-// runInstall wires format-dispatch into the installing user's
-// settings.json, replacing install.sh's jq-based mutation of the same
-// file. `--dry-run` (as the sole remaining argument) previews the change
-// without writing it.
+// runInstall wires format-dispatch into (or, with --uninstall, removes it
+// from) the installing user's settings.json, replacing install.sh's
+// jq-based mutation of the same file. `--dry-run` previews the change
+// without writing it; both flags may be given in either order.
 func runInstall(args []string) int {
-	dryRun := len(args) > 0 && args[0] == "--dry-run"
+	var dryRun, uninstall bool
+	for _, a := range args {
+		switch a {
+		case "--dry-run":
+			dryRun = true
+		case "--uninstall":
+			uninstall = true
+		}
+	}
+
+	label := "--install"
+	action := installer.Install
+	if uninstall {
+		label = "--uninstall"
+		action = installer.Uninstall
+	}
 
 	opts, err := installer.DefaultOptions()
 	if err != nil {
-		fmt.Fprintf(os.Stderr, "format-dispatch --install: %v\n", err)
+		fmt.Fprintf(os.Stderr, "format-dispatch %s: %v\n", label, err)
 		return 1
 	}
-	if err := installer.Install(opts, dryRun, os.Stdout); err != nil {
-		fmt.Fprintf(os.Stderr, "format-dispatch --install: %v\n", err)
+	if err := action(opts, dryRun, os.Stdout); err != nil {
+		fmt.Fprintf(os.Stderr, "format-dispatch %s: %v\n", label, err)
 		return 1
 	}
 	return 0

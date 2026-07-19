@@ -36,7 +36,7 @@ type PostToolUseEntry struct {
 	Hooks   []HookCommand `json:"hooks"`
 }
 
-// Options controls where Install reads and writes.
+// Options controls where Install/Uninstall read and write.
 type Options struct {
 	BinPath      string
 	SettingsPath string
@@ -64,39 +64,73 @@ func DefaultOptions() (Options, error) {
 	}, nil
 }
 
-// Wire reads the settings JSON at settingsPath (a missing file is treated
-// as `{}`) and returns the document before and after wiring in our
-// PostToolUse hook. Idempotent: a prior entry pointing at binPath, or the
-// old narrow inline biome-only hook (matcher "Write|Edit" running a
-// "biome check --write" command), is removed before the new entry is
-// appended. Every other top-level key, every other hooks.* event, and
-// every other PostToolUse entry is preserved untouched.
-func Wire(settingsPath, binPath string) (before, after []byte, err error) {
+// parseSettings reads settingsPath (a missing file is treated as `{}`) and
+// decodes it down to its hooks.PostToolUse entries, preserving top-level
+// and hooks.* key order via orderedMap so an unrelated key survives a
+// round-trip untouched.
+func parseSettings(settingsPath string) (before []byte, top, hooks *orderedMap, entries []PostToolUseEntry, err error) {
 	before, err = os.ReadFile(settingsPath) //nolint:gosec // caller-controlled settings location (env override or fixed default)
 	if err != nil {
 		if !os.IsNotExist(err) {
-			return nil, nil, err
+			return nil, nil, nil, nil, err
 		}
 		before = []byte("{}")
 	}
 
-	top := newOrderedMap()
+	top = newOrderedMap()
 	if err := json.Unmarshal(before, top); err != nil {
-		return nil, nil, fmt.Errorf("parse %s: %w", settingsPath, err)
+		return nil, nil, nil, nil, fmt.Errorf("parse %s: %w", settingsPath, err)
 	}
 
-	hooks := newOrderedMap()
+	hooks = newOrderedMap()
 	if raw, ok := top.Get("hooks"); ok {
 		if err := json.Unmarshal(raw, hooks); err != nil {
-			return nil, nil, fmt.Errorf("parse %s: hooks: %w", settingsPath, err)
+			return nil, nil, nil, nil, fmt.Errorf("parse %s: hooks: %w", settingsPath, err)
 		}
 	}
 
-	var entries []PostToolUseEntry
 	if raw, ok := hooks.Get("PostToolUse"); ok {
 		if err := json.Unmarshal(raw, &entries); err != nil {
-			return nil, nil, fmt.Errorf("parse %s: hooks.PostToolUse: %w", settingsPath, err)
+			return nil, nil, nil, nil, fmt.Errorf("parse %s: hooks.PostToolUse: %w", settingsPath, err)
 		}
+	}
+	return before, top, hooks, entries, nil
+}
+
+// renderSettings re-embeds entries as hooks.PostToolUse into top/hooks and
+// serializes the result, indented, with every untouched key in its
+// original position.
+func renderSettings(top, hooks *orderedMap, entries []PostToolUseEntry) ([]byte, error) {
+	ptuRaw, err := json.Marshal(entries)
+	if err != nil {
+		return nil, err
+	}
+	hooks.Set("PostToolUse", ptuRaw)
+
+	hooksRaw, err := json.Marshal(hooks)
+	if err != nil {
+		return nil, err
+	}
+	top.Set("hooks", hooksRaw)
+
+	afterCompact, err := json.MarshalIndent(top, "", "  ")
+	if err != nil {
+		return nil, err
+	}
+	return append(afterCompact, '\n'), nil
+}
+
+// Wire reads the settings JSON at settingsPath and returns the document
+// before and after wiring in our PostToolUse hook. Idempotent: a prior
+// entry pointing at binPath, or the old narrow inline biome-only hook
+// (matcher "Write|Edit" running a "biome check --write" command), is
+// removed before the new entry is appended. Every other top-level key,
+// every other hooks.* event, and every other PostToolUse entry is
+// preserved untouched, in its original order.
+func Wire(settingsPath, binPath string) (before, after []byte, err error) {
+	before, top, hooks, entries, err := parseSettings(settingsPath)
+	if err != nil {
+		return nil, nil, err
 	}
 
 	kept := entries[:0:0]
@@ -116,45 +150,63 @@ func Wire(settingsPath, binPath string) (before, after []byte, err error) {
 		}},
 	})
 
-	ptuRaw, err := json.Marshal(kept)
+	after, err = renderSettings(top, hooks, kept)
 	if err != nil {
 		return nil, nil, err
 	}
-	hooks.Set("PostToolUse", ptuRaw)
-
-	hooksRaw, err := json.Marshal(hooks)
-	if err != nil {
-		return nil, nil, err
-	}
-	top.Set("hooks", hooksRaw)
-
-	afterCompact, err := json.MarshalIndent(top, "", "  ")
-	if err != nil {
-		return nil, nil, err
-	}
-	after = append(afterCompact, '\n')
 	return before, after, nil
 }
 
-// keepEntry reports whether an existing PostToolUse entry should survive
-// the rewrite: it must not already be a stale copy of our own binary, and
-// it must not be the old narrow biome-only hook this installer replaces.
-func keepEntry(e PostToolUseEntry, binPath string) bool {
-	hasOwnBin := false
-	hasOldBiome := false
+// Unwire reads the settings JSON at settingsPath and returns the document
+// before and after removing the PostToolUse entry pointing at binPath. A
+// settings file with no such entry round-trips unchanged (aside from
+// re-serialization). Every other top-level key, hooks.* event, and
+// PostToolUse entry is preserved untouched, in its original order.
+func Unwire(settingsPath, binPath string) (before, after []byte, err error) {
+	before, top, hooks, entries, err := parseSettings(settingsPath)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	kept := entries[:0:0]
+	for _, e := range entries {
+		if !hasBin(e, binPath) {
+			kept = append(kept, e)
+		}
+	}
+
+	after, err = renderSettings(top, hooks, kept)
+	if err != nil {
+		return nil, nil, err
+	}
+	return before, after, nil
+}
+
+// hasBin reports whether e has a hook command pointing at binPath.
+func hasBin(e PostToolUseEntry, binPath string) bool {
 	for _, h := range e.Hooks {
 		if h.Command == binPath {
-			hasOwnBin = true
+			return true
 		}
+	}
+	return false
+}
+
+// keepEntry reports whether an existing PostToolUse entry should survive
+// Wire's rewrite: it must not already be a stale copy of our own binary,
+// and it must not be the old narrow biome-only hook this installer
+// replaces.
+func keepEntry(e PostToolUseEntry, binPath string) bool {
+	if hasBin(e, binPath) {
+		return false
+	}
+	if e.Matcher != matcherOld {
+		return true
+	}
+	for _, h := range e.Hooks {
 		if strings.Contains(h.Command, oldBiomeMark) {
-			hasOldBiome = true
+			return false
 		}
-	}
-	if hasOwnBin {
-		return false
-	}
-	if e.Matcher == matcherOld && hasOldBiome {
-		return false
 	}
 	return true
 }
@@ -167,7 +219,23 @@ func Install(opts Options, dryRun bool, out io.Writer) error {
 	if err != nil {
 		return err
 	}
+	return applyChange(opts, before, after, dryRun, out, "Wired PostToolUse hook into")
+}
 
+// Uninstall removes the PostToolUse hook from opts.SettingsPath. If
+// dryRun, the settings file is left untouched and a diff is printed to
+// out instead of being written.
+func Uninstall(opts Options, dryRun bool, out io.Writer) error {
+	before, after, err := Unwire(opts.SettingsPath, opts.BinPath)
+	if err != nil {
+		return err
+	}
+	return applyChange(opts, before, after, dryRun, out, "Removed PostToolUse hook from")
+}
+
+// applyChange previews or writes a settings.json mutation. verb is the
+// past-tense description printed on a real write, e.g. "Wired ... into".
+func applyChange(opts Options, before, after []byte, dryRun bool, out io.Writer, verb string) error {
 	if dryRun {
 		_, _ = fmt.Fprintln(out, "==> --dry-run: settings.json diff (not written):")
 		if bytes.Equal(before, after) {
@@ -179,12 +247,17 @@ func Install(opts Options, dryRun bool, out io.Writer) error {
 		return nil
 	}
 
+	if bytes.Equal(before, after) {
+		_, _ = fmt.Fprintf(out, "==> %s already reflects this state, nothing to do\n", opts.SettingsPath)
+		return nil
+	}
+
 	if err := os.MkdirAll(filepath.Dir(opts.SettingsPath), 0o700); err != nil {
 		return err
 	}
 	if err := os.WriteFile(opts.SettingsPath, after, 0o600); err != nil {
 		return err
 	}
-	_, _ = fmt.Fprintf(out, "==> Wired PostToolUse hook into %s\n", opts.SettingsPath)
+	_, _ = fmt.Fprintf(out, "==> %s %s\n", verb, opts.SettingsPath)
 	return nil
 }

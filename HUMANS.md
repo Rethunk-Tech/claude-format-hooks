@@ -55,13 +55,16 @@ Env overrides (mainly for testing): `CLAUDE_HOOKS_BIN_DIR` (default
 
 ### Uninstall
 
-Remove the `PostToolUse` entry whose `command` points at
-`~/.claude/hooks/format-dispatch` from `~/.claude/settings.json` (by hand,
-or via `/hooks`), then delete the binary:
-
 ```bash
-rm ~/.claude/hooks/format-dispatch
+~/.claude/hooks/format-dispatch --install --uninstall              # remove the PostToolUse entry
+~/.claude/hooks/format-dispatch --install --uninstall --dry-run    # preview the diff, write nothing
+rm ~/.claude/hooks/format-dispatch                                  # then delete the binary
 ```
+
+`--uninstall` removes only the `PostToolUse` entry whose `command` points
+at `~/.claude/hooks/format-dispatch` (or `$CLAUDE_HOOKS_BIN_DIR`'s
+binary); every other key and hook entry is left exactly as it was. A
+settings.json with no such entry is a no-op.
 
 ## Supported extensions
 
