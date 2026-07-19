@@ -84,6 +84,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `revive`'s exported-symbol check surfaced on 11 previously-undocumented
   exported types/functions.
 
+### Removed
+
+- Dead `Result.Changed` field, and the wasted before/after file reads
+  each external formatter (biome, bunx-based, sqlfluff) performed solely
+  to populate it — no caller ever read `.Changed`, only `.Err` and
+  `.Diagnostic`.
+
 ### Fixed
 
 - `internal/installer.Wire` no longer round-trips `settings.json` through
@@ -99,13 +106,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `.editorconfig`) converted straight to `uint`, wrapping around to a huge
   value instead of erroring — clamp to a 1-space minimum, matching the
   JSON formatter's existing `max(spec.Size, 1)`.
-
-### Removed
-
-- Dead `Result.Changed` field, and the wasted before/after file reads
-  each external formatter (biome, bunx-based, sqlfluff) performed solely
-  to populate it — no caller ever read `.Changed`, only `.Err` and
-  `.Diagnostic`.
 
 ## [0.1.0] - 2026-07-19
 
