@@ -7,8 +7,6 @@ import "context"
 
 // Result is the outcome of running a formatter against one file.
 type Result struct {
-	// Changed is true if the file's contents were modified.
-	Changed bool
 	// Skipped is true if the formatter declined to run (tool not found,
 	// no config present, file outside its scope). Not an error.
 	Skipped bool

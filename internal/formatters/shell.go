@@ -60,5 +60,5 @@ func (f shellFormatter) Format(_ context.Context, _, abs string) Result {
 	if err := os.WriteFile(abs, out, mode); err != nil {
 		return Result{Err: fmt.Errorf("write: %w", err)}
 	}
-	return Result{Changed: true}
+	return Result{}
 }

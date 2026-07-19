@@ -2,7 +2,6 @@ package formatters
 
 import (
 	"context"
-	"os"
 	"os/exec"
 )
 
@@ -41,11 +40,9 @@ func (b bunxFormatter) Format(ctx context.Context, projectRoot, abs string) Resu
 	if _, err := exec.LookPath("bunx"); err != nil {
 		return Result{Skipped: true}
 	}
-	before, _ := os.ReadFile(abs) //nolint:gosec // abs is the file this formatter was invoked to format, by design
 	ok, diag := runExternal(ctx, projectRoot, "bunx", b.args(abs))
 	if !ok {
 		return Result{Diagnostic: diag}
 	}
-	after, _ := os.ReadFile(abs) //nolint:gosec // abs is the file this formatter was invoked to format, by design
-	return Result{Changed: string(before) != string(after)}
+	return Result{}
 }

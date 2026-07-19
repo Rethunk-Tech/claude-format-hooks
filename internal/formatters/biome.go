@@ -33,13 +33,11 @@ func (biomeFormatter) Format(ctx context.Context, projectRoot, abs string) Resul
 		cfgDir = projectRoot
 	}
 
-	before, _ := os.ReadFile(abs) //nolint:gosec // abs is the file this formatter was invoked to format, by design
 	ok, diag := runExternal(ctx, cfgDir, "bunx", []string{"@biomejs/biome", "check", "--write", "--no-errors-on-unmatched", "--", abs})
 	if !ok {
 		return Result{Diagnostic: diag}
 	}
-	after, _ := os.ReadFile(abs) //nolint:gosec // abs is the file this formatter was invoked to format, by design
-	return Result{Changed: string(before) != string(after)}
+	return Result{}
 }
 
 // findUpward walks from dir up to (and including) root looking for any of
