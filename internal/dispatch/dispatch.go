@@ -32,6 +32,7 @@ func NewRegistry(cfg config.Config) *Registry {
 	sql := formatters.NewSQLFluff()
 	python := formatters.NewPython()
 	rust := formatters.NewRust()
+	terraform := formatters.NewTerraform()
 
 	all := map[string]formatters.Formatter{
 		".json": json,
@@ -78,6 +79,7 @@ func NewRegistry(cfg config.Config) *Registry {
 
 		".py": python,
 		".rs": rust,
+		".tf": terraform,
 	}
 	maps.DeleteFunc(all, func(ext string, _ formatters.Formatter) bool { return cfg.IsDisabled(ext) })
 	return &Registry{byExt: all}

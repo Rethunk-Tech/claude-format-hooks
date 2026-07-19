@@ -54,6 +54,7 @@ func TestExternalFormatterNames(t *testing.T) {
 		{NewSQLFluff(), "sqlfluff"},
 		{NewPython(), "ruff/black"},
 		{NewRust(), "rustfmt"},
+		{NewTerraform(), "terraform"},
 	}
 	for _, tc := range cases {
 		qt.Check(t, qt.Equals(tc.f.Name(), tc.want))
@@ -201,6 +202,33 @@ func TestRustFormatterSuccessAndFailure(t *testing.T) {
 	t.Run("failure with no output falls back to the process error", func(t *testing.T) {
 		writeFakeTool(t, "rustfmt", "exit 1")
 		res := NewRust().Format(t.Context(), dir, abs)
+		qt.Check(t, qt.Not(qt.Equals(res.Diagnostic, "")))
+	})
+}
+
+func TestTerraformFormatterSkipsWhenMissing(t *testing.T) {
+	isolateBinCache(t)
+	clearPath(t)
+	abs := filepath.Join(t.TempDir(), "f.tf")
+	res := NewTerraform().Format(t.Context(), t.TempDir(), abs)
+	qt.Check(t, qt.IsTrue(res.Skipped))
+}
+
+func TestTerraformFormatterSuccessAndFailure(t *testing.T) {
+	isolateBinCache(t)
+	dir := t.TempDir()
+	abs := filepath.Join(dir, "f.tf")
+
+	t.Run("success", func(t *testing.T) {
+		writeFakeTool(t, "terraform", "exit 0")
+		res := NewTerraform().Format(t.Context(), dir, abs)
+		qt.Check(t, qt.IsNil(res.Err))
+		qt.Check(t, qt.Equals(res.Diagnostic, ""))
+	})
+
+	t.Run("failure with no output falls back to the process error", func(t *testing.T) {
+		writeFakeTool(t, "terraform", "exit 1")
+		res := NewTerraform().Format(t.Context(), dir, abs)
 		qt.Check(t, qt.Not(qt.Equals(res.Diagnostic, "")))
 	})
 }

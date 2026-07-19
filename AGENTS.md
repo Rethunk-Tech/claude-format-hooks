@@ -86,6 +86,9 @@ native alternatives rather than assuming:
 - **Rust** — `rustfmt`; no Go equivalent exists, and unlike JSON there's
   no fidelity trade-off to weigh — rustfmt is the canonical formatter for
   Rust itself, the same relationship gofmt has to Go.
+- **Terraform/HCL** — `terraform fmt`; no Go equivalent invokable
+  in-process without vendoring HashiCorp's own `hclwrite`, and (like
+  rustfmt) there's no competing tool to weigh.
 
 External formatters already read their own project config (`biome.json`,
 `.prettierrc`, `.sqlfluff`, ...) automatically, since we invoke the real
@@ -100,7 +103,7 @@ tool. Only the two native formatters needed their own config story (see
 | [`internal/hookio/`](internal/hookio/) | Decodes the `PostToolUse` JSON payload into a file path |
 | [`internal/config/`](internal/config/) | Resolves per-file indent settings: built-in defaults -> user config -> `.editorconfig` |
 | [`internal/dispatch/`](internal/dispatch/) | Extension -> `Formatter` registry, vendored-dir list, disabled-extension filtering |
-| [`internal/formatters/`](internal/formatters/) | One `Formatter` implementation per file type (native: `json.go`, `shell.go`, `golang.go`; external: `biome.go`, `bunxtool.go`, `sqlfluff.go`, `python.go`, `rust.go`); `exec.go` holds the shared subprocess-run + diagnostic-truncation helper; `binpath.go` holds the shared, disk-cached `lookPath` every external formatter uses instead of calling `exec.LookPath` directly |
+| [`internal/formatters/`](internal/formatters/) | One `Formatter` implementation per file type (native: `json.go`, `shell.go`, `golang.go`; external: `biome.go`, `bunxtool.go`, `sqlfluff.go`, `python.go`, `rust.go`, `terraform.go`); `exec.go` holds the shared subprocess-run + diagnostic-truncation helper; `binpath.go` holds the shared, disk-cached `lookPath` every external formatter uses instead of calling `exec.LookPath` directly |
 | [`internal/installer/`](internal/installer/) | Wires/unwires format-dispatch's `PostToolUse` hook in `~/.claude/settings.json` (`format-dispatch --install`/`--uninstall`), replacing `install.sh`'s old `jq` filter; `orderedmap.go` preserves the file's existing key order across the rewrite and a `.bak` backup is written before any real change |
 
 ## Invariants

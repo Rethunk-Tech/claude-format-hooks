@@ -36,6 +36,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Rust (`.rs`) support via `rustfmt` — no Go equivalent, and (like Go
   itself) no fidelity trade-off to weigh: rustfmt is the canonical
   formatter for Rust, the same relationship gofmt has to Go.
+- Terraform/HCL (`.tf`) support via `terraform fmt` — surfaced by a fleet
+  survey as the one clean, low-effort gap worth closing immediately (a
+  single canonical formatter, real hand-authored `.tf` files already
+  present in this fleet); Kotlin/XML/Lua/Gradle were also surveyed and
+  passed over (fragmented tooling, too rare, or generated/config-
+  sensitive content), and `.proto` was flagged as a near-term watch item
+  once protobuf usage spreads past its one current repo.
 - `internal/formatters/binpath.go`: a disk-backed, 30-second-TTL negative
   cache for "is this external tool installed" (`lookPath`, replacing
   every formatter's direct `exec.LookPath` call). Each format-dispatch

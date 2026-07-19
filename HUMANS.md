@@ -27,6 +27,8 @@ required.
 - Optional: [`rustfmt`](https://github.com/rust-lang/rustfmt) (installed
   with the Rust toolchain via `rustup component add rustfmt`) for `.rs`
   formatting.
+- Optional: [`terraform`](https://developer.hashicorp.com/terraform)
+  (system binary) for `.tf` formatting.
 
 ### Installation
 
@@ -109,6 +111,7 @@ hanging on stdin — safe to run by hand while debugging.
 | `.sql` | `sqlfluff fix` | no (system binary) |
 | `.py` | `ruff format` (preferred) or `black` | no (system binary) |
 | `.rs` | `rustfmt` | no (system binary) |
+| `.tf` | `terraform fmt` | no (system binary) |
 
 Any other extension is an instant no-op. Vendored/build directories and
 anything outside `$CLAUDE_PROJECT_DIR` are always skipped — see
