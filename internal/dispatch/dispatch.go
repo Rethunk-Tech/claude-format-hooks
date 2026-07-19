@@ -56,8 +56,10 @@ func NewRegistry(cfg config.Config) *Registry {
 
 		".sql": sql,
 	}
-	for _, ext := range cfg.Disabled {
-		delete(all, strings.ToLower(ext))
+	for ext := range all {
+		if cfg.IsDisabled(ext) {
+			delete(all, ext)
+		}
 	}
 	return &Registry{byExt: all}
 }

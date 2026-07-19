@@ -16,6 +16,9 @@ func runExternal(ctx context.Context, dir, name string, args []string) (ok bool,
 	if err == nil {
 		return true, ""
 	}
+	if len(out) == 0 {
+		return false, err.Error()
+	}
 	return false, truncate(out, 10, 500)
 }
 

@@ -12,7 +12,7 @@ This hook runs on *every* file write in a session. Its own dispatch logic
 cost is process startup, which is repeated every single invocation:
 
 | Runtime | Cold-start overhead |
-|---|---|
+| --- | --- |
 | Go (this binary) | ~1–3ms |
 | Bash + jq | ~5–15ms |
 | Python | ~30–60ms (worse behind a venv/pyenv shim) |
@@ -51,12 +51,16 @@ native alternatives rather than assuming:
 External formatters already read their own project config (`biome.json`,
 `.prettierrc`, `.sqlfluff`, ...) automatically, since we invoke the real
 tool. Only the two native formatters needed their own config story — see
-below.
+below. None of them require that config to exist first: a `.ts` file in a
+project with no `biome.json`, or a `.md` file with no `.markdownlint.json`,
+still gets formatted, using each tool's own built-in defaults — the same
+way every extension in the table below is handled regardless of which
+project it lives in.
 
 ## Supported extensions
 
 | Extension | Formatter | Native? |
-|---|---|---|
+| --- | --- | --- |
 | `.json` | `encoding/json.Indent` | yes |
 | `.sh`, `.bash` | `mvdan.cc/sh/v3` | yes |
 | `.ts`, `.tsx`, `.js`, `.jsx`, `.mjs`, `.cjs`, `.css`, `.jsonc` | `biome check --write` | no (bunx) |

@@ -20,6 +20,7 @@ package config
 import (
 	"encoding/json"
 	"os"
+	"strings"
 
 	"mvdan.cc/editorconfig"
 )
@@ -72,10 +73,12 @@ func Load(path string) (Config, error) {
 	return cfg, nil
 }
 
-// IsDisabled reports whether ext is in the user's disabled list.
+// IsDisabled reports whether ext is in the user's disabled list. Comparison
+// is case-insensitive, since extensions are matched case-insensitively
+// everywhere else (filepath.Ext preserves the source file's casing).
 func (c Config) IsDisabled(ext string) bool {
 	for _, d := range c.Disabled {
-		if d == ext {
+		if strings.EqualFold(d, ext) {
 			return true
 		}
 	}

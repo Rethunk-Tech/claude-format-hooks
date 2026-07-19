@@ -12,7 +12,11 @@ import (
 //
 // It walks up from the file to the nearest biome.json/biome.jsonc and runs
 // from that directory, so monorepos with a nested config (e.g. a package
-// under apps/*) pick up the right config instead of the repo root's.
+// under apps/*) pick up the right config instead of the repo root's. When no
+// config exists anywhere under projectRoot, it still runs — from
+// projectRoot, using biome's own built-in defaults — the same way the
+// bunx-based formatters (prettier, taplo, markdownlint-cli2) format any
+// project regardless of whether that project has opted into their config.
 type biomeFormatter struct{}
 
 func NewBiome() Formatter { return biomeFormatter{} }
@@ -26,7 +30,7 @@ func (biomeFormatter) Format(ctx context.Context, projectRoot, abs string) Resul
 
 	cfgDir := findUpward(filepath.Dir(abs), projectRoot, "biome.json", "biome.jsonc")
 	if cfgDir == "" {
-		return Result{Skipped: true}
+		cfgDir = projectRoot
 	}
 
 	before, _ := os.ReadFile(abs)
