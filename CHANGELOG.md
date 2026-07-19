@@ -18,6 +18,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- CI: added an explicit least-privilege `permissions: contents: read`
+  block, a `concurrency` group to cancel superseded runs, and pinned
+  `actions/checkout`, `actions/setup-go`, and `golangci-lint-action` to
+  commit SHAs instead of mutable version tags. The coverage floor was
+  raised from 45% to 75% (actual coverage was already 85.3%, so the old
+  floor gated nothing).
+- `.golangci.yml`: enabled `contextcheck`, `errorlint`, `gocritic`,
+  `predeclared`, `revive`, `unconvert`, and `wastedassign` alongside the
+  existing `standard` + `gosec` set; added the missing doc comments
+  `revive`'s exported-symbol check surfaced on 11 previously-undocumented
+  exported types/functions.
 - A per-file formatter timeout now uses `context.WithTimeoutCause`
   instead of `context.WithTimeout`; `runExternal` prefers
   `context.Cause(ctx)` for its diagnostic when the timeout actually
