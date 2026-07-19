@@ -13,6 +13,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   the same engine `gofmt` itself is built on, so output matches exactly
   with no subprocess. Unlike JSON, there's no fidelity trade-off to weigh:
   Go source has exactly one canonical formatting.
+- Extensions already covered by an integrated tool, added at zero
+  integration cost: `.mts`/`.cts` (biome, alongside the existing
+  `.mjs`/`.cjs`), `.markdown` (markdownlint-cli2, alongside `.md`), and
+  `.scss`/`.less`/`.graphql`/`.gql` (prettier, which supports all four
+  natively; biome has no SCSS/Less support).
 
 ### Fixed
 

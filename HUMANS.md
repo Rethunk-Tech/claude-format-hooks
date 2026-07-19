@@ -89,10 +89,10 @@ hanging on stdin — safe to run by hand while debugging.
 | `.json` | `encoding/json.Indent` | yes |
 | `.sh`, `.bash` | `mvdan.cc/sh/v3` | yes |
 | `.go` | `go/format.Source` | yes |
-| `.ts`, `.tsx`, `.js`, `.jsx`, `.mjs`, `.cjs`, `.css`, `.jsonc` | `biome check --write` | no (bunx) |
-| `.md`, `.mdx` | `markdownlint-cli2 --fix` | no (bunx) |
+| `.ts`, `.tsx`, `.js`, `.jsx`, `.mjs`, `.cjs`, `.mts`, `.cts`, `.css`, `.jsonc` | `biome check --write` | no (bunx) |
+| `.md`, `.mdx`, `.markdown` | `markdownlint-cli2 --fix` | no (bunx) |
 | `.toml` | `taplo format` | no (bunx) |
-| `.yaml`, `.yml`, `.html` | `prettier --write` | no (bunx) |
+| `.yaml`, `.yml`, `.html`, `.scss`, `.less`, `.graphql`, `.gql` | `prettier --write` | no (bunx) |
 | `.sql` | `sqlfluff fix` | no (system binary) |
 
 Any other extension is an instant no-op. Vendored/build directories and

@@ -15,8 +15,9 @@ func TestSupported(t *testing.T) {
 
 	supported := []string{
 		".json", ".sh", ".bash", ".go",
-		".ts", ".tsx", ".js", ".jsx", ".mjs", ".cjs", ".css", ".jsonc",
-		".md", ".mdx", ".toml", ".yaml", ".yml", ".html", ".sql",
+		".ts", ".tsx", ".js", ".jsx", ".mjs", ".cjs", ".mts", ".cts", ".css", ".jsonc",
+		".md", ".mdx", ".markdown", ".toml", ".yaml", ".yml", ".html", ".scss", ".less",
+		".graphql", ".gql", ".sql",
 	}
 	for _, ext := range supported {
 		qt.Check(t, qt.IsTrue(r.Supported(ext)), qt.Commentf("ext=%q", ext))

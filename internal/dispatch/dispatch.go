@@ -45,19 +45,32 @@ func NewRegistry(cfg config.Config) *Registry {
 		".jsx": biome,
 		".mjs": biome,
 		".cjs": biome,
+		// .mts/.cts are TypeScript's explicit-module-type variants of
+		// .mjs/.cjs — biome parses them the same way.
+		".mts": biome,
+		".cts": biome,
 		".css": biome,
 		// .jsonc keeps comments, which json.Indent can't handle safely —
 		// route it to biome instead of the native json formatter.
 		".jsonc": biome,
 
-		".md":  markdown,
-		".mdx": markdown,
+		".md":       markdown,
+		".mdx":      markdown,
+		".markdown": markdown,
 
 		".toml": toml,
 
 		".yaml": prettier,
 		".yml":  prettier,
 		".html": prettier,
+		// biome's CSS parser doesn't support the SCSS/Less supersets;
+		// prettier does natively.
+		".scss": prettier,
+		".less": prettier,
+		// GraphQL has no dedicated tool integrated here; prettier supports
+		// it natively at no extra cost.
+		".graphql": prettier,
+		".gql":     prettier,
 
 		".sql": sql,
 	}
