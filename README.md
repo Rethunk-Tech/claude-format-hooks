@@ -128,6 +128,14 @@ and adds (or replaces an existing narrower biome-only hook with) a
 schema's exec form (`command` + `args: []`) — no shell spawned to launch
 it, just the binary directly.
 
+If `bunx` is on `PATH`, the installer also pre-warms its package cache for
+biome, prettier, taplo, and markdownlint-cli2 (`bunx <pkg> --version`) —
+each is unpinned (floats to whatever version bunx resolves) and would
+otherwise pay a cold npm-registry fetch on the first file write of a
+session, against the hook's 25s per-file timeout. This is best-effort: a
+failed pre-warm never fails the install, since the same fetch just retries
+on first use.
+
 If Claude Code is already running, open `/hooks` once (or restart) to pick
 up the change — the settings watcher only watches directories that had a
 settings file when the session started.
@@ -138,4 +146,9 @@ settings file when the session started.
 go build ./...
 go vet ./...
 gofmt -l .
+golangci-lint run ./...
+go test -race -cover ./...
 ```
+
+CI ([`.github/workflows/ci.yml`](.github/workflows/ci.yml)) runs the same
+checks, plus `govulncheck`, on every push and pull request to `main`.
