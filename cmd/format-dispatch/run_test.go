@@ -122,6 +122,33 @@ func TestRunInstallDryRunDoesNotWrite(t *testing.T) {
 	qt.Check(t, qt.IsTrue(os.IsNotExist(err)), qt.Commentf("--dry-run must not write settings.json"))
 }
 
+func TestRunInstallRejectsUnrecognizedArgs(t *testing.T) {
+	cases := []struct {
+		name       string
+		args       []string
+		wantSubstr string
+	}{
+		{"typo of --dry-run", []string{"--dryrun"}, "unrecognized argument"},
+		{"unrelated flag", []string{"--bogus"}, "unrecognized argument"},
+		{"extra arguments", []string{"--dry-run", "extra"}, "unexpected arguments"},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			dir := t.TempDir()
+			t.Setenv("CLAUDE_HOOKS_BIN_DIR", filepath.Join(dir, "bin"))
+			settingsPath := filepath.Join(dir, "settings.json")
+			t.Setenv("CLAUDE_SETTINGS_FILE", settingsPath)
+
+			var code int
+			stderr := captureStderr(t, func() { code = runInstall(tc.args, false) })
+			qt.Check(t, qt.Equals(code, 1))
+			qt.Check(t, qt.StringContains(stderr, tc.wantSubstr))
+			_, err := os.Stat(settingsPath)
+			qt.Check(t, qt.IsTrue(os.IsNotExist(err)), qt.Commentf("a rejected arg must not write settings.json"))
+		})
+	}
+}
+
 func TestRunInstallReportsDefaultOptionsError(t *testing.T) {
 	t.Setenv("HOME", "")
 	t.Setenv("CLAUDE_HOOKS_BIN_DIR", "")

@@ -112,15 +112,28 @@ func versionString() string {
 // runInstall wires format-dispatch into (--install) or removes it from
 // (--uninstall) the installing user's settings.json, replacing install.sh's
 // jq-based mutation of the same file. `--dry-run` (as the sole remaining
-// argument) previews the change without writing it.
+// argument) previews the change without writing it; anything else is a
+// usage error rather than a silently-ignored typo.
 func runInstall(args []string, uninstall bool) int {
-	dryRun := len(args) > 0 && args[0] == "--dry-run"
-
 	label := "--install"
 	action := installer.Install
 	if uninstall {
 		label = "--uninstall"
 		action = installer.Uninstall
+	}
+
+	var dryRun bool
+	switch len(args) {
+	case 0:
+	case 1:
+		if args[0] != "--dry-run" {
+			fmt.Fprintf(os.Stderr, "format-dispatch %s: unrecognized argument %q\n\n%s", label, args[0], usage)
+			return 1
+		}
+		dryRun = true
+	default:
+		fmt.Fprintf(os.Stderr, "format-dispatch %s: unexpected arguments %q\n\n%s", label, args, usage)
+		return 1
 	}
 
 	opts, err := installer.DefaultOptions()

@@ -7,6 +7,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- `format-dispatch --install`/`--uninstall` silently ignored any argument
+  after the subcommand other than exactly `--dry-run` (e.g. a typo like
+  `--dryrun`, or a stray extra argument) instead of erroring — it now
+  prints usage and exits 1, matching the top-level unrecognized-flag
+  behavior.
+
 ## [0.2.0] - 2026-07-19
 
 ### Added
