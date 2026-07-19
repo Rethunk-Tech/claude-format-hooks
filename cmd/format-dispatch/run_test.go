@@ -77,6 +77,30 @@ func TestVersionStringReportsBuildInfo(t *testing.T) {
 	qt.Check(t, qt.StringContains(got, "format-dispatch"))
 }
 
+func TestDispatchArgsRoutesInstallAndUninstall(t *testing.T) {
+	t.Run("--install", func(t *testing.T) {
+		dir := t.TempDir()
+		t.Setenv("CLAUDE_HOOKS_BIN_DIR", filepath.Join(dir, "bin"))
+		settingsPath := filepath.Join(dir, "settings.json")
+		t.Setenv("CLAUDE_SETTINGS_FILE", settingsPath)
+
+		qt.Check(t, qt.Equals(dispatchArgs([]string{"--install", "--dry-run"}), 0))
+		_, err := os.Stat(settingsPath)
+		qt.Check(t, qt.IsTrue(os.IsNotExist(err)), qt.Commentf("--dry-run must not write settings.json"))
+	})
+
+	t.Run("--uninstall", func(t *testing.T) {
+		dir := t.TempDir()
+		t.Setenv("CLAUDE_HOOKS_BIN_DIR", filepath.Join(dir, "bin"))
+		settingsPath := filepath.Join(dir, "settings.json")
+		t.Setenv("CLAUDE_SETTINGS_FILE", settingsPath)
+
+		qt.Check(t, qt.Equals(dispatchArgs([]string{"--install"}), 0))
+		qt.Check(t, qt.Equals(dispatchArgs([]string{"--uninstall"}), 0))
+		qt.Check(t, qt.IsFalse(strings.Contains(readFile(t, settingsPath), filepath.Join(dir, "bin", "format-dispatch"))))
+	})
+}
+
 func writeFile(t *testing.T, path, content string) {
 	t.Helper()
 	qt.Assert(t, qt.IsNil(os.MkdirAll(filepath.Dir(path), 0o700)))
