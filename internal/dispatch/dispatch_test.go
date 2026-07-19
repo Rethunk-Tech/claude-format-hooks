@@ -17,14 +17,14 @@ func TestSupported(t *testing.T) {
 		".json", ".sh", ".bash", ".go",
 		".ts", ".tsx", ".js", ".jsx", ".mjs", ".cjs", ".mts", ".cts", ".css", ".jsonc",
 		".md", ".mdx", ".markdown", ".toml", ".yaml", ".yml", ".html", ".scss", ".less",
-		".graphql", ".gql", ".sql",
+		".graphql", ".gql", ".sql", ".py", ".rs",
 	}
 	for _, ext := range supported {
 		qt.Check(t, qt.IsTrue(r.Supported(ext)), qt.Commentf("ext=%q", ext))
 	}
 
 	qt.Check(t, qt.IsTrue(r.Supported(".JSON")), qt.Commentf("case-insensitive"))
-	qt.Check(t, qt.IsFalse(r.Supported(".py")), qt.Commentf("no formatter registered"))
+	qt.Check(t, qt.IsFalse(r.Supported(".rb")), qt.Commentf("no formatter registered"))
 	qt.Check(t, qt.IsFalse(r.Supported("")))
 }
 
@@ -41,7 +41,7 @@ func TestSupportedRespectsDisabled(t *testing.T) {
 func TestKnownExtension(t *testing.T) {
 	qt.Check(t, qt.IsTrue(KnownExtension(".json")), qt.Commentf("registered by every Config, including empty"))
 	qt.Check(t, qt.IsTrue(KnownExtension(".JSON")), qt.Commentf("case-insensitive"))
-	qt.Check(t, qt.IsFalse(KnownExtension(".py")), qt.Commentf("no formatter registered"))
+	qt.Check(t, qt.IsFalse(KnownExtension(".rb")), qt.Commentf("no formatter registered"))
 	qt.Check(t, qt.IsFalse(KnownExtension("")))
 }
 

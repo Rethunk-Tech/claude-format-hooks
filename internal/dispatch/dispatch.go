@@ -30,6 +30,8 @@ func NewRegistry(cfg config.Config) *Registry {
 	toml := formatters.NewTOML()
 	prettier := formatters.NewPrettier()
 	sql := formatters.NewSQLFluff()
+	python := formatters.NewPython()
+	rust := formatters.NewRust()
 
 	all := map[string]formatters.Formatter{
 		".json": json,
@@ -73,6 +75,9 @@ func NewRegistry(cfg config.Config) *Registry {
 		".gql":     prettier,
 
 		".sql": sql,
+
+		".py": python,
+		".rs": rust,
 	}
 	maps.DeleteFunc(all, func(ext string, _ formatters.Formatter) bool { return cfg.IsDisabled(ext) })
 	return &Registry{byExt: all}

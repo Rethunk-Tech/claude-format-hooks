@@ -21,6 +21,12 @@ required.
   JSON, shell, and (if installed) `sqlfluff` still work.
 - Optional: [`sqlfluff`](https://sqlfluff.com/) (system binary, e.g. via
   `pipx install sqlfluff`) for `.sql` formatting.
+- Optional: [`ruff`](https://docs.astral.sh/ruff/) or
+  [`black`](https://black.readthedocs.io/) (system binary) for `.py`
+  formatting — ruff is tried first if both are installed.
+- Optional: [`rustfmt`](https://github.com/rust-lang/rustfmt) (installed
+  with the Rust toolchain via `rustup component add rustfmt`) for `.rs`
+  formatting.
 
 ### Installation
 
@@ -101,6 +107,8 @@ hanging on stdin — safe to run by hand while debugging.
 | `.toml` | `taplo format` | no (bunx) |
 | `.yaml`, `.yml`, `.html`, `.scss`, `.less`, `.graphql`, `.gql` | `prettier --write` | no (bunx) |
 | `.sql` | `sqlfluff fix` | no (system binary) |
+| `.py` | `ruff format` (preferred) or `black` | no (system binary) |
+| `.rs` | `rustfmt` | no (system binary) |
 
 Any other extension is an instant no-op. Vendored/build directories and
 anything outside `$CLAUDE_PROJECT_DIR` are always skipped — see
@@ -176,6 +184,14 @@ it should be.** Confirm `bunx` is on `PATH` (`command -v bunx`); those
 formatters are silently skipped without it. A first-ever `bunx` fetch on a
 machine can also be slow enough to hit the hook's 25s timeout — re-running
 `install.sh` pre-warms the cache for this.
+
+**I just installed `ruff`/`black`/`rustfmt`/`sqlfluff`/`bunx`, but the
+hook still skipped a file.** A missing tool's absence is cached on disk
+for up to 30 seconds, so a burst of file writes doesn't re-walk `$PATH`
+for every one — it self-heals within that window with no restart needed.
+The cache lives under your OS cache directory (`$XDG_CACHE_HOME`,
+`%LocalAppData%`, etc.) in a `claude-format-hooks` subfolder; it's safe to
+delete by hand if you want the next write to recheck immediately.
 
 **Still can't tell what happened.** Set `CLAUDE_FORMAT_HOOKS_LOG` to a
 file path before starting Claude Code, and every invocation appends one

@@ -30,6 +30,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   formatted" (and a slow-feeling hook, usually a cold `bunx` fetch)
   without changing the hook's default silent-on-success behavior. Off
   unless set; a logging failure never affects the hook's exit code.
+- Native-adjacent Python (`.py`) support: `ruff format` (preferred) or
+  `black` as a fallback, whichever is on `PATH` — ruff wins if both are.
+  Neither has a Go equivalent, same reasoning as `sqlfluff`/SQL.
+- Rust (`.rs`) support via `rustfmt` — no Go equivalent, and (like Go
+  itself) no fidelity trade-off to weigh: rustfmt is the canonical
+  formatter for Rust, the same relationship gofmt has to Go.
+- `internal/formatters/binpath.go`: a disk-backed, 30-second-TTL negative
+  cache for "is this external tool installed" (`lookPath`, replacing
+  every formatter's direct `exec.LookPath` call). Each format-dispatch
+  invocation is a fresh, short-lived process, so an in-memory cache
+  wouldn't survive between file writes — without this, a project missing
+  `bunx`/`sqlfluff`/`ruff`/`black`/`rustfmt` re-walked `$PATH` on every
+  single file write. The check reruns after the TTL, so installing the
+  missing tool mid-session is picked up without restarting.
 - `.github/workflows/release.yml`: a `v*` tag push now cross-compiles
   `format-dispatch` for linux/darwin (amd64+arm64) from a single
   `ubuntu-latest` runner (pure Go, no cgo) and publishes a GitHub Release

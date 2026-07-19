@@ -3,7 +3,6 @@ package formatters
 import (
 	"context"
 	"os"
-	"os/exec"
 	"path/filepath"
 	"slices"
 )
@@ -26,7 +25,7 @@ func NewBiome() Formatter { return biomeFormatter{} }
 func (biomeFormatter) Name() string { return "biome" }
 
 func (biomeFormatter) Format(ctx context.Context, projectRoot, abs string) Result {
-	if _, err := exec.LookPath("bunx"); err != nil {
+	if _, err := lookPath("bunx"); err != nil {
 		return Result{Skipped: true}
 	}
 

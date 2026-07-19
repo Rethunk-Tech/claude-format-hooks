@@ -1,9 +1,6 @@
 package formatters
 
-import (
-	"context"
-	"os/exec"
-)
+import "context"
 
 // bunxFormatter runs a bunx-published CLI formatter against a single file
 // from the project root, for tools with no practical native Go equivalent
@@ -40,7 +37,7 @@ func NewPrettier() Formatter {
 func (b bunxFormatter) Name() string { return b.name }
 
 func (b bunxFormatter) Format(ctx context.Context, projectRoot, abs string) Result {
-	if _, err := exec.LookPath("bunx"); err != nil {
+	if _, err := lookPath("bunx"); err != nil {
 		return Result{Skipped: true}
 	}
 	ok, diag := runExternal(ctx, projectRoot, "bunx", b.args(abs))

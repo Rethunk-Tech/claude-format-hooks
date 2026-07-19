@@ -80,6 +80,12 @@ native alternatives rather than assuming:
   not improve on it. Stays on `prettier`.
 - **TS/TSX/JS/JSX/CSS/JSONC** — `biome` is Rust with no Go bindings.
 - **SQL** — `sqlfluff` is Python; no Go equivalent exists.
+- **Python** — `ruff format` (preferred) or `black` as a fallback; both
+  are Python tools, no Go equivalent exists. Whichever is on `PATH` runs;
+  ruff wins if both are present.
+- **Rust** — `rustfmt`; no Go equivalent exists, and unlike JSON there's
+  no fidelity trade-off to weigh — rustfmt is the canonical formatter for
+  Rust itself, the same relationship gofmt has to Go.
 
 External formatters already read their own project config (`biome.json`,
 `.prettierrc`, `.sqlfluff`, ...) automatically, since we invoke the real
@@ -94,7 +100,7 @@ tool. Only the two native formatters needed their own config story (see
 | [`internal/hookio/`](internal/hookio/) | Decodes the `PostToolUse` JSON payload into a file path |
 | [`internal/config/`](internal/config/) | Resolves per-file indent settings: built-in defaults -> user config -> `.editorconfig` |
 | [`internal/dispatch/`](internal/dispatch/) | Extension -> `Formatter` registry, vendored-dir list, disabled-extension filtering |
-| [`internal/formatters/`](internal/formatters/) | One `Formatter` implementation per file type (native: `json.go`, `shell.go`, `golang.go`; external: `biome.go`, `bunxtool.go`, `sqlfluff.go`); `exec.go` holds the shared subprocess-run + diagnostic-truncation helper |
+| [`internal/formatters/`](internal/formatters/) | One `Formatter` implementation per file type (native: `json.go`, `shell.go`, `golang.go`; external: `biome.go`, `bunxtool.go`, `sqlfluff.go`, `python.go`, `rust.go`); `exec.go` holds the shared subprocess-run + diagnostic-truncation helper; `binpath.go` holds the shared, disk-cached `lookPath` every external formatter uses instead of calling `exec.LookPath` directly |
 | [`internal/installer/`](internal/installer/) | Wires/unwires format-dispatch's `PostToolUse` hook in `~/.claude/settings.json` (`format-dispatch --install`/`--uninstall`), replacing `install.sh`'s old `jq` filter; `orderedmap.go` preserves the file's existing key order across the rewrite and a `.bak` backup is written before any real change |
 
 ## Invariants
@@ -111,7 +117,12 @@ Unchanged from the hand-written per-project hooks this replaces:
   NotebookEdit call reports failure.
 - **An unsupported extension is an instant no-op** — one `filepath.Ext`
   call and one map lookup, nothing else — no `stat`, no `exec.LookPath`,
-  no subprocess.
+  no subprocess, no config read.
+- **A missing external tool binary is remembered for a short TTL**
+  (`binPathCacheTTL`, `internal/formatters/binpath.go`) so a burst of
+  file writes doesn't re-walk `$PATH` for every one; the check reruns
+  after the TTL, so installing the tool mid-session is picked up without
+  restarting.
 - **Every formatter runs unconditionally within scope** — no formatter
   requires its own project config file to exist first. A `.ts` file in a
   project with no `biome.json` still gets formatted with biome's built-in
@@ -123,6 +134,12 @@ Unchanged from the hand-written per-project hooks this replaces:
   `dist/`, `build/`, `coverage/`, `test-results/`, `vendor/`, or `.venv/`
   (anywhere in the path), or outside `$CLAUDE_PROJECT_DIR`, are always
   skipped (`dispatch.InVendoredDir`, `main.within`).
+- **A missing external tool binary is remembered for a short TTL**
+  (`binPathCacheTTL`, `internal/formatters/binpath.go`) so a burst of file
+  writes doesn't re-walk `$PATH` for every one; the check reruns after the
+  TTL, so installing the tool mid-session is picked up without restarting
+  Claude Code. Every external formatter must go through
+  `formatters.lookPath`, never a bare `exec.LookPath`, to get this.
 
 ## Conventions
 
