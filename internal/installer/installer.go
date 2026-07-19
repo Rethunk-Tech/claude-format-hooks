@@ -5,6 +5,7 @@ package installer
 
 import (
 	"bytes"
+	"cmp"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -51,14 +52,8 @@ func DefaultOptions() (Options, error) {
 	if err != nil {
 		return Options{}, err
 	}
-	binDir := os.Getenv("CLAUDE_HOOKS_BIN_DIR")
-	if binDir == "" {
-		binDir = filepath.Join(home, ".claude", "hooks")
-	}
-	settingsPath := os.Getenv("CLAUDE_SETTINGS_FILE")
-	if settingsPath == "" {
-		settingsPath = filepath.Join(home, ".claude", "settings.json")
-	}
+	binDir := cmp.Or(os.Getenv("CLAUDE_HOOKS_BIN_DIR"), filepath.Join(home, ".claude", "hooks"))
+	settingsPath := cmp.Or(os.Getenv("CLAUDE_SETTINGS_FILE"), filepath.Join(home, ".claude", "settings.json"))
 	return Options{
 		BinPath:      filepath.Join(binDir, "format-dispatch"),
 		SettingsPath: settingsPath,

@@ -16,6 +16,11 @@ func runExternal(ctx context.Context, dir, name string, args []string) (ok bool,
 	if err == nil {
 		return true, ""
 	}
+	if ctx.Err() != nil {
+		// The process was killed because our timeout fired, not because it
+		// failed on its own — report why, not the generic "signal: killed".
+		return false, context.Cause(ctx).Error()
+	}
 	if len(out) == 0 {
 		return false, err.Error()
 	}

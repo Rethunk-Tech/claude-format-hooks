@@ -51,6 +51,38 @@ type errReader struct{}
 
 func (errReader) Read([]byte) (int, error) { return 0, errors.New("boom") }
 
+func TestRunInstallWiresAndUninstallsSettings(t *testing.T) {
+	dir := t.TempDir()
+	t.Setenv("CLAUDE_HOOKS_BIN_DIR", filepath.Join(dir, "bin"))
+	settingsPath := filepath.Join(dir, "settings.json")
+	t.Setenv("CLAUDE_SETTINGS_FILE", settingsPath)
+
+	qt.Check(t, qt.Equals(runInstall(nil, false), 0))
+	qt.Check(t, qt.StringContains(readFile(t, settingsPath), "format-dispatch"))
+
+	qt.Check(t, qt.Equals(runInstall(nil, true), 0))
+	qt.Check(t, qt.IsFalse(strings.Contains(readFile(t, settingsPath), filepath.Join(dir, "bin", "format-dispatch"))))
+}
+
+func TestRunInstallDryRunDoesNotWrite(t *testing.T) {
+	dir := t.TempDir()
+	t.Setenv("CLAUDE_HOOKS_BIN_DIR", filepath.Join(dir, "bin"))
+	settingsPath := filepath.Join(dir, "settings.json")
+	t.Setenv("CLAUDE_SETTINGS_FILE", settingsPath)
+
+	qt.Check(t, qt.Equals(runInstall([]string{"--dry-run"}, false), 0))
+	_, err := os.Stat(settingsPath)
+	qt.Check(t, qt.IsTrue(os.IsNotExist(err)), qt.Commentf("--dry-run must not write settings.json"))
+}
+
+func TestRunInstallReportsDefaultOptionsError(t *testing.T) {
+	t.Setenv("HOME", "")
+	t.Setenv("CLAUDE_HOOKS_BIN_DIR", "")
+	t.Setenv("CLAUDE_SETTINGS_FILE", "")
+
+	qt.Check(t, qt.Equals(runInstall(nil, false), 1))
+}
+
 func TestRunReadStdinError(t *testing.T) {
 	qt.Check(t, qt.Equals(run(errReader{}), 1))
 }

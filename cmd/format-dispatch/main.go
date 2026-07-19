@@ -18,6 +18,7 @@ package main
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"io"
 	"os"
@@ -30,6 +31,11 @@ import (
 	"github.com/Rethunk-Tech/claude-format-hooks/internal/hookio"
 	"github.com/Rethunk-Tech/claude-format-hooks/internal/installer"
 )
+
+// errFormatterTimeout is context.Cause(ctx) once the per-file timeout below
+// fires, so a hung formatter's diagnostic says why instead of surfacing the
+// generic context.DeadlineExceeded.
+var errFormatterTimeout = errors.New("formatter timed out after 25s")
 
 func main() {
 	if len(os.Args) > 1 {
@@ -132,7 +138,7 @@ func run(stdin io.Reader) int {
 		return 0
 	}
 
-	ctx, cancel := context.WithTimeout(context.Background(), 25*time.Second)
+	ctx, cancel := context.WithTimeoutCause(context.Background(), 25*time.Second, errFormatterTimeout)
 	defer cancel()
 
 	result := registry.Dispatch(ctx, projectRoot, abs)

@@ -12,6 +12,28 @@ import (
 
 const binPath = "/home/user/.claude/hooks/format-dispatch"
 
+func TestDefaultOptionsUsesEnvOverrides(t *testing.T) {
+	t.Setenv("CLAUDE_HOOKS_BIN_DIR", "/custom/bin")
+	t.Setenv("CLAUDE_SETTINGS_FILE", "/custom/settings.json")
+
+	opts, err := DefaultOptions()
+	qt.Assert(t, qt.IsNil(err))
+	qt.Check(t, qt.Equals(opts.BinPath, "/custom/bin/format-dispatch"))
+	qt.Check(t, qt.Equals(opts.SettingsPath, "/custom/settings.json"))
+}
+
+func TestDefaultOptionsFallsBackUnderHome(t *testing.T) {
+	t.Setenv("CLAUDE_HOOKS_BIN_DIR", "")
+	t.Setenv("CLAUDE_SETTINGS_FILE", "")
+	home := t.TempDir()
+	t.Setenv("HOME", home)
+
+	opts, err := DefaultOptions()
+	qt.Assert(t, qt.IsNil(err))
+	qt.Check(t, qt.Equals(opts.BinPath, filepath.Join(home, ".claude", "hooks", "format-dispatch")))
+	qt.Check(t, qt.Equals(opts.SettingsPath, filepath.Join(home, ".claude", "settings.json")))
+}
+
 func settingsPostToolUse(t *testing.T, raw []byte) []PostToolUseEntry {
 	t.Helper()
 	var top map[string]json.RawMessage

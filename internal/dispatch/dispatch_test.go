@@ -1,7 +1,6 @@
 package dispatch
 
 import (
-	"context"
 	"os"
 	"path/filepath"
 	"testing"
@@ -52,7 +51,7 @@ func TestDispatchRoutesToFormatter(t *testing.T) {
 	qt.Assert(t, qt.IsNil(os.WriteFile(path, []byte(`{"b":1,"a":2}`), 0o644)))
 
 	r := NewRegistry(config.Default())
-	result := r.Dispatch(context.Background(), dir, path)
+	result := r.Dispatch(t.Context(), dir, path)
 	qt.Assert(t, qt.IsNil(result.Err))
 
 	out, err := os.ReadFile(path)

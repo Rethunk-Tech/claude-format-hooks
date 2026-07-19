@@ -7,7 +7,27 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- Test coverage for `installer.DefaultOptions`, `cmd/format-dispatch`'s
+  `runInstall` (including its `installer.DefaultOptions` error path), the
+  `json`/`shell` formatters' `Name()` methods, and the shared
+  `bunxFormatter.Format` success/failure paths — all previously at 0-33%
+  despite being cheap to cover with no real external tool needed. Total
+  coverage: 78.9% -> 85.3%.
+
 ### Changed
+
+- A per-file formatter timeout now uses `context.WithTimeoutCause`
+  instead of `context.WithTimeout`; `runExternal` prefers
+  `context.Cause(ctx)` for its diagnostic when the timeout actually
+  fired, instead of a generic "signal: killed".
+- `installer.DefaultOptions`'s two env-var-with-fallback assignments now
+  use `cmp.Or` (Go 1.21) instead of an `if val == "" { val = fallback }`
+  pair.
+- All tests now use `t.Context()` (Go 1.24) instead of
+  `context.Background()`, so each test's context is canceled at its own
+  cleanup instead of never.
 
 - Modernized manual loops onto the standard `slices`/`maps` packages
   (available since Go 1.21; go.mod is on 1.26.5): `dispatch.NewRegistry`'s

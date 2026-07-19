@@ -1,7 +1,6 @@
 package formatters
 
 import (
-	"context"
 	"os"
 	"path/filepath"
 	"runtime"
@@ -51,15 +50,33 @@ func TestBunxFormattersSkipWhenBunxMissing(t *testing.T) {
 	clearPath(t)
 	abs := filepath.Join(t.TempDir(), "f.txt")
 	for _, f := range []Formatter{NewBiome(), NewMarkdown(), NewTOML(), NewPrettier()} {
-		res := f.Format(context.Background(), t.TempDir(), abs)
+		res := f.Format(t.Context(), t.TempDir(), abs)
 		qt.Check(t, qt.IsTrue(res.Skipped), qt.Commentf("%s should skip when bunx is not on PATH", f.Name()))
 	}
+}
+
+func TestBunxFormatterSuccessAndFailure(t *testing.T) {
+	dir := t.TempDir()
+	abs := filepath.Join(dir, "f.md")
+
+	t.Run("success", func(t *testing.T) {
+		writeFakeTool(t, "bunx", "exit 0")
+		res := NewMarkdown().Format(t.Context(), dir, abs)
+		qt.Check(t, qt.IsNil(res.Err))
+		qt.Check(t, qt.Equals(res.Diagnostic, ""))
+	})
+
+	t.Run("failure with no output falls back to the process error", func(t *testing.T) {
+		writeFakeTool(t, "bunx", "exit 1")
+		res := NewPrettier().Format(t.Context(), dir, abs)
+		qt.Check(t, qt.Not(qt.Equals(res.Diagnostic, "")))
+	})
 }
 
 func TestSQLFluffSkipsWhenMissing(t *testing.T) {
 	clearPath(t)
 	abs := filepath.Join(t.TempDir(), "f.sql")
-	res := NewSQLFluff().Format(context.Background(), t.TempDir(), abs)
+	res := NewSQLFluff().Format(t.Context(), t.TempDir(), abs)
 	qt.Check(t, qt.IsTrue(res.Skipped))
 }
 
@@ -67,7 +84,7 @@ func TestBiomeFormatSuccess(t *testing.T) {
 	writeFakeTool(t, "bunx", "exit 0")
 	dir := t.TempDir()
 	abs := filepath.Join(dir, "f.ts")
-	res := NewBiome().Format(context.Background(), dir, abs)
+	res := NewBiome().Format(t.Context(), dir, abs)
 	qt.Check(t, qt.IsNil(res.Err))
 	qt.Check(t, qt.Equals(res.Diagnostic, ""))
 	qt.Check(t, qt.IsFalse(res.Skipped))
@@ -77,7 +94,7 @@ func TestBiomeFormatFailureTruncatesDiagnostic(t *testing.T) {
 	writeFakeTool(t, "bunx", `i=1; while [ $i -le 20 ]; do echo "line $i"; i=$((i+1)); done; exit 1`)
 	dir := t.TempDir()
 	abs := filepath.Join(dir, "f.ts")
-	res := NewBiome().Format(context.Background(), dir, abs)
+	res := NewBiome().Format(t.Context(), dir, abs)
 	qt.Assert(t, qt.Not(qt.Equals(res.Diagnostic, "")))
 	qt.Check(t, qt.IsTrue(strings.Count(res.Diagnostic, "\n")+1 <= 10),
 		qt.Commentf("diagnostic has more than 10 lines: %q", res.Diagnostic))
@@ -89,14 +106,14 @@ func TestSQLFluffFormatSuccessAndFailure(t *testing.T) {
 
 	t.Run("success", func(t *testing.T) {
 		writeFakeTool(t, "sqlfluff", "exit 0")
-		res := NewSQLFluff().Format(context.Background(), dir, abs)
+		res := NewSQLFluff().Format(t.Context(), dir, abs)
 		qt.Check(t, qt.IsNil(res.Err))
 		qt.Check(t, qt.Equals(res.Diagnostic, ""))
 	})
 
 	t.Run("failure with no output falls back to the process error", func(t *testing.T) {
 		writeFakeTool(t, "sqlfluff", "exit 1")
-		res := NewSQLFluff().Format(context.Background(), dir, abs)
+		res := NewSQLFluff().Format(t.Context(), dir, abs)
 		qt.Check(t, qt.Not(qt.Equals(res.Diagnostic, "")))
 	})
 }

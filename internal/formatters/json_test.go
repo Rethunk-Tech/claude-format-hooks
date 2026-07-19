@@ -1,7 +1,6 @@
 package formatters
 
 import (
-	"context"
 	"os"
 	"path/filepath"
 	"testing"
@@ -10,6 +9,10 @@ import (
 
 	"github.com/Rethunk-Tech/claude-format-hooks/internal/config"
 )
+
+func TestJSONFormatterName(t *testing.T) {
+	qt.Check(t, qt.Equals(NewJSON(config.Default()).Name(), "json"))
+}
 
 func TestJSONFormatterIdempotent(t *testing.T) {
 	cases := []struct {
@@ -29,7 +32,7 @@ func TestJSONFormatterIdempotent(t *testing.T) {
 			qt.Assert(t, qt.IsNil(os.WriteFile(path, []byte(tc.src), 0o600)))
 
 			f := NewJSON(config.Default())
-			ctx := context.Background()
+			ctx := t.Context()
 
 			f.Format(ctx, dir, path)
 			first, err := os.ReadFile(path)
@@ -54,7 +57,7 @@ func TestJSONFormatterPreservesKeyOrder(t *testing.T) {
 	src := "{\n\"zebra\": 1,\n\"apple\": 2\n}\n"
 	qt.Assert(t, qt.IsNil(os.WriteFile(path, []byte(src), 0o600)))
 
-	NewJSON(config.Default()).Format(context.Background(), dir, path)
+	NewJSON(config.Default()).Format(t.Context(), dir, path)
 
 	out, err := os.ReadFile(path)
 	qt.Assert(t, qt.IsNil(err))

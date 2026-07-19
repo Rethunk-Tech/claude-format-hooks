@@ -1,7 +1,6 @@
 package formatters
 
 import (
-	"context"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -11,6 +10,10 @@ import (
 
 	"github.com/Rethunk-Tech/claude-format-hooks/internal/config"
 )
+
+func TestShellFormatterName(t *testing.T) {
+	qt.Check(t, qt.Equals(NewShell(config.Default()).Name(), "shfmt"))
+}
 
 func TestShellFormatterIdempotent(t *testing.T) {
 	cases := []struct {
@@ -30,7 +33,7 @@ func TestShellFormatterIdempotent(t *testing.T) {
 			qt.Assert(t, qt.IsNil(os.WriteFile(path, []byte(tc.src), 0o600)))
 
 			f := NewShell(config.Default())
-			ctx := context.Background()
+			ctx := t.Context()
 
 			f.Format(ctx, dir, path)
 			first, err := os.ReadFile(path)
@@ -54,7 +57,7 @@ func TestShellFormatterUsesTabsWhenConfigured(t *testing.T) {
 	cfg := config.Default()
 	cfg.Shell.UseTabs = true
 
-	NewShell(cfg).Format(context.Background(), dir, path)
+	NewShell(cfg).Format(t.Context(), dir, path)
 
 	out, err := os.ReadFile(path)
 	qt.Assert(t, qt.IsNil(err))
@@ -75,7 +78,7 @@ func TestShellFormatterClampsNonPositiveIndentSize(t *testing.T) {
 			cfg := config.Default()
 			cfg.Shell.IndentSize = size
 
-			result := NewShell(cfg).Format(context.Background(), dir, path)
+			result := NewShell(cfg).Format(t.Context(), dir, path)
 			qt.Assert(t, qt.IsNil(result.Err))
 
 			out, err := os.ReadFile(path)
@@ -91,7 +94,7 @@ func TestShellFormatterSkipsInvalidSyntax(t *testing.T) {
 	src := "#!/bin/sh\nif true; then\necho hi\n" // missing `fi`
 	qt.Assert(t, qt.IsNil(os.WriteFile(path, []byte(src), 0o600)))
 
-	result := NewShell(config.Default()).Format(context.Background(), dir, path)
+	result := NewShell(config.Default()).Format(t.Context(), dir, path)
 	qt.Check(t, qt.IsTrue(result.Skipped))
 	qt.Check(t, qt.IsNil(result.Err))
 }
