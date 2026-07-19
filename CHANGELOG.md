@@ -7,22 +7,63 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.2.0] - 2026-07-19
+
 ### Added
 
+- `format-dispatch --uninstall` (with `--dry-run` support), removing the
+  `PostToolUse` entry pointing at the installed binary — no more hand-
+  editing `settings.json` to uninstall.
+- The installer now backs up `settings.json` to a sibling `.bak` (a
+  single rolling backup) before any real write.
+- Test coverage for the five external-tool formatters (biome,
+  markdownlint-cli2, taplo, prettier, sqlfluff) and `runExternal`,
+  previously all at 0% since CI installs neither `bunx` nor `sqlfluff`.
+  `internal/formatters` coverage: 43.6% -> 85.6%.
+- Test coverage for `cmd/format-dispatch`'s core `run()` dispatch path
+  (extension gate, project-root/vendored-dir checks, dispatch,
+  diagnostics), previously untested beyond its pure helpers.
+  `cmd/format-dispatch` coverage: 20.0% -> 65.7%; total: 54.2% -> 79.4%.
+- Test coverage for `installer.DefaultOptions`, `cmd/format-dispatch`'s
+  `runInstall` (including its `installer.DefaultOptions` error path), the
+  `json`/`shell` formatters' `Name()` methods, and the shared
+  `bunxFormatter.Format` success/failure paths — all previously at 0-33%.
+  Total coverage: 78.9% -> 85.3%.
 - `format-dispatch --version` (via `runtime/debug.ReadBuildInfo`, no
   ldflags needed) and `format-dispatch --help`/`-h`. An unrecognized flag
   now prints usage to stderr and exits 1 instead of silently falling
   through to reading stdin, which would otherwise hang forever in an
-  interactive terminal.
-- Test coverage for `installer.DefaultOptions`, `cmd/format-dispatch`'s
-  `runInstall` (including its `installer.DefaultOptions` error path), the
-  `json`/`shell` formatters' `Name()` methods, and the shared
-  `bunxFormatter.Format` success/failure paths — all previously at 0-33%
-  despite being cheap to cover with no real external tool needed. Total
-  coverage: 78.9% -> 85.3%.
+  interactive terminal. Total coverage: 85.3% -> 84.4% (new CLI surface
+  outpaced its own test coverage slightly).
 
 ### Changed
 
+- `cmd/format-dispatch`'s `run()` now takes stdin as an `io.Reader`
+  parameter instead of a hardcoded `os.Stdin` read, enabling the
+  dispatch-path test coverage above.
+- All tests standardized on `github.com/go-quicktest/qt` (a few packages
+  still used plain `if`/`t.Errorf`/`t.Fatalf` assertions); no behavior
+  change.
+- CI's pinned `golangci-lint` version: v2.9.0 -> v2.12.2, so local runs
+  and CI use the same linter build by default.
+- Modernized manual loops onto the standard `slices`/`maps` packages
+  (available since Go 1.21; go.mod is on 1.26.5): `dispatch.NewRegistry`'s
+  disabled-extension filter now uses `maps.DeleteFunc`;
+  `dispatch.InVendoredDir`, `config.IsDisabled`, `biome.findUpward`, and
+  `installer`'s `hasBin`/`keepEntry` now use `slices.ContainsFunc`; and
+  `installer.Wire`/`Unwire`'s filter-by-append loops (with the
+  `entries[:0:0]` zero-capacity idiom) now use `slices.DeleteFunc`. No
+  behavior change.
+- `installer.DefaultOptions`'s two env-var-with-fallback assignments now
+  use `cmp.Or` (Go 1.21) instead of an `if val == "" { val = fallback }`
+  pair.
+- A per-file formatter timeout now uses `context.WithTimeoutCause`
+  instead of `context.WithTimeout`; `runExternal` prefers
+  `context.Cause(ctx)` for its diagnostic when the timeout actually
+  fired, instead of a generic "signal: killed".
+- All tests now use `t.Context()` (Go 1.24) instead of
+  `context.Background()`, so each test's context is canceled at its own
+  cleanup instead of never.
 - CI: added an explicit least-privilege `permissions: contents: read`
   block, a `concurrency` group to cancel superseded runs, and pinned
   `actions/checkout`, `actions/setup-go`, and `golangci-lint-action` to
@@ -34,176 +75,34 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   existing `standard` + `gosec` set; added the missing doc comments
   `revive`'s exported-symbol check surfaced on 11 previously-undocumented
   exported types/functions.
-- A per-file formatter timeout now uses `context.WithTimeoutCause`
-  instead of `context.WithTimeout`; `runExternal` prefers
-  `context.Cause(ctx)` for its diagnostic when the timeout actually
-  fired, instead of a generic "signal: killed".
-- `installer.DefaultOptions`'s two env-var-with-fallback assignments now
-  use `cmp.Or` (Go 1.21) instead of an `if val == "" { val = fallback }`
-  pair.
-- All tests now use `t.Context()` (Go 1.24) instead of
-  `context.Background()`, so each test's context is canceled at its own
-  cleanup instead of never.
-
-- Modernized manual loops onto the standard `slices`/`maps` packages
-  (available since Go 1.21; go.mod is on 1.26.5): `dispatch.NewRegistry`'s
-  disabled-extension filter now uses `maps.DeleteFunc`;
-  `dispatch.InVendoredDir`, `config.IsDisabled`, `biome.findUpward`, and
-  `installer`'s `hasBin`/`keepEntry` now use `slices.ContainsFunc`; and
-  `installer.Wire`/`Unwire`'s filter-by-append loops (with the
-  `entries[:0:0]` zero-capacity idiom) now use `slices.DeleteFunc`. No
-  behavior change.
 
 ### Fixed
 
-- Shell formatter: a non-positive `shell.indentSize` (via user config or
-  `.editorconfig`) converted straight to `uint`, wrapping around to a huge
-  value instead of erroring — clamp to a 1-space minimum, matching the
-  JSON formatter's existing `max(spec.Size, 1)`. Caught by CI's pinned
-  `golangci-lint` (gosec `G115`) but not by a newer local install, since
-  gosec's integer-overflow check evidently doesn't recognize `max()` as a
-  bound in every version.
-
-### Changed
-
-- CI's pinned `golangci-lint` version: v2.9.0 -> v2.12.2 (latest at the
-  time), so local runs and CI use the same linter build by default.
-
-### Added
-
-- `format-dispatch --uninstall` (with `--dry-run` support), removing the
-  `PostToolUse` entry pointing at the installed binary — no more hand-
-  editing `settings.json` to uninstall.
-- The installer now backs up `settings.json` to a sibling `.bak` (a
-  single rolling backup) before any real write.
-- Test coverage for the five external-tool formatters (biome,
-  markdownlint-cli2, taplo, prettier, sqlfluff) and `runExternal`,
-  previously all at 0% since CI installs neither `bunx` nor `sqlfluff`;
-  and for `cmd/format-dispatch`'s core `run()` dispatch path (extension
-  gate, project-root/vendored-dir checks, dispatch, diagnostics),
-  previously untested beyond its pure helpers.
-
-### Changed
-
-- `internal/installer` no longer round-trips `settings.json` through
+- `internal/installer.Wire` no longer round-trips `settings.json` through
   `map[string]json.RawMessage` + `json.Marshal`, which silently
   alphabetized every top-level key and every `hooks.*` entry on each
   `--install` run. A new order-preserving `orderedMap` keeps every
   untouched key exactly where it was.
-- All tests now use `github.com/go-quicktest/qt` for uniformity; a few
-  packages still used plain `if`/`t.Errorf`/`t.Fatalf` assertions.
+- `--install`/`--uninstall` are now mutually exclusive top-level
+  subcommands, instead of `--uninstall` being a modifier taken after
+  `--install` (`--install --uninstall`), which read like two
+  contradictory flags.
+- Shell formatter: a non-positive `shell.indentSize` (via user config or
+  `.editorconfig`) converted straight to `uint`, wrapping around to a huge
+  value instead of erroring — clamp to a 1-space minimum, matching the
+  JSON formatter's existing `max(spec.Size, 1)`.
 
-### Fixed
+### Removed
 
-- `cmd/format-dispatch`'s `run()` took stdin as a hardcoded `os.Stdin`
-  read, making its core dispatch logic untestable; it now takes an
-  `io.Reader` parameter.
-- Removed `Result.Changed`, a field the external formatters computed via
-  a wasted before/after file read on every invocation but no caller ever
-  read.
-- `--install`/`--uninstall` are mutually exclusive top-level subcommands
-  instead of `--uninstall` being a modifier taken after `--install`.
+- Dead `Result.Changed` field, and the wasted before/after file reads
+  each external formatter (biome, bunx-based, sqlfluff) performed solely
+  to populate it — no caller ever read `.Changed`, only `.Err` and
+  `.Diagnostic`.
 
 ## [0.1.0] - 2026-07-19
 
-### Added
+Initial release.
 
-- Unit tests for `internal/installer`'s `settings.json` mutation logic:
-  fresh install, missing settings file, idempotent re-install, replacing
-  the old narrow biome-only hook, and preserving unrelated `hooks.*`
-  entries — none of which had coverage under the old `jq` implementation.
-- Unit tests for `internal/dispatch`, `internal/config`, `internal/hookio`
-  (0% -> 100% each), `cmd/format-dispatch`'s `within()`/`configPath()`
-  helpers, and a shell-formatter idempotency suite mirroring the existing
-  JSON one. Uses `github.com/go-quicktest/qt` (already present via
-  `mvdan.cc/sh/v3`'s own test dependencies) for the new packages.
-- CI now enforces a 45% total-coverage floor (`go tool cover -func`) so
-  this gap can't silently recur.
-- `gosec` added to `.golangci.yml`'s linter set, given this tool's entire
-  job is subprocess execution and file writes from external input.
-- Initial `format-dispatch` `PostToolUse` hook: native in-process formatters
-  for JSON (`encoding/json.Indent`, key-order preserving) and shell scripts
-  (`mvdan.cc/sh/v3`, matches `shfmt` output exactly), plus external
-  formatters routed through `bunx` (biome, markdownlint-cli2, taplo,
-  prettier) or a system binary (`sqlfluff`) for everything else.
-- Three-layer indent configuration for the native formatters: built-in
-  defaults, `~/.claude/claude-format-hooks.json`, then the target project's
-  `.editorconfig`.
-- `install.sh`: builds the binary and wires it into
-  `~/.claude/settings.json` as a `PostToolUse` hook, replacing any prior
-  narrower biome-only hook; pre-warms `bunx`'s package cache for the four
-  bunx-invoked formatters so the first file write of a session doesn't pay
-  a cold npm-registry fetch against the hook's timeout.
-- GitHub Actions CI (`go build`, `go vet`, `gofmt`, `golangci-lint`,
-  `go test -race -cover`, `govulncheck`) on every push and pull request to
-  `main`, backed by a minimal `.golangci.yml`.
-- Repo-hygiene doc set: `CHANGELOG.md`, `SECURITY.md`, `CODE_OF_CONDUCT.md`.
-- Split the README into tiered docs: `HUMANS.md` (install, configuration,
-  supported extensions, troubleshooting, uninstall), `AGENTS.md`
-  (architecture, design rationale, package layout, invariants), and
-  `CONTRIBUTING.md` (prerequisites, build/test/lint, PR workflow); added a
-  `CLAUDE.md` symlink to `AGENTS.md`. README trimmed to a pitch,
-  highlights, and a documentation table, and conformed to the standard
-  7-part README structure (centered title, badges, quick start section).
-- GitHub meta: `.github/CODEOWNERS`, `.github/dependabot.yml` (weekly
-  `gomod` + `github-actions` updates), issue templates (bug report,
-  feature request), and a pull request template.
-
-### Changed
-
-- `install.sh`'s `settings.json` wiring (the `jq` filter that removed a
-  stale/old-biome-only `PostToolUse` entry and appended the new one) moved
-  into a native `format-dispatch --install [--dry-run]` Go subcommand
-  using `encoding/json`, matching the "native Go over external tools" bar
-  the rest of this project holds itself to. `install.sh` is now a thin
-  wrapper: it still builds the binary and pre-warms `bunx`'s cache (no Go
-  equivalent for that step), then delegates to `--install`. `jq` is no
-  longer a prerequisite.
-- README: dropped the meta/narrative "generalizes a hand-written
-  per-project hook" framing in favor of describing what the tool does.
-- De-duplicated the build/vet/lint/test command block that had drifted
-  out of sync between AGENTS.md and CONTRIBUTING.md (CONTRIBUTING.md's
-  copy didn't mention the new coverage floor); AGENTS.md § Commands is
-  now the single canonical copy, CONTRIBUTING.md points to it.
-- Added GitHub repo topics (`claude-code`, `hooks`, `formatter`, `linter`,
-  `golang`, `developer-tools`, `cli`, `biome`, `prettier`) — previously
-  unset.
-
-### Fixed
-
-- `cmd/format-dispatch/main.go`'s `within()` boundary check now resolves
-  symlinks (`filepath.EvalSymlinks`) on both the target path and
-  `$CLAUDE_PROJECT_DIR` before comparing, so a symlink inside the project
-  that points outside it can no longer slip past the boundary check as a
-  pure string-prefix match.
-- `biome` formatter and `install.sh`'s bunx prewarm invoked the npm package
-  literally named `biome` — an unrelated, abandoned (2016, v0.3.3)
-  environment-variable manager — instead of `@biomejs/biome`. Every
-  `.ts`/`.tsx`/`.js`/`.jsx`/`.mjs`/`.cjs`/`.css`/`.jsonc` write was
-  dispatching to the wrong CLI.
-- External formatter invocations (`biome`, `markdownlint-cli2`, `taplo`,
-  `prettier`, `sqlfluff`) now pass `--` before the target file path, so a
-  file name beginning with `-` can't be parsed as a flag by the underlying
-  CLI (argument injection).
-- `truncate()` could split a multi-byte UTF-8 character when cutting a
-  diagnostic to `maxChars`, emitting invalid UTF-8 to stderr for non-ASCII
-  formatter/linter output; it now backs off to the nearest rune boundary.
-- JSON formatter: a source file already ending in `}\n` gained an extra
-  blank line on every reformat (non-idempotent, ever-growing) — trailing
-  whitespace is now trimmed before appending exactly one newline.
-- `biome` formatter now runs from `projectRoot` on its own built-in
-  defaults when no `biome.json`/`biome.jsonc` exists upward, instead of
-  skipping the file entirely — consistent with how the other bunx-invoked
-  formatters (prettier, taplo, markdownlint-cli2) already format any
-  project unconditionally.
-- `dispatch.NewRegistry` duplicated `Config.IsDisabled`'s filtering logic
-  inline instead of calling it; now calls the method (made
-  case-insensitive to match how extensions are compared everywhere else).
-- `runExternal` returned an empty diagnostic when a command failed with no
-  captured output; it now falls back to the process error itself.
-- `govulncheck` pinned to `v1.6.0` in CI instead of floating on `@latest`,
-  so a new govulncheck release can't fail a PR with no corresponding code
-  change.
-
-[Unreleased]: https://github.com/Rethunk-Tech/claude-format-hooks/compare/v0.1.0...HEAD
+[Unreleased]: https://github.com/Rethunk-Tech/claude-format-hooks/compare/v0.2.0...HEAD
+[0.2.0]: https://github.com/Rethunk-Tech/claude-format-hooks/compare/v0.1.0...v0.2.0
 [0.1.0]: https://github.com/Rethunk-Tech/claude-format-hooks/releases/tag/v0.1.0
