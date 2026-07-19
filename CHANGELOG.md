@@ -55,6 +55,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- Added `.gitattributes` (`* text=auto eol=lf`): the new `windows-latest`
+  CI leg failed immediately at `gofmt`, since Windows Git's default
+  `core.autocrlf` checked out every tracked file as CRLF with no
+  `.gitattributes` forcing normalization, and `gofmt` is line-ending-
+  sensitive. Verified locally (clone with `-c core.autocrlf=true`
+  before/after) rather than assumed.
+- Several tests carried POSIX-only assumptions that only broke on the
+  new `windows-latest` CI leg: the `payload()` test helper built its
+  JSON literal by raw string concatenation, corrupting it on any
+  Windows path (backslashes need escaping) — now uses `json.Marshal`;
+  two tests hardcoded POSIX-style path literals instead of building
+  them with `filepath.Join`; and two tests simulated "no home
+  directory" by clearing only `$HOME`, which `os.UserHomeDir()` never
+  reads on Windows (it reads `%USERPROFILE%`) — now clears both.
 - `format-dispatch --install`/`--uninstall` silently ignored any argument
   after the subcommand other than exactly `--dry-run` (e.g. a typo like
   `--dryrun`, or a stray extra argument) instead of erroring — it now

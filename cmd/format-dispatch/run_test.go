@@ -2,6 +2,7 @@ package main
 
 import (
 	"bytes"
+	"encoding/json"
 	"errors"
 	"io"
 	"os"
@@ -115,8 +116,16 @@ func readFile(t *testing.T, path string) string {
 	return string(b)
 }
 
+// payload builds a PostToolUse JSON payload naming filePath. Windows
+// paths contain backslashes, which must be JSON-escaped — json.Marshal
+// on the raw string (rather than naive concatenation) gets this right
+// regardless of platform.
 func payload(filePath string) string {
-	return `{"tool_input":{"file_path":"` + filePath + `"}}`
+	encoded, err := json.Marshal(filePath)
+	if err != nil {
+		panic(err) // Marshal on a string value never errors
+	}
+	return `{"tool_input":{"file_path":` + string(encoded) + `}}`
 }
 
 type errReader struct{}
@@ -176,6 +185,9 @@ func TestRunInstallRejectsUnrecognizedArgs(t *testing.T) {
 
 func TestRunInstallReportsDefaultOptionsError(t *testing.T) {
 	t.Setenv("HOME", "")
+	// os.UserHomeDir() reads USERPROFILE on Windows, not HOME — clearing
+	// only HOME leaves the real runner profile dir in place there.
+	t.Setenv("USERPROFILE", "")
 	t.Setenv("CLAUDE_HOOKS_BIN_DIR", "")
 	t.Setenv("CLAUDE_SETTINGS_FILE", "")
 

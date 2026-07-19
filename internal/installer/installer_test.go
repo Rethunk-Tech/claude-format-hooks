@@ -13,13 +13,17 @@ import (
 const binPath = "/home/user/.claude/hooks/format-dispatch"
 
 func TestDefaultOptionsUsesEnvOverrides(t *testing.T) {
-	t.Setenv("CLAUDE_HOOKS_BIN_DIR", "/custom/bin")
-	t.Setenv("CLAUDE_SETTINGS_FILE", "/custom/settings.json")
+	// Built via filepath.Join, not a hardcoded POSIX literal, since
+	// DefaultOptions itself joins with the OS-native separator.
+	binDir := filepath.Join(t.TempDir(), "custom", "bin")
+	settingsFile := filepath.Join(t.TempDir(), "custom", "settings.json")
+	t.Setenv("CLAUDE_HOOKS_BIN_DIR", binDir)
+	t.Setenv("CLAUDE_SETTINGS_FILE", settingsFile)
 
 	opts, err := DefaultOptions()
 	qt.Assert(t, qt.IsNil(err))
-	qt.Check(t, qt.Equals(opts.BinPath, "/custom/bin/format-dispatch"))
-	qt.Check(t, qt.Equals(opts.SettingsPath, "/custom/settings.json"))
+	qt.Check(t, qt.Equals(opts.BinPath, filepath.Join(binDir, "format-dispatch")))
+	qt.Check(t, qt.Equals(opts.SettingsPath, settingsFile))
 }
 
 func TestDefaultOptionsFallsBackUnderHome(t *testing.T) {
@@ -27,6 +31,8 @@ func TestDefaultOptionsFallsBackUnderHome(t *testing.T) {
 	t.Setenv("CLAUDE_SETTINGS_FILE", "")
 	home := t.TempDir()
 	t.Setenv("HOME", home)
+	// os.UserHomeDir() reads USERPROFILE on Windows, not HOME.
+	t.Setenv("USERPROFILE", home)
 
 	opts, err := DefaultOptions()
 	qt.Assert(t, qt.IsNil(err))
