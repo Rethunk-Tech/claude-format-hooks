@@ -9,6 +9,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- `cmd/format-dispatch/main.go`'s `within()` boundary check now resolves
+  symlinks (`filepath.EvalSymlinks`) on both the target path and
+  `$CLAUDE_PROJECT_DIR` before comparing, so a symlink inside the project
+  that points outside it can no longer slip past the boundary check as a
+  pure string-prefix match.
 - `biome` formatter and `install.sh`'s bunx prewarm invoked the npm package
   literally named `biome` — an unrelated, abandoned (2016, v0.3.3)
   environment-variable manager — instead of `@biomejs/biome`. Every

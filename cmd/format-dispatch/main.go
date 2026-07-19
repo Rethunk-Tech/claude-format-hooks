@@ -126,12 +126,26 @@ func configPath() string {
 	return filepath.Join(home, ".claude", "claude-format-hooks.json")
 }
 
-// within reports whether abs is at or under root.
+// within reports whether abs is at or under root. Both are resolved
+// through any symlinks first, so a symlink inside root pointing outside
+// it (or vice versa) can't slip past a raw string-prefix comparison. If
+// symlink resolution fails for a path (e.g. it doesn't exist yet), the
+// unresolved path is used for that side.
 func within(abs, root string) bool {
-	root = filepath.Clean(root)
-	abs = filepath.Clean(abs)
+	root = resolveSymlinks(filepath.Clean(root))
+	abs = resolveSymlinks(filepath.Clean(abs))
 	if abs == root {
 		return true
 	}
 	return strings.HasPrefix(abs, root+string(filepath.Separator))
+}
+
+// resolveSymlinks returns path with all symlinks resolved, or path
+// unchanged if resolution fails (e.g. the path doesn't exist yet).
+func resolveSymlinks(path string) string {
+	resolved, err := filepath.EvalSymlinks(path)
+	if err != nil {
+		return path
+	}
+	return resolved
 }

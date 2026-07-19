@@ -32,6 +32,33 @@ func TestWithin(t *testing.T) {
 	}
 }
 
+func TestWithinSymlinks(t *testing.T) {
+	root := t.TempDir()
+	outside := t.TempDir()
+
+	t.Run("symlink inside root pointing outside is not within", func(t *testing.T) {
+		target := filepath.Join(outside, "secret.txt")
+		qt.Assert(t, qt.IsNil(os.WriteFile(target, []byte("x"), 0o600)))
+
+		link := filepath.Join(root, "escape.txt")
+		qt.Assert(t, qt.IsNil(os.Symlink(target, link)))
+
+		qt.Check(t, qt.Equals(within(link, root), false))
+	})
+
+	t.Run("symlink whose target is still inside root passes", func(t *testing.T) {
+		realSub := filepath.Join(root, "realsub")
+		qt.Assert(t, qt.IsNil(os.Mkdir(realSub, 0o700)))
+		file := filepath.Join(realSub, "file.txt")
+		qt.Assert(t, qt.IsNil(os.WriteFile(file, []byte("x"), 0o600)))
+
+		link := filepath.Join(root, "linksub")
+		qt.Assert(t, qt.IsNil(os.Symlink(realSub, link)))
+
+		qt.Check(t, qt.Equals(within(filepath.Join(link, "file.txt"), root), true))
+	})
+}
+
 func TestConfigPath(t *testing.T) {
 	t.Run("env override wins", func(t *testing.T) {
 		t.Setenv("CLAUDE_FORMAT_HOOKS_CONFIG", "/custom/path.json")
