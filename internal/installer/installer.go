@@ -80,26 +80,20 @@ func Wire(settingsPath, binPath string) (before, after []byte, err error) {
 		before = []byte("{}")
 	}
 
-	var top map[string]json.RawMessage
-	if err := json.Unmarshal(before, &top); err != nil {
+	top := newOrderedMap()
+	if err := json.Unmarshal(before, top); err != nil {
 		return nil, nil, fmt.Errorf("parse %s: %w", settingsPath, err)
 	}
-	if top == nil {
-		top = map[string]json.RawMessage{}
-	}
 
-	var hooks map[string]json.RawMessage
-	if raw, ok := top["hooks"]; ok {
-		if err := json.Unmarshal(raw, &hooks); err != nil {
+	hooks := newOrderedMap()
+	if raw, ok := top.Get("hooks"); ok {
+		if err := json.Unmarshal(raw, hooks); err != nil {
 			return nil, nil, fmt.Errorf("parse %s: hooks: %w", settingsPath, err)
 		}
 	}
-	if hooks == nil {
-		hooks = map[string]json.RawMessage{}
-	}
 
 	var entries []PostToolUseEntry
-	if raw, ok := hooks["PostToolUse"]; ok {
+	if raw, ok := hooks.Get("PostToolUse"); ok {
 		if err := json.Unmarshal(raw, &entries); err != nil {
 			return nil, nil, fmt.Errorf("parse %s: hooks.PostToolUse: %w", settingsPath, err)
 		}
@@ -126,13 +120,13 @@ func Wire(settingsPath, binPath string) (before, after []byte, err error) {
 	if err != nil {
 		return nil, nil, err
 	}
-	hooks["PostToolUse"] = ptuRaw
+	hooks.Set("PostToolUse", ptuRaw)
 
 	hooksRaw, err := json.Marshal(hooks)
 	if err != nil {
 		return nil, nil, err
 	}
-	top["hooks"] = hooksRaw
+	top.Set("hooks", hooksRaw)
 
 	afterCompact, err := json.MarshalIndent(top, "", "  ")
 	if err != nil {

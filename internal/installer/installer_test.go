@@ -98,6 +98,43 @@ func TestWireReplacesOldBiomeOnlyHook(t *testing.T) {
 	qt.Check(t, qt.Equals(entries[0].Hooks[0].Command, binPath))
 }
 
+func TestWirePreservesTopLevelKeyOrder(t *testing.T) {
+	dir := t.TempDir()
+	settingsPath := filepath.Join(dir, "settings.json")
+	// A deliberately non-alphabetical order, mirroring a real operator's
+	// hand-curated settings.json.
+	existing := `{"env":{},"permissions":{},"model":"opus","hooks":{},"statusLine":{}}`
+	qt.Assert(t, qt.IsNil(os.WriteFile(settingsPath, []byte(existing), 0o600)))
+
+	_, after, err := Wire(settingsPath, binPath)
+	qt.Assert(t, qt.IsNil(err))
+
+	var top map[string]json.RawMessage
+	qt.Assert(t, qt.IsNil(json.Unmarshal(after, &top)))
+	qt.Check(t, qt.HasLen(top, 5))
+
+	got := keysInOrder(t, after)
+	qt.Check(t, qt.DeepEquals(got, []string{"env", "permissions", "model", "hooks", "statusLine"}))
+}
+
+func keysInOrder(t *testing.T, raw []byte) []string {
+	t.Helper()
+	dec := json.NewDecoder(strings.NewReader(string(raw)))
+	tok, err := dec.Token()
+	qt.Assert(t, qt.IsNil(err))
+	qt.Assert(t, qt.IsTrue(tok == json.Delim('{')))
+
+	var keys []string
+	for dec.More() {
+		keyTok, err := dec.Token()
+		qt.Assert(t, qt.IsNil(err))
+		keys = append(keys, keyTok.(string))
+		var skip json.RawMessage
+		qt.Assert(t, qt.IsNil(dec.Decode(&skip)))
+	}
+	return keys
+}
+
 func TestWirePreservesUnrelatedHooks(t *testing.T) {
 	dir := t.TempDir()
 	settingsPath := filepath.Join(dir, "settings.json")
