@@ -1,9 +1,31 @@
-# claude-format-hooks
+<h1 align="center">claude-format-hooks</h1>
+
+<div align="center">
+
+[![Go 1.26+](https://img.shields.io/badge/go-1.26+-blue.svg)](go.mod)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
+[![CI](https://github.com/Rethunk-Tech/claude-format-hooks/actions/workflows/ci.yml/badge.svg)](https://github.com/Rethunk-Tech/claude-format-hooks/actions/workflows/ci.yml)
 
 A [Claude Code](https://claude.com/claude-code) `PostToolUse` hook that
-formats/lints a file right after Write/Edit/NotebookEdit writes it —
-generalized from a hand-written per-project hook into a single global Go
-binary (`format-dispatch`), with no per-repo setup required.
+formats/lints a file right after Write/Edit/NotebookEdit writes it
+
+</div>
+
+---
+
+`claude-format-hooks` generalizes a hand-written per-project hook into a
+single global Go binary (`format-dispatch`), with no per-repo setup
+required. Two formatters (JSON, shell) run natively in-process; everything
+else routes to the real project-config-aware tool (biome, prettier, taplo,
+markdownlint-cli2, sqlfluff).
+
+## Quick start
+
+```bash
+git clone git@github.com:Rethunk-Tech/claude-format-hooks.git && cd claude-format-hooks && ./install.sh
+```
+
+Full install steps, prerequisites, and configuration: [HUMANS.md](HUMANS.md).
 
 ## Highlights
 
