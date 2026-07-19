@@ -1,0 +1,5 @@
+# Force LF line endings on checkout regardless of the checking-out
+# platform's core.autocrlf, so gofmt (which is line-ending-sensitive)
+# doesn't see a false diff on Windows checkouts of files that are LF in
+# the repository.
+* text=auto eol=lf
