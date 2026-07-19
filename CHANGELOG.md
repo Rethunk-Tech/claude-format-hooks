@@ -51,6 +51,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `bunx`/`sqlfluff`/`ruff`/`black`/`rustfmt` re-walked `$PATH` on every
   single file write. The check reruns after the TTL, so installing the
   missing tool mid-session is picked up without restarting.
+- `internal/formatters/writefile.go`: a shared `writeFormatted` helper
+  (stat the existing file for its mode, fall back to a default, write)
+  replacing three near-identical copies of the same block in `json.go`,
+  `golang.go`, and `shell.go` — and, since none of the three had a test
+  actually asserting the mode-preservation behavior they all claimed,
+  added one (`TestShellFormatterPreservesExecutableBit`) that would have
+  caught a regression here.
 - `.github/workflows/release.yml`: a `v*` tag push now cross-compiles
   `format-dispatch` for linux/darwin (amd64+arm64) from a single
   `ubuntu-latest` runner (pure Go, no cgo) and publishes a GitHub Release
@@ -76,6 +83,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- `internal/installer`'s writes to `settings.json` (and its `.bak`
+  backup) went through a plain `os.WriteFile`, which isn't atomic — a
+  process killed or crashing mid-write could leave the operator's entire
+  Claude Code hook configuration (every hook, not just this one)
+  truncated. Both writes now go through a new `writeAtomic` (temp file in
+  the same directory, then `os.Rename`), which on both POSIX and Windows
+  either fully replaces the target or doesn't touch it at all.
 - Added `.gitattributes` (`* text=auto eol=lf`): the new `windows-latest`
   CI leg failed immediately at `gofmt`, since Windows Git's default
   `core.autocrlf` checked out every tracked file as CRLF with no
