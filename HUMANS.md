@@ -45,6 +45,12 @@ session, against the hook's 25s per-file timeout. This is best-effort: a
 failed pre-warm never fails the install, since the same fetch just retries
 on first use.
 
+Every real write to `settings.json` (install or uninstall) first backs up
+its current content to a sibling `settings.json.bak` — a single rolling
+backup of the last-known-good state, overwritten on each subsequent write,
+not a history. Re-running with no actual change to make (e.g. installing
+when already installed) skips the write, and the backup, entirely.
+
 If Claude Code is already running, open `/hooks` once (or restart) to pick
 up the change — the settings watcher only watches directories that had a
 settings file when the session started.
