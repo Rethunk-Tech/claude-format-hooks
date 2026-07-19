@@ -43,9 +43,13 @@ func (f jsonFormatter) Format(_ context.Context, _, abs string) Result {
 		// Not our job to fix malformed JSON — skip silently.
 		return Result{Skipped: true}
 	}
-	buf.WriteByte('\n')
 
-	out := buf.Bytes()
+	// json.Indent passes through any insignificant whitespace already
+	// trailing the top-level value in src verbatim (it does not strip
+	// it). Trim before appending exactly one newline, or a file that
+	// already ends in "}\n" would gain an extra blank line every single
+	// time it's formatted — a non-idempotent, ever-growing bug.
+	out := append(bytes.TrimRight(buf.Bytes(), "\n\t \r"), '\n')
 	if bytes.Equal(out, src) {
 		return Result{}
 	}
