@@ -56,9 +56,9 @@ Env overrides (mainly for testing): `CLAUDE_HOOKS_BIN_DIR` (default
 ### Uninstall
 
 ```bash
-~/.claude/hooks/format-dispatch --install --uninstall              # remove the PostToolUse entry
-~/.claude/hooks/format-dispatch --install --uninstall --dry-run    # preview the diff, write nothing
-rm ~/.claude/hooks/format-dispatch                                  # then delete the binary
+~/.claude/hooks/format-dispatch --uninstall              # remove the PostToolUse entry
+~/.claude/hooks/format-dispatch --uninstall --dry-run    # preview the diff, write nothing
+rm ~/.claude/hooks/format-dispatch                        # then delete the binary
 ```
 
 `--uninstall` removes only the `PostToolUse` entry whose `command` points

@@ -235,6 +235,9 @@ func Uninstall(opts Options, dryRun bool, out io.Writer) error {
 
 // applyChange previews or writes a settings.json mutation. verb is the
 // past-tense description printed on a real write, e.g. "Wired ... into".
+// Before a real write, the settings file's current on-disk content (if any)
+// is copied to a sibling ".bak" file, overwriting any previous backup —
+// one rolling backup of the last-known-good state, not a write history.
 func applyChange(opts Options, before, after []byte, dryRun bool, out io.Writer, verb string) error {
 	if dryRun {
 		_, _ = fmt.Fprintln(out, "==> --dry-run: settings.json diff (not written):")
@@ -252,12 +255,27 @@ func applyChange(opts Options, before, after []byte, dryRun bool, out io.Writer,
 		return nil
 	}
 
+	backupPath := opts.SettingsPath + ".bak"
+	wroteBackup := false
+	if existing, err := os.ReadFile(opts.SettingsPath); err == nil { //nolint:gosec // caller-controlled settings location
+		if err := os.WriteFile(backupPath, existing, 0o600); err != nil {
+			return fmt.Errorf("backup %s: %w", opts.SettingsPath, err)
+		}
+		wroteBackup = true
+	} else if !os.IsNotExist(err) {
+		return err
+	}
+
 	if err := os.MkdirAll(filepath.Dir(opts.SettingsPath), 0o700); err != nil {
 		return err
 	}
 	if err := os.WriteFile(opts.SettingsPath, after, 0o600); err != nil {
 		return err
 	}
-	_, _ = fmt.Fprintf(out, "==> %s %s\n", verb, opts.SettingsPath)
+	if wroteBackup {
+		_, _ = fmt.Fprintf(out, "==> %s %s (previous version backed up to %s)\n", verb, opts.SettingsPath, backupPath)
+	} else {
+		_, _ = fmt.Fprintf(out, "==> %s %s\n", verb, opts.SettingsPath)
+	}
 	return nil
 }

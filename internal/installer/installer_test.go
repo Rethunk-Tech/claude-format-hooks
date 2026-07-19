@@ -265,6 +265,48 @@ func TestInstallNoOpWhenAlreadyWired(t *testing.T) {
 	qt.Check(t, qt.StringContains(out.String(), "nothing to do"))
 }
 
+func TestInstallBacksUpExistingSettings(t *testing.T) {
+	dir := t.TempDir()
+	settingsPath := filepath.Join(dir, "settings.json")
+	original := []byte(`{"theme":"dark"}`)
+	qt.Assert(t, qt.IsNil(os.WriteFile(settingsPath, original, 0o600)))
+
+	var out strings.Builder
+	qt.Assert(t, qt.IsNil(Install(Options{BinPath: binPath, SettingsPath: settingsPath}, false, &out)))
+
+	backup, err := os.ReadFile(settingsPath + ".bak")
+	qt.Assert(t, qt.IsNil(err))
+	qt.Check(t, qt.DeepEquals(backup, original))
+	qt.Check(t, qt.StringContains(out.String(), ".bak"))
+}
+
+func TestInstallFreshInstallWritesNoBackup(t *testing.T) {
+	dir := t.TempDir()
+	settingsPath := filepath.Join(dir, "settings.json")
+
+	var out strings.Builder
+	qt.Assert(t, qt.IsNil(Install(Options{BinPath: binPath, SettingsPath: settingsPath}, false, &out)))
+
+	_, err := os.Stat(settingsPath + ".bak")
+	qt.Check(t, qt.IsTrue(os.IsNotExist(err)), qt.Commentf("no prior settings.json existed, so nothing should be backed up"))
+}
+
+func TestInstallSecondRunOverwritesRollingBackup(t *testing.T) {
+	dir := t.TempDir()
+	settingsPath := filepath.Join(dir, "settings.json")
+	qt.Assert(t, qt.IsNil(os.WriteFile(settingsPath, []byte(`{"theme":"dark"}`), 0o600)))
+
+	var out strings.Builder
+	qt.Assert(t, qt.IsNil(Install(Options{BinPath: binPath, SettingsPath: settingsPath}, false, &out)))
+	afterFirstInstall := readFile(t, settingsPath)
+
+	qt.Assert(t, qt.IsNil(Uninstall(Options{BinPath: binPath, SettingsPath: settingsPath}, false, &out)))
+
+	backup, err := os.ReadFile(settingsPath + ".bak")
+	qt.Assert(t, qt.IsNil(err))
+	qt.Check(t, qt.DeepEquals(backup, afterFirstInstall), qt.Commentf("the rolling backup should hold the state just before the most recent write, not the very first one"))
+}
+
 func TestInstallDryRunDoesNotWrite(t *testing.T) {
 	dir := t.TempDir()
 	settingsPath := filepath.Join(dir, "settings.json")

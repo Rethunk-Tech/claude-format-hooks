@@ -32,26 +32,23 @@ import (
 )
 
 func main() {
-	if len(os.Args) > 1 && os.Args[1] == "--install" {
-		os.Exit(runInstall(os.Args[2:]))
+	if len(os.Args) > 1 {
+		switch os.Args[1] {
+		case "--install":
+			os.Exit(runInstall(os.Args[2:], false))
+		case "--uninstall":
+			os.Exit(runInstall(os.Args[2:], true))
+		}
 	}
 	os.Exit(run(os.Stdin))
 }
 
-// runInstall wires format-dispatch into (or, with --uninstall, removes it
-// from) the installing user's settings.json, replacing install.sh's
-// jq-based mutation of the same file. `--dry-run` previews the change
-// without writing it; both flags may be given in either order.
-func runInstall(args []string) int {
-	var dryRun, uninstall bool
-	for _, a := range args {
-		switch a {
-		case "--dry-run":
-			dryRun = true
-		case "--uninstall":
-			uninstall = true
-		}
-	}
+// runInstall wires format-dispatch into (--install) or removes it from
+// (--uninstall) the installing user's settings.json, replacing install.sh's
+// jq-based mutation of the same file. `--dry-run` (as the sole remaining
+// argument) previews the change without writing it.
+func runInstall(args []string, uninstall bool) int {
+	dryRun := len(args) > 0 && args[0] == "--dry-run"
 
 	label := "--install"
 	action := installer.Install
