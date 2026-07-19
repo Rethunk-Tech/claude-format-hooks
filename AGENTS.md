@@ -122,7 +122,8 @@ Unchanged from the hand-written per-project hooks this replaces:
   (`binPathCacheTTL`, `internal/formatters/binpath.go`) so a burst of
   file writes doesn't re-walk `$PATH` for every one; the check reruns
   after the TTL, so installing the tool mid-session is picked up without
-  restarting.
+  restarting Claude Code. Every external formatter must go through
+  `formatters.lookPath`, never a bare `exec.LookPath`, to get this.
 - **Every formatter runs unconditionally within scope** — no formatter
   requires its own project config file to exist first. A `.ts` file in a
   project with no `biome.json` still gets formatted with biome's built-in
@@ -134,12 +135,6 @@ Unchanged from the hand-written per-project hooks this replaces:
   `dist/`, `build/`, `coverage/`, `test-results/`, `vendor/`, or `.venv/`
   (anywhere in the path), or outside `$CLAUDE_PROJECT_DIR`, are always
   skipped (`dispatch.InVendoredDir`, `main.within`).
-- **A missing external tool binary is remembered for a short TTL**
-  (`binPathCacheTTL`, `internal/formatters/binpath.go`) so a burst of file
-  writes doesn't re-walk `$PATH` for every one; the check reruns after the
-  TTL, so installing the tool mid-session is picked up without restarting
-  Claude Code. Every external formatter must go through
-  `formatters.lookPath`, never a bare `exec.LookPath`, to get this.
 
 ## Conventions
 
