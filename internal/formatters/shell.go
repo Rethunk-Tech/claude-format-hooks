@@ -34,7 +34,7 @@ func (f shellFormatter) Format(_ context.Context, _, abs string) Result {
 	}
 
 	spec := config.ResolveShellIndent(f.cfg, abs)
-	indentWidth := uint(spec.Size)
+	indentWidth := uint(max(spec.Size, 1))
 	if spec.UseTabs {
 		indentWidth = 0 // syntax.Indent(0) means "use tabs" per its own doc.
 	}

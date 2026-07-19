@@ -7,6 +7,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- Shell formatter: a non-positive `shell.indentSize` (via user config or
+  `.editorconfig`) converted straight to `uint`, wrapping around to a huge
+  value instead of erroring — clamp to a 1-space minimum, matching the
+  JSON formatter's existing `max(spec.Size, 1)`. Caught by CI's pinned
+  `golangci-lint` (gosec `G115`) but not by a newer local install, since
+  gosec's integer-overflow check evidently doesn't recognize `max()` as a
+  bound in every version.
+
+### Changed
+
+- CI's pinned `golangci-lint` version: v2.9.0 -> v2.12.2 (latest at the
+  time), so local runs and CI use the same linter build by default.
+
 ### Added
 
 - `format-dispatch --uninstall` (with `--dry-run` support), removing the

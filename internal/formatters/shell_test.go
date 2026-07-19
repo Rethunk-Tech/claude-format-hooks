@@ -2,6 +2,7 @@ package formatters
 
 import (
 	"context"
+	"fmt"
 	"os"
 	"path/filepath"
 	"testing"
@@ -59,6 +60,29 @@ func TestShellFormatterUsesTabsWhenConfigured(t *testing.T) {
 	qt.Assert(t, qt.IsNil(err))
 	want := "#!/bin/sh\nif true; then\n\techo hi\nfi\n"
 	qt.Check(t, qt.Equals(string(out), want))
+}
+
+func TestShellFormatterClampsNonPositiveIndentSize(t *testing.T) {
+	src := "#!/bin/sh\nif true; then\necho hi\nfi\n"
+	want := "#!/bin/sh\nif true; then\n echo hi\nfi\n"
+
+	for _, size := range []int{0, -1, -4} {
+		t.Run(fmt.Sprintf("indentSize=%d", size), func(t *testing.T) {
+			dir := t.TempDir()
+			path := filepath.Join(dir, "t.sh")
+			qt.Assert(t, qt.IsNil(os.WriteFile(path, []byte(src), 0o600)))
+
+			cfg := config.Default()
+			cfg.Shell.IndentSize = size
+
+			result := NewShell(cfg).Format(context.Background(), dir, path)
+			qt.Assert(t, qt.IsNil(result.Err))
+
+			out, err := os.ReadFile(path)
+			qt.Assert(t, qt.IsNil(err))
+			qt.Check(t, qt.Equals(string(out), want), qt.Commentf("a non-positive indentSize should clamp to 1 space, not wrap to a huge uint"))
+		})
+	}
 }
 
 func TestShellFormatterSkipsInvalidSyntax(t *testing.T) {
