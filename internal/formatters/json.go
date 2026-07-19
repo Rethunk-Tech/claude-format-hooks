@@ -26,7 +26,7 @@ func NewJSON(cfg config.Config) Formatter { return jsonFormatter{cfg: cfg} }
 func (jsonFormatter) Name() string { return "json" }
 
 func (f jsonFormatter) Format(_ context.Context, _, abs string) Result {
-	src, err := os.ReadFile(abs)
+	src, err := os.ReadFile(abs) //nolint:gosec // abs is the file this formatter was invoked to format, by design
 	if err != nil {
 		return Result{Err: fmt.Errorf("read: %w", err)}
 	}

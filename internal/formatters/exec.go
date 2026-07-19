@@ -11,7 +11,7 @@ import (
 // safe diagnostic size, and reports whether the file actually changed by
 // comparing a content hash the caller supplies via changed.
 func runExternal(ctx context.Context, dir, name string, args []string) (ok bool, diagnostic string) {
-	cmd := exec.CommandContext(ctx, name, args...)
+	cmd := exec.CommandContext(ctx, name, args...) //nolint:gosec // running an external formatter by design; args are our own construction, never a shell
 	cmd.Dir = dir
 	out, err := cmd.CombinedOutput()
 	if err == nil {

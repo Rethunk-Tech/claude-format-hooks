@@ -60,7 +60,7 @@ func Default() Config {
 // silent formatting hook into something that blocks every file write.
 func Load(path string) (Config, error) {
 	cfg := Default()
-	raw, err := os.ReadFile(path)
+	raw, err := os.ReadFile(path) //nolint:gosec // path is the caller-controlled config location (env override or fixed default), by design
 	if err != nil {
 		if os.IsNotExist(err) {
 			return cfg, nil

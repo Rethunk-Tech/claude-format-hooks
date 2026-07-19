@@ -22,6 +22,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   diagnostic to `maxChars`, emitting invalid UTF-8 to stderr for non-ASCII
   formatter/linter output; it now backs off to the nearest rune boundary.
 
+### Added (test coverage)
+
+- Unit tests for `internal/dispatch`, `internal/config`, `internal/hookio`
+  (0% -> 100% each), `cmd/format-dispatch`'s `within()`/`configPath()`
+  helpers, and a shell-formatter idempotency suite mirroring the existing
+  JSON one. Uses `github.com/go-quicktest/qt` (already present via
+  `mvdan.cc/sh/v3`'s own test dependencies) for the new packages.
+- CI now enforces a 45% total-coverage floor (`go tool cover -func`) so
+  this gap can't silently recur.
+- `gosec` added to `.golangci.yml`'s linter set, given this tool's entire
+  job is subprocess execution and file writes from external input.
+
 ### Added
 
 - Initial `format-dispatch` `PostToolUse` hook: native in-process formatters

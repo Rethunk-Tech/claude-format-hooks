@@ -24,7 +24,7 @@ func TestJSONFormatterIdempotent(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			dir := t.TempDir()
 			path := filepath.Join(dir, "t.json")
-			if err := os.WriteFile(path, []byte(tc.src), 0o644); err != nil {
+			if err := os.WriteFile(path, []byte(tc.src), 0o600); err != nil {
 				t.Fatal(err)
 			}
 
@@ -60,7 +60,7 @@ func TestJSONFormatterPreservesKeyOrder(t *testing.T) {
 	dir := t.TempDir()
 	path := filepath.Join(dir, "t.json")
 	src := "{\n\"zebra\": 1,\n\"apple\": 2\n}\n"
-	if err := os.WriteFile(path, []byte(src), 0o644); err != nil {
+	if err := os.WriteFile(path, []byte(src), 0o600); err != nil {
 		t.Fatal(err)
 	}
 

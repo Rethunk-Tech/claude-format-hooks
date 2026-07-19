@@ -17,7 +17,7 @@ func TestLoad(t *testing.T) {
 
 	t.Run("valid file overrides only the fields it sets", func(t *testing.T) {
 		path := filepath.Join(t.TempDir(), "cfg.json")
-		qt.Assert(t, qt.IsNil(os.WriteFile(path, []byte(`{"json":{"indentSize":4,"useTabs":true},"disabled":[".sql"]}`), 0o644)))
+		qt.Assert(t, qt.IsNil(os.WriteFile(path, []byte(`{"json":{"indentSize":4,"useTabs":true},"disabled":[".sql"]}`), 0o600)))
 
 		cfg, err := Load(path)
 		qt.Assert(t, qt.IsNil(err))
@@ -29,7 +29,7 @@ func TestLoad(t *testing.T) {
 
 	t.Run("malformed file returns defaults and an error", func(t *testing.T) {
 		path := filepath.Join(t.TempDir(), "cfg.json")
-		qt.Assert(t, qt.IsNil(os.WriteFile(path, []byte(`{not valid json`), 0o644)))
+		qt.Assert(t, qt.IsNil(os.WriteFile(path, []byte(`{not valid json`), 0o600)))
 
 		cfg, err := Load(path)
 		qt.Check(t, qt.IsNotNil(err))
@@ -49,7 +49,7 @@ func TestIsDisabled(t *testing.T) {
 func TestResolveIndentEditorConfigLayering(t *testing.T) {
 	writeEditorConfig := func(t *testing.T, dir, body string) {
 		t.Helper()
-		qt.Assert(t, qt.IsNil(os.WriteFile(filepath.Join(dir, ".editorconfig"), []byte(body), 0o644)))
+		qt.Assert(t, qt.IsNil(os.WriteFile(filepath.Join(dir, ".editorconfig"), []byte(body), 0o600)))
 	}
 
 	t.Run("no covering section falls back to cfg default", func(t *testing.T) {

@@ -18,11 +18,11 @@ func (sqlfluffFormatter) Format(ctx context.Context, projectRoot, abs string) Re
 	if _, err := exec.LookPath("sqlfluff"); err != nil {
 		return Result{Skipped: true}
 	}
-	before, _ := os.ReadFile(abs)
+	before, _ := os.ReadFile(abs) //nolint:gosec // abs is the file this formatter was invoked to format, by design
 	ok, diag := runExternal(ctx, projectRoot, "sqlfluff", []string{"fix", "--force", "--", abs})
 	if !ok {
 		return Result{Diagnostic: diag}
 	}
-	after, _ := os.ReadFile(abs)
+	after, _ := os.ReadFile(abs) //nolint:gosec // abs is the file this formatter was invoked to format, by design
 	return Result{Changed: string(before) != string(after)}
 }

@@ -37,7 +37,15 @@ jobs:
           version: v2.9.0
 
       - name: Test
-        run: go test -race -cover ./...
+        run: |
+          go test -race -coverprofile=coverage.out -covermode=atomic ./...
+          go tool cover -func=coverage.out
+
+      - name: Coverage floor
+        run: |
+          pct="$(go tool cover -func=coverage.out | tail -1 | grep -oE '[0-9]+\.[0-9]+')"
+          echo "Total coverage: ${pct}%"
+          awk -v pct="$pct" 'BEGIN { if (pct + 0 < 45) { print "::error::coverage " pct "% is below the 45% floor"; exit 1 } }'
 
       - name: Build
         run: go build -trimpath -o /dev/null ./cmd/format-dispatch

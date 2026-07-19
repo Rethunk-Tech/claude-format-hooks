@@ -21,7 +21,7 @@ func NewShell(cfg config.Config) Formatter { return shellFormatter{cfg: cfg} }
 func (shellFormatter) Name() string { return "shfmt" }
 
 func (f shellFormatter) Format(_ context.Context, _, abs string) Result {
-	src, err := os.ReadFile(abs)
+	src, err := os.ReadFile(abs) //nolint:gosec // abs is the file this formatter was invoked to format, by design
 	if err != nil {
 		return Result{Err: fmt.Errorf("read: %w", err)}
 	}

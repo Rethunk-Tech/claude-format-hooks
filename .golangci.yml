@@ -5,3 +5,16 @@ run:
   modules-download-mode: readonly
 linters:
   default: standard
+  enable:
+    - gosec
+  exclusions:
+    rules:
+      # Test fixtures read/write their own t.TempDir() files — gosec's
+      # taint-tracking rules (G304 file inclusion, G306 write perms) don't
+      # apply to a test's own throwaway files.
+      - path: _test\.go
+        linters:
+          - gosec
+issues:
+  max-issues-per-linter: 0
+  max-same-issues: 0
