@@ -16,18 +16,21 @@ type bunxFormatter struct {
 	args func(abs string) []string
 }
 
+// NewMarkdown returns the bunxFormatter for .md/.mdx, via markdownlint-cli2.
 func NewMarkdown() Formatter {
 	return bunxFormatter{name: "markdownlint-cli2", args: func(abs string) []string {
 		return []string{"markdownlint-cli2", "--fix", "--", abs}
 	}}
 }
 
+// NewTOML returns the bunxFormatter for .toml, via taplo.
 func NewTOML() Formatter {
 	return bunxFormatter{name: "taplo", args: func(abs string) []string {
 		return []string{"@taplo/cli", "format", "--", abs}
 	}}
 }
 
+// NewPrettier returns the bunxFormatter for .yaml/.yml/.html, via prettier.
 func NewPrettier() Formatter {
 	return bunxFormatter{name: "prettier", args: func(abs string) []string {
 		return []string{"prettier", "--write", "--", abs}

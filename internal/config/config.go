@@ -26,11 +26,14 @@ import (
 	"mvdan.cc/editorconfig"
 )
 
+// JSON holds the user's indent preference for the native JSON formatter.
 type JSON struct {
 	IndentSize int  `json:"indentSize"`
 	UseTabs    bool `json:"useTabs"`
 }
 
+// Shell holds the user's indent and switch-case-indent preference for the
+// native shell formatter.
 type Shell struct {
 	IndentSize       int  `json:"indentSize"`
 	UseTabs          bool `json:"useTabs"`
@@ -47,6 +50,7 @@ type Config struct {
 	Disabled []string `json:"disabled"`
 }
 
+// Default returns the built-in indent defaults (2-space, no tabs).
 func Default() Config {
 	return Config{
 		JSON:  JSON{IndentSize: 2, UseTabs: false},

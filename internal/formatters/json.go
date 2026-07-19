@@ -21,6 +21,7 @@ import (
 // means for a JSON file a human or another tool authored.
 type jsonFormatter struct{ cfg config.Config }
 
+// NewJSON returns the native jsonFormatter for .json.
 func NewJSON(cfg config.Config) Formatter { return jsonFormatter{cfg: cfg} }
 
 func (jsonFormatter) Name() string { return "json" }

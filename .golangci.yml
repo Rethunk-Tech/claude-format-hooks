@@ -6,7 +6,14 @@ run:
 linters:
   default: standard
   enable:
+    - contextcheck
+    - errorlint
+    - gocritic
     - gosec
+    - predeclared
+    - revive
+    - unconvert
+    - wastedassign
   exclusions:
     rules:
       # Test fixtures read/write their own t.TempDir() files — gosec's

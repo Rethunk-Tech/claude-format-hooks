@@ -20,6 +20,7 @@ import (
 // project regardless of whether that project has opted into their config.
 type biomeFormatter struct{}
 
+// NewBiome returns the biomeFormatter for JS/TS/JSX/TSX/CSS/JSONC.
 func NewBiome() Formatter { return biomeFormatter{} }
 
 func (biomeFormatter) Name() string { return "biome" }

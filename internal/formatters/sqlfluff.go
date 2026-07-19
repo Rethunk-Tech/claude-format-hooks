@@ -9,6 +9,7 @@ import (
 // tool, not npm-published — no bunx path, and no Go equivalent exists).
 type sqlfluffFormatter struct{}
 
+// NewSQLFluff returns the sqlfluffFormatter for .sql.
 func NewSQLFluff() Formatter { return sqlfluffFormatter{} }
 
 func (sqlfluffFormatter) Name() string { return "sqlfluff" }

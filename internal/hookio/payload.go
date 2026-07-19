@@ -7,6 +7,7 @@ package hookio
 
 import "encoding/json"
 
+// Payload is the subset of the PostToolUse JSON envelope this package reads.
 type Payload struct {
 	ToolInput struct {
 		FilePath     string `json:"file_path"`
