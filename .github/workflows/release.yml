@@ -1,0 +1,74 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - "v*"
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        include:
+          - goos: linux
+            goarch: amd64
+          - goos: linux
+            goarch: arm64
+          - goos: darwin
+            goarch: amd64
+          - goos: darwin
+            goarch: arm64
+    steps:
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7
+
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7
+        with:
+          go-version-file: go.mod
+
+      # Pure Go, no cgo — every target cross-compiles from one ubuntu
+      # runner instead of needing native macOS/Windows builders.
+      - name: Build
+        env:
+          GOOS: ${{ matrix.goos }}
+          GOARCH: ${{ matrix.goarch }}
+          CGO_ENABLED: "0"
+        run: |
+          out="format-dispatch-${{ matrix.goos }}-${{ matrix.goarch }}"
+          go build -trimpath -o "$out" ./cmd/format-dispatch
+          sha256sum "$out" > "$out.sha256"
+
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: format-dispatch-${{ matrix.goos }}-${{ matrix.goarch }}
+          path: |
+            format-dispatch-${{ matrix.goos }}-${{ matrix.goarch }}
+            format-dispatch-${{ matrix.goos }}-${{ matrix.goarch }}.sha256
+
+  release:
+    needs: build
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7
+
+      - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          path: dist
+          merge-multiple: true
+
+      # gh (preinstalled on GitHub-hosted runners) over a third-party
+      # release action, consistent with this project's own bias toward
+      # invoking the real tool directly rather than trusting another
+      # action to wrap it.
+      - name: Create release
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          gh release create "${{ github.ref_name }}" dist/* \
+            --title "${{ github.ref_name }}" \
+            --generate-notes

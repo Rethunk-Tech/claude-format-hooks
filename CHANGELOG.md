@@ -30,6 +30,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   formatted" (and a slow-feeling hook, usually a cold `bunx` fetch)
   without changing the hook's default silent-on-success behavior. Off
   unless set; a logging failure never affects the hook's exit code.
+- `.github/workflows/release.yml`: a `v*` tag push now cross-compiles
+  `format-dispatch` for linux/darwin (amd64+arm64) from a single
+  `ubuntu-latest` runner (pure Go, no cgo) and publishes a GitHub Release
+  with the binaries and their sha256sums via `gh release create` — an
+  install path with no local Go toolchain required, alongside
+  `install.sh`'s existing build-from-source path.
 
 ### Changed
 
@@ -38,6 +44,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   batch's additions. Extracted `buildRegistry`, `resolveTarget`, and
   `projectDisables` so each guard is independently testable and `run()`
   reads as a sequence of checks. No behavior change.
+- CI now runs build/vet/gofmt/test across a
+  `ubuntu-latest`/`macos-latest`/`windows-latest` matrix instead of
+  `ubuntu-latest` only, catching platform-specific bugs (path
+  separators, symlink/file-mode differences) in code that already had
+  Windows-aware branches with zero Windows test coverage. `golangci-lint`
+  and `govulncheck` were split into their own `ubuntu-latest`-only job,
+  since static analysis and vulnerability data don't vary by OS — running
+  them per matrix leg would have tripled their cost for no signal.
 
 ### Fixed
 

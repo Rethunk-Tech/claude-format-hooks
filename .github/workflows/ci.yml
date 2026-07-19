@@ -14,8 +14,17 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  go:
-    runs-on: ubuntu-latest
+  test:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest, windows-latest]
+    runs-on: ${{ matrix.os }}
+    # golangci-lint and govulncheck are OS-independent static analysis --
+    # they run once, in the lint job below, instead of once per matrix leg.
+    defaults:
+      run:
+        shell: bash
     steps:
       - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7
 
@@ -38,11 +47,6 @@ jobs:
       - name: go vet
         run: go vet ./...
 
-      - name: golangci-lint
-        uses: golangci/golangci-lint-action@ba0d7d2ec06a0ea1cb5fa41b2e4a3ab91d21278a # v9
-        with:
-          version: v2.12.2
-
       - name: Test
         run: |
           go test -race -coverprofile=coverage.out -covermode=atomic ./...
@@ -55,7 +59,21 @@ jobs:
           awk -v pct="$pct" 'BEGIN { if (pct + 0 < 75) { print "::error::coverage " pct "% is below the 75% floor"; exit 1 } }'
 
       - name: Build
-        run: go build -trimpath -o /dev/null ./cmd/format-dispatch
+        run: go build -trimpath -o format-dispatch ./cmd/format-dispatch
+
+  lint:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7
+
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7
+        with:
+          go-version-file: go.mod
+
+      - name: golangci-lint
+        uses: golangci/golangci-lint-action@ba0d7d2ec06a0ea1cb5fa41b2e4a3ab91d21278a # v9
+        with:
+          version: v2.12.2
 
       - name: govulncheck
         run: go run golang.org/x/vuln/cmd/govulncheck@v1.6.0 ./...

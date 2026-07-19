@@ -32,6 +32,16 @@ HUMANS.md and the [layout table](AGENTS.md#layout) in AGENTS.md if the
 package layout changed, and add a `CHANGELOG.md` entry under
 `[Unreleased]`.
 
+## Releasing
+
+Update `CHANGELOG.md` (move `[Unreleased]` into a new dated version
+section, add the compare links at the bottom) and push a matching
+annotated `vX.Y.Z` tag. The tag push triggers
+[`.github/workflows/release.yml`](.github/workflows/release.yml), which
+cross-compiles `format-dispatch` for linux/darwin (amd64+arm64) and
+publishes a GitHub Release with the binaries and their sha256sums — no
+manual build/upload step.
+
 ## Security
 
 Report vulnerabilities via [SECURITY.md](SECURITY.md) (private advisory),

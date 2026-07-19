@@ -18,9 +18,18 @@ go test -race -cover ./...
 Single package: `go test -race -v ./internal/formatters/...`. Single test:
 `go test -race -v -run TestJSONFormatterIdempotent ./internal/formatters`.
 
-CI ([`.github/workflows/ci.yml`](.github/workflows/ci.yml)) runs the same
-checks, plus a 75% total-coverage floor (`go tool cover -func`) and
-`govulncheck`, on every push and pull request to `main`.
+CI ([`.github/workflows/ci.yml`](.github/workflows/ci.yml)) runs build/vet/
+gofmt/test plus a 75% total-coverage floor (`go tool cover -func`) across a
+`ubuntu-latest`/`macos-latest`/`windows-latest` matrix; `golangci-lint` and
+`govulncheck` run once, on `ubuntu-latest` only, since static analysis and
+vulnerability data don't vary by OS. Runs on every push and pull request to
+`main`.
+
+A tag push matching `v*` triggers
+[`.github/workflows/release.yml`](.github/workflows/release.yml): cross-
+compiles `format-dispatch` for linux/darwin (amd64+arm64) from a single
+`ubuntu-latest` runner (pure Go, no cgo) and publishes a GitHub Release
+with the binaries and their sha256sums via `gh release create`.
 
 This is the canonical command reference — [CONTRIBUTING.md](CONTRIBUTING.md)
 points here instead of repeating it.

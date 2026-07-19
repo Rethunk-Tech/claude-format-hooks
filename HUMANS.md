@@ -45,6 +45,13 @@ session, against the hook's 25s per-file timeout. This is best-effort: a
 failed pre-warm never fails the install, since the same fetch just retries
 on first use.
 
+**No Go toolchain?** Download the `linux`/`darwin` (amd64 or arm64)
+binary from the [latest release](https://github.com/Rethunk-Tech/claude-format-hooks/releases/latest)
+instead of building from source, place it at
+`~/.claude/hooks/format-dispatch`, `chmod +x` it, then run
+`~/.claude/hooks/format-dispatch --install` yourself — `install.sh`'s
+extra steps (the build, and `bunx` cache pre-warming) are just skipped.
+
 Every real write to `settings.json` (install or uninstall) first backs up
 its current content to a sibling `settings.json.bak` — a single rolling
 backup of the last-known-good state, overwritten on each subsequent write,
