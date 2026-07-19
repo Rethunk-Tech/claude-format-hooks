@@ -170,6 +170,14 @@ formatters are silently skipped without it. A first-ever `bunx` fetch on a
 machine can also be slow enough to hit the hook's 25s timeout — re-running
 `install.sh` pre-warms the cache for this.
 
+**Still can't tell what happened.** Set `CLAUDE_FORMAT_HOOKS_LOG` to a
+file path before starting Claude Code, and every invocation appends one
+line there (timestamp, file path, formatter, outcome — e.g. `skip:
+vendored directory`, `skip: disabled by project config`, `fixer failed`,
+`ok`) without changing the hook's normal silent output. Unset it when
+done — the file isn't rotated or truncated, so it grows unbounded; this
+is meant for a short debugging session, not to be left on permanently.
+
 ## See also
 
 - [AGENTS.md](AGENTS.md) — architecture and developer reference

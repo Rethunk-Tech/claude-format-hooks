@@ -159,14 +159,20 @@ func runInstall(args []string, uninstall bool) int {
 // Code, but exiting non-zero there is at least diagnosable rather than
 // silently swallowed).
 func run(stdin io.Reader) int {
+	var logPath, logFormatter, logOutcome string
+	defer func() { logInvocation(logPath, logFormatter, logOutcome) }()
+
 	raw, err := io.ReadAll(stdin)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "format-dispatch: read stdin: %v\n", err)
+		logOutcome = "error: read stdin failed"
 		return 1
 	}
 
-	path := hookio.Parse(raw).FilePath()
+	logPath = hookio.Parse(raw).FilePath()
+	path := logPath
 	if path == "" {
+		logOutcome = "skip: empty payload"
 		return 0
 	}
 
@@ -183,8 +189,10 @@ func run(stdin io.Reader) int {
 	// no filesystem access at all beyond the two cheap calls below.
 	ext := filepath.Ext(path)
 	if !registry.Supported(ext) {
+		logOutcome = "skip: unsupported extension"
 		return 0
 	}
+	logFormatter = registry.Name(ext)
 
 	abs := path
 	if !filepath.IsAbs(abs) {
@@ -194,6 +202,7 @@ func run(stdin io.Reader) int {
 	}
 
 	if info, err := os.Stat(abs); err != nil || info.IsDir() {
+		logOutcome = "skip: stat failed or is a directory"
 		return 0
 	}
 
@@ -207,13 +216,16 @@ func run(stdin io.Reader) int {
 	}
 
 	if !within(abs, projectRoot) {
+		logOutcome = "skip: outside project root"
 		return 0
 	}
 	rel, err := filepath.Rel(projectRoot, abs)
 	if err != nil {
+		logOutcome = "skip: relative path error"
 		return 0
 	}
 	if dispatch.InVendoredDir(rel) {
+		logOutcome = "skip: vendored directory"
 		return 0
 	}
 
@@ -226,6 +238,7 @@ func run(stdin io.Reader) int {
 	if projectCfg, err := config.Load(filepath.Join(projectRoot, projectConfigFile)); err != nil {
 		fmt.Fprintf(os.Stderr, "format-dispatch: project config: %v (ignoring)\n", err)
 	} else if projectCfg.IsDisabled(ext) {
+		logOutcome = "skip: disabled by project config"
 		return 0
 	}
 
@@ -236,13 +249,40 @@ func run(stdin io.Reader) int {
 
 	if result.Err != nil {
 		fmt.Fprintf(os.Stderr, "%s: %v\n", registry.Name(ext), result.Err)
+		logOutcome = fmt.Sprintf("error: %v", result.Err)
 		return 0
 	}
 	if result.Diagnostic != "" {
 		fmt.Fprintf(os.Stderr, "%s: fixer failed\n%s\n", registry.Name(ext), result.Diagnostic)
+		logOutcome = "fixer failed"
 		return 0
 	}
+	if result.Skipped {
+		logOutcome = "skip: formatter declined"
+	} else {
+		logOutcome = "ok"
+	}
 	return 0
+}
+
+// logInvocation appends one line to $CLAUDE_FORMAT_HOOKS_LOG, if set — an
+// opt-in troubleshooting aid for "why didn't my file get formatted",
+// silent (a no-op) otherwise, matching the hook's own silent-on-success
+// contract. A failure to open or write the log is swallowed: logging must
+// never be the reason a hook invocation fails. The file grows unbounded —
+// meant for a short debugging session, not left on permanently.
+func logInvocation(path, formatterName, outcome string) {
+	logPath := os.Getenv("CLAUDE_FORMAT_HOOKS_LOG")
+	if logPath == "" {
+		return
+	}
+	f, err := os.OpenFile(logPath, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0o600) //nolint:gosec // logPath is an explicit opt-in env var, by design
+	if err != nil {
+		return
+	}
+	defer func() { _ = f.Close() }()
+	_, _ = fmt.Fprintf(f, "%s path=%q formatter=%q outcome=%q\n",
+		time.Now().UTC().Format(time.RFC3339), path, formatterName, outcome)
 }
 
 // configPath returns the installing user's config file location:

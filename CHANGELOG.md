@@ -24,6 +24,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   every operator changing their global config. A malformed project
   config is ignored (diagnostic to stderr) rather than blocking, same as
   a malformed user config.
+- Opt-in troubleshooting log: when `$CLAUDE_FORMAT_HOOKS_LOG` names a
+  file, one line (timestamp, path, formatter, outcome) is appended per
+  invocation — for diagnosing "why didn't my file get formatted" without
+  changing the hook's default silent-on-success behavior. Off unless
+  set; a logging failure never affects the hook's exit code.
 
 ### Fixed
 

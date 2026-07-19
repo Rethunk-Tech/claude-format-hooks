@@ -255,6 +255,51 @@ func TestRunProjectConfigMalformedFallsBackAndWarns(t *testing.T) {
 		qt.Commentf("a malformed project config must not block formatting"))
 }
 
+func TestLogInvocationNoopWhenEnvUnset(t *testing.T) {
+	t.Setenv("CLAUDE_FORMAT_HOOKS_LOG", "")
+	logPath := filepath.Join(t.TempDir(), "format-dispatch.log")
+
+	logInvocation("/some/file.json", "json", "ok")
+
+	_, err := os.Stat(logPath)
+	qt.Check(t, qt.IsTrue(os.IsNotExist(err)), qt.Commentf("logInvocation must not write anywhere when unset"))
+}
+
+func TestLogInvocationSwallowsWriteFailure(t *testing.T) {
+	// A directory can't be opened for writing as a regular file — this
+	// must not panic or otherwise surface.
+	t.Setenv("CLAUDE_FORMAT_HOOKS_LOG", t.TempDir())
+	logInvocation("/some/file.json", "json", "ok")
+}
+
+func TestRunLogsInvocationWhenEnvSet(t *testing.T) {
+	projectRoot := t.TempDir()
+	abs := filepath.Join(projectRoot, "f.json")
+	writeFile(t, abs, `{"b":1,"a":2}`)
+	logPath := filepath.Join(t.TempDir(), "format-dispatch.log")
+
+	t.Setenv("CLAUDE_PROJECT_DIR", projectRoot)
+	t.Setenv("CLAUDE_FORMAT_HOOKS_LOG", logPath)
+	qt.Check(t, qt.Equals(run(strings.NewReader(payload(abs))), 0))
+
+	log := readFile(t, logPath)
+	qt.Check(t, qt.StringContains(log, abs))
+	qt.Check(t, qt.StringContains(log, `formatter="json"`))
+	qt.Check(t, qt.StringContains(log, `outcome="ok"`))
+}
+
+func TestRunLogsSkipReason(t *testing.T) {
+	abs := filepath.Join(t.TempDir(), "f.xyz")
+	writeFile(t, abs, "irrelevant")
+	logPath := filepath.Join(t.TempDir(), "format-dispatch.log")
+
+	t.Setenv("CLAUDE_FORMAT_HOOKS_LOG", logPath)
+	qt.Check(t, qt.Equals(run(strings.NewReader(payload(abs))), 0))
+
+	log := readFile(t, logPath)
+	qt.Check(t, qt.StringContains(log, `outcome="skip: unsupported extension"`))
+}
+
 func TestRunPrintsDiagnosticOnFormatterFailure(t *testing.T) {
 	if runtime.GOOS == "windows" {
 		t.Skip("fake shell-script tool is POSIX-shell only")
