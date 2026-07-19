@@ -228,6 +228,33 @@ func TestRunDispatchesToJSONFormatter(t *testing.T) {
 	qt.Check(t, qt.Equals(readFile(t, abs), "{\n  \"b\": 1,\n  \"a\": 2\n}\n"))
 }
 
+func TestRunProjectConfigDisablesFormatter(t *testing.T) {
+	projectRoot := t.TempDir()
+	abs := filepath.Join(projectRoot, "f.json")
+	src := `{"b":1,"a":2}`
+	writeFile(t, abs, src)
+	writeFile(t, filepath.Join(projectRoot, projectConfigFile), `{"disabled": [".json"]}`)
+
+	t.Setenv("CLAUDE_PROJECT_DIR", projectRoot)
+	qt.Check(t, qt.Equals(run(strings.NewReader(payload(abs))), 0))
+	qt.Check(t, qt.Equals(readFile(t, abs), src), qt.Commentf("project-disabled extension must not be formatted"))
+}
+
+func TestRunProjectConfigMalformedFallsBackAndWarns(t *testing.T) {
+	projectRoot := t.TempDir()
+	abs := filepath.Join(projectRoot, "f.json")
+	writeFile(t, abs, `{"b":1,"a":2}`)
+	writeFile(t, filepath.Join(projectRoot, projectConfigFile), `not valid json`)
+
+	t.Setenv("CLAUDE_PROJECT_DIR", projectRoot)
+	var code int
+	stderr := captureStderr(t, func() { code = run(strings.NewReader(payload(abs))) })
+	qt.Check(t, qt.Equals(code, 0))
+	qt.Check(t, qt.StringContains(stderr, "project config"))
+	qt.Check(t, qt.Equals(readFile(t, abs), "{\n  \"b\": 1,\n  \"a\": 2\n}\n"),
+		qt.Commentf("a malformed project config must not block formatting"))
+}
+
 func TestRunPrintsDiagnosticOnFormatterFailure(t *testing.T) {
 	if runtime.GOOS == "windows" {
 		t.Skip("fake shell-script tool is POSIX-shell only")

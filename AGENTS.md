@@ -81,7 +81,7 @@ tool. Only the two native formatters needed their own config story (see
 
 | Path | Role |
 | --- | --- |
-| [`cmd/format-dispatch/`](cmd/format-dispatch/) | Entrypoint: stdin parsing, extension gate, vendored-dir/project-root checks, timeout, exit-0 contract; also dispatches `--install`/`--uninstall` to `internal/installer` |
+| [`cmd/format-dispatch/`](cmd/format-dispatch/) | Entrypoint: stdin parsing, extension gate, vendored-dir/project-root checks, project-level formatter opt-out, timeout, exit-0 contract; also dispatches `--install`/`--uninstall` to `internal/installer` |
 | [`internal/hookio/`](internal/hookio/) | Decodes the `PostToolUse` JSON payload into a file path |
 | [`internal/config/`](internal/config/) | Resolves per-file indent settings: built-in defaults -> user config -> `.editorconfig` |
 | [`internal/dispatch/`](internal/dispatch/) | Extension -> `Formatter` registry, vendored-dir list, disabled-extension filtering |

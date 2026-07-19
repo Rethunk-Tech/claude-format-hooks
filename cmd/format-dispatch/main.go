@@ -38,6 +38,12 @@ import (
 // generic context.DeadlineExceeded.
 var errFormatterTimeout = errors.New("formatter timed out after 25s")
 
+// projectConfigFile is a project-root dotfile (same schema as the user's
+// own ~/.claude/claude-format-hooks.json) letting a project opt a specific
+// formatter out for itself, layered the same way .editorconfig already is
+// for indent settings.
+const projectConfigFile = ".claude-format-hooks.json"
+
 const usage = `format-dispatch is a Claude Code PostToolUse hook. Invoked with no
 arguments, it reads a hook payload from stdin and formats the file it names.
 
@@ -208,6 +214,18 @@ func run(stdin io.Reader) int {
 		return 0
 	}
 	if dispatch.InVendoredDir(rel) {
+		return 0
+	}
+
+	// A project can opt a specific formatter out for itself (e.g. it
+	// already runs its own pre-commit prettier with different rules)
+	// without every operator changing their global config. Same schema,
+	// same Load/IsDisabled as the user-level config; a malformed project
+	// file is ignored (diagnostic to stderr) rather than blocking, for the
+	// same reason a malformed user config falls back above.
+	if projectCfg, err := config.Load(filepath.Join(projectRoot, projectConfigFile)); err != nil {
+		fmt.Fprintf(os.Stderr, "format-dispatch: project config: %v (ignoring)\n", err)
+	} else if projectCfg.IsDisabled(ext) {
 		return 0
 	}
 

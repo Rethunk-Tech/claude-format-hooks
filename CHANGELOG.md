@@ -18,6 +18,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `.mjs`/`.cjs`), `.markdown` (markdownlint-cli2, alongside `.md`), and
   `.scss`/`.less`/`.graphql`/`.gql` (prettier, which supports all four
   natively; biome has no SCSS/Less support).
+- Project-level formatter opt-out: a `.claude-format-hooks.json` at the
+  project root (same schema as the user-level config; only `disabled` is
+  consulted) lets a project skip a specific formatter for itself, without
+  every operator changing their global config. A malformed project
+  config is ignored (diagnostic to stderr) rather than blocking, same as
+  a malformed user config.
 
 ### Fixed
 

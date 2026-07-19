@@ -127,12 +127,31 @@ Three layers, in increasing priority:
    EditorConfig behaves. A missing or malformed config file never blocks
    a file write — the hook falls back to defaults and says why on stderr.
 
+### Project-level formatter opt-out
+
+A project can opt a specific formatter out for itself — e.g. it already
+runs its own pre-commit `prettier` with different rules and doesn't want
+this hook's `biome` double-running — without every operator changing
+their global config. Drop a `.claude-format-hooks.json` at the project
+root (same schema as your own config above; only `disabled` is
+consulted — `json`/`shell` indent settings there are ignored, since
+`.editorconfig` already owns that layer):
+
+```json
+{ "disabled": [".ts", ".tsx"] }
+```
+
+A missing file is normal (no project-level opt-out). A malformed one is
+ignored — a diagnostic goes to stderr, and formatting proceeds as if it
+weren't there, same as a malformed user config.
+
 ## Troubleshooting
 
 **Nothing happened after I wrote a file.** That's the default, silent
 success — check the extension is in the [supported table](#supported-extensions)
-above and not in your `disabled` list. If the file lives under a
-vendored directory, it's skipped on purpose.
+above and not in your `disabled` list or the project's own
+`.claude-format-hooks.json`. If the file lives under a vendored
+directory, it's skipped on purpose.
 
 **A diagnostic showed up on stderr.** The formatter ran and failed (e.g.
 malformed syntax it couldn't safely fix). The message is truncated to 10
