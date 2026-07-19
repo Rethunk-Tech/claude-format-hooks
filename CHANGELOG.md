@@ -7,6 +7,41 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- `format-dispatch --uninstall` (with `--dry-run` support), removing the
+  `PostToolUse` entry pointing at the installed binary — no more hand-
+  editing `settings.json` to uninstall.
+- The installer now backs up `settings.json` to a sibling `.bak` (a
+  single rolling backup) before any real write.
+- Test coverage for the five external-tool formatters (biome,
+  markdownlint-cli2, taplo, prettier, sqlfluff) and `runExternal`,
+  previously all at 0% since CI installs neither `bunx` nor `sqlfluff`;
+  and for `cmd/format-dispatch`'s core `run()` dispatch path (extension
+  gate, project-root/vendored-dir checks, dispatch, diagnostics),
+  previously untested beyond its pure helpers.
+
+### Changed
+
+- `internal/installer` no longer round-trips `settings.json` through
+  `map[string]json.RawMessage` + `json.Marshal`, which silently
+  alphabetized every top-level key and every `hooks.*` entry on each
+  `--install` run. A new order-preserving `orderedMap` keeps every
+  untouched key exactly where it was.
+- All tests now use `github.com/go-quicktest/qt` for uniformity; a few
+  packages still used plain `if`/`t.Errorf`/`t.Fatalf` assertions.
+
+### Fixed
+
+- `cmd/format-dispatch`'s `run()` took stdin as a hardcoded `os.Stdin`
+  read, making its core dispatch logic untestable; it now takes an
+  `io.Reader` parameter.
+- Removed `Result.Changed`, a field the external formatters computed via
+  a wasted before/after file read on every invocation but no caller ever
+  read.
+- `--install`/`--uninstall` are mutually exclusive top-level subcommands
+  instead of `--uninstall` being a modifier taken after `--install`.
+
 ## [0.1.0] - 2026-07-19
 
 ### Added
