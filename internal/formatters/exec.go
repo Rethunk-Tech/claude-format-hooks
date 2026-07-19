@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"os/exec"
+	"unicode/utf8"
 )
 
 // runExternal runs name with args in dir, truncates combined output to a
@@ -28,8 +29,14 @@ func truncate(out []byte, maxLines, maxChars int) string {
 		lines = lines[:maxLines]
 	}
 	joined := bytes.Join(lines, []byte("\n"))
-	if len(joined) > maxChars {
-		joined = joined[:maxChars]
+	if len(joined) <= maxChars {
+		return string(joined)
 	}
-	return string(joined)
+	// Back off to the nearest rune boundary so a multi-byte character
+	// (e.g. in a non-ASCII linter message) isn't split mid-encoding.
+	cut := maxChars
+	for cut > 0 && !utf8.RuneStart(joined[cut]) {
+		cut--
+	}
+	return string(joined[:cut])
 }

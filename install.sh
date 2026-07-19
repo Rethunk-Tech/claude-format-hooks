@@ -43,7 +43,7 @@ echo "==> Built: $BIN_PATH"
 # cache) on every subsequent run regardless.
 if command -v bunx >/dev/null 2>&1; then
   echo "==> Pre-warming bunx cache for biome, prettier, taplo, markdownlint-cli2..."
-  for pkg in biome prettier @taplo/cli markdownlint-cli2; do
+  for pkg in @biomejs/biome prettier @taplo/cli markdownlint-cli2; do
     bunx "$pkg" --version >/dev/null 2>&1 || echo "    (skipped $pkg: fetch failed, will retry on first use)"
   done
 fi

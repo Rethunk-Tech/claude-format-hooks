@@ -19,19 +19,19 @@ type bunxFormatter struct {
 
 func NewMarkdown() Formatter {
 	return bunxFormatter{name: "markdownlint-cli2", args: func(abs string) []string {
-		return []string{"markdownlint-cli2", "--fix", abs}
+		return []string{"markdownlint-cli2", "--fix", "--", abs}
 	}}
 }
 
 func NewTOML() Formatter {
 	return bunxFormatter{name: "taplo", args: func(abs string) []string {
-		return []string{"@taplo/cli", "format", abs}
+		return []string{"@taplo/cli", "format", "--", abs}
 	}}
 }
 
 func NewPrettier() Formatter {
 	return bunxFormatter{name: "prettier", args: func(abs string) []string {
-		return []string{"prettier", "--write", abs}
+		return []string{"prettier", "--write", "--", abs}
 	}}
 }
 

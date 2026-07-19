@@ -19,7 +19,7 @@ func (sqlfluffFormatter) Format(ctx context.Context, projectRoot, abs string) Re
 		return Result{Skipped: true}
 	}
 	before, _ := os.ReadFile(abs)
-	ok, diag := runExternal(ctx, projectRoot, "sqlfluff", []string{"fix", "--force", abs})
+	ok, diag := runExternal(ctx, projectRoot, "sqlfluff", []string{"fix", "--force", "--", abs})
 	if !ok {
 		return Result{Diagnostic: diag}
 	}

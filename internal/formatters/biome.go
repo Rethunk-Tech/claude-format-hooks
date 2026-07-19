@@ -7,7 +7,7 @@ import (
 	"path/filepath"
 )
 
-// biomeFormatter shells out to `bunx biome check --write` for JS/TS/JSX/
+// biomeFormatter shells out to `bunx @biomejs/biome check --write` for JS/TS/JSX/
 // TSX/CSS/JSONC. Biome (Rust) has no Go bindings, so this stays external.
 //
 // It walks up from the file to the nearest biome.json/biome.jsonc and runs
@@ -34,7 +34,7 @@ func (biomeFormatter) Format(ctx context.Context, projectRoot, abs string) Resul
 	}
 
 	before, _ := os.ReadFile(abs)
-	ok, diag := runExternal(ctx, cfgDir, "bunx", []string{"biome", "check", "--write", "--no-errors-on-unmatched", abs})
+	ok, diag := runExternal(ctx, cfgDir, "bunx", []string{"@biomejs/biome", "check", "--write", "--no-errors-on-unmatched", "--", abs})
 	if !ok {
 		return Result{Diagnostic: diag}
 	}

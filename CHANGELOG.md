@@ -7,6 +7,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- `biome` formatter and `install.sh`'s bunx prewarm invoked the npm package
+  literally named `biome` — an unrelated, abandoned (2016, v0.3.3)
+  environment-variable manager — instead of `@biomejs/biome`. Every
+  `.ts`/`.tsx`/`.js`/`.jsx`/`.mjs`/`.cjs`/`.css`/`.jsonc` write was
+  dispatching to the wrong CLI.
+- External formatter invocations (`biome`, `markdownlint-cli2`, `taplo`,
+  `prettier`, `sqlfluff`) now pass `--` before the target file path, so a
+  file name beginning with `-` can't be parsed as a flag by the underlying
+  CLI (argument injection).
+- `truncate()` could split a multi-byte UTF-8 character when cutting a
+  diagnostic to `maxChars`, emitting invalid UTF-8 to stderr for non-ASCII
+  formatter/linter output; it now backs off to the nearest rune boundary.
+
 ### Added
 
 - Initial `format-dispatch` `PostToolUse` hook: native in-process formatters
