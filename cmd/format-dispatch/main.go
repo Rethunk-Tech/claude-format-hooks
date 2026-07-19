@@ -35,7 +35,7 @@ func main() {
 	if len(os.Args) > 1 && os.Args[1] == "--install" {
 		os.Exit(runInstall(os.Args[2:]))
 	}
-	os.Exit(run())
+	os.Exit(run(os.Stdin))
 }
 
 // runInstall wires format-dispatch into the installing user's
@@ -61,8 +61,8 @@ func runInstall(args []string) int {
 // inability to even read stdin (which should never happen under Claude
 // Code, but exiting non-zero there is at least diagnosable rather than
 // silently swallowed).
-func run() int {
-	raw, err := io.ReadAll(os.Stdin)
+func run(stdin io.Reader) int {
+	raw, err := io.ReadAll(stdin)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "format-dispatch: read stdin: %v\n", err)
 		return 1

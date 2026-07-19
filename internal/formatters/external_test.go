@@ -79,7 +79,7 @@ func TestBiomeFormatSuccess(t *testing.T) {
 }
 
 func TestBiomeFormatFailureTruncatesDiagnostic(t *testing.T) {
-	writeFakeTool(t, "bunx", `for i in $(seq 1 20); do echo "line $i"; done; exit 1`)
+	writeFakeTool(t, "bunx", `i=1; while [ $i -le 20 ]; do echo "line $i"; i=$((i+1)); done; exit 1`)
 	dir := t.TempDir()
 	abs := filepath.Join(dir, "f.ts")
 	res := NewBiome().Format(context.Background(), dir, abs)
