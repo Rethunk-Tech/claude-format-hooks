@@ -24,7 +24,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   a cold npm-registry fetch against the hook's timeout.
 - GitHub Actions CI (`go build`, `go vet`, `gofmt`, `golangci-lint`,
   `go test -race -cover`, `govulncheck`) on every push and pull request to
-  `main`.
+  `main`, backed by a minimal `.golangci.yml`.
+- Repo-hygiene doc set: `CHANGELOG.md`, `SECURITY.md`, `CODE_OF_CONDUCT.md`.
+- Split the README into tiered docs: `HUMANS.md` (install, configuration,
+  supported extensions, troubleshooting, uninstall), `AGENTS.md`
+  (architecture, design rationale, package layout, invariants), and
+  `CONTRIBUTING.md` (prerequisites, build/test/lint, PR workflow); added a
+  `CLAUDE.md` symlink to `AGENTS.md`. README trimmed to a pitch,
+  highlights, and a documentation table, and conformed to the standard
+  7-part README structure (centered title, badges, quick start section).
+- GitHub meta: `.github/CODEOWNERS`, `.github/dependabot.yml` (weekly
+  `gomod` + `github-actions` updates), issue templates (bug report,
+  feature request), and a pull request template.
 
 ### Fixed
 
@@ -36,5 +47,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   skipping the file entirely — consistent with how the other bunx-invoked
   formatters (prettier, taplo, markdownlint-cli2) already format any
   project unconditionally.
+- `dispatch.NewRegistry` duplicated `Config.IsDisabled`'s filtering logic
+  inline instead of calling it; now calls the method (made
+  case-insensitive to match how extensions are compared everywhere else).
+- `runExternal` returned an empty diagnostic when a command failed with no
+  captured output; it now falls back to the process error itself.
+- `govulncheck` pinned to `v1.6.0` in CI instead of floating on `@latest`,
+  so a new govulncheck release can't fail a PR with no corresponding code
+  change.
 
 [Unreleased]: https://github.com/Rethunk-Tech/claude-format-hooks/commits/main
