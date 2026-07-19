@@ -29,6 +29,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- `install.sh`'s `settings.json` wiring (the `jq` filter that removed a
+  stale/old-biome-only `PostToolUse` entry and appended the new one) moved
+  into a native `format-dispatch --install [--dry-run]` Go subcommand
+  using `encoding/json`, matching the "native Go over external tools" bar
+  the rest of this project holds itself to. `install.sh` is now a thin
+  wrapper: it still builds the binary and pre-warms `bunx`'s cache (no Go
+  equivalent for that step), then delegates to `--install`. `jq` is no
+  longer a prerequisite.
 - README: dropped the meta/narrative "generalizes a hand-written
   per-project hook" framing in favor of describing what the tool does.
 - De-duplicated the build/vet/lint/test command block that had drifted
@@ -50,6 +58,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   this gap can't silently recur.
 - `gosec` added to `.golangci.yml`'s linter set, given this tool's entire
   job is subprocess execution and file writes from external input.
+- Unit tests for `internal/installer`'s `settings.json` mutation logic:
+  fresh install, missing settings file, idempotent re-install, replacing
+  the old narrow biome-only hook, and preserving unrelated `hooks.*`
+  entries — none of which had coverage under the old `jq` implementation.
 
 ### Added
 

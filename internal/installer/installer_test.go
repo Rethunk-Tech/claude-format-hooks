@@ -1,0 +1,166 @@
+package installer
+
+import (
+	"encoding/json"
+	"os"
+	"path/filepath"
+	"strings"
+	"testing"
+
+	"github.com/go-quicktest/qt"
+)
+
+const binPath = "/home/user/.claude/hooks/format-dispatch"
+
+func settingsPostToolUse(t *testing.T, raw []byte) []PostToolUseEntry {
+	t.Helper()
+	var top map[string]json.RawMessage
+	qt.Assert(t, qt.IsNil(json.Unmarshal(raw, &top)))
+	var hooks map[string]json.RawMessage
+	qt.Assert(t, qt.IsNil(json.Unmarshal(top["hooks"], &hooks)))
+	var entries []PostToolUseEntry
+	qt.Assert(t, qt.IsNil(json.Unmarshal(hooks["PostToolUse"], &entries)))
+	return entries
+}
+
+func TestWireFreshInstall(t *testing.T) {
+	dir := t.TempDir()
+	settingsPath := filepath.Join(dir, "settings.json")
+	qt.Assert(t, qt.IsNil(os.WriteFile(settingsPath, []byte(`{"theme":"dark"}`), 0o600)))
+
+	_, after, err := Wire(settingsPath, binPath)
+	qt.Assert(t, qt.IsNil(err))
+
+	var top map[string]json.RawMessage
+	qt.Assert(t, qt.IsNil(json.Unmarshal(after, &top)))
+	var theme string
+	qt.Assert(t, qt.IsNil(json.Unmarshal(top["theme"], &theme)))
+	qt.Check(t, qt.Equals(theme, "dark"))
+
+	entries := settingsPostToolUse(t, after)
+	qt.Assert(t, qt.HasLen(entries, 1))
+	qt.Check(t, qt.Equals(entries[0].Matcher, "Write|Edit|NotebookEdit"))
+	qt.Assert(t, qt.HasLen(entries[0].Hooks, 1))
+	qt.Check(t, qt.Equals(entries[0].Hooks[0].Command, binPath))
+	qt.Check(t, qt.Equals(entries[0].Hooks[0].Timeout, 30))
+}
+
+func TestWireMissingSettingsFile(t *testing.T) {
+	dir := t.TempDir()
+	settingsPath := filepath.Join(dir, "settings.json")
+
+	_, after, err := Wire(settingsPath, binPath)
+	qt.Assert(t, qt.IsNil(err))
+
+	entries := settingsPostToolUse(t, after)
+	qt.Assert(t, qt.HasLen(entries, 1))
+	qt.Check(t, qt.Equals(entries[0].Hooks[0].Command, binPath))
+}
+
+func TestWireIdempotentReinstall(t *testing.T) {
+	dir := t.TempDir()
+	settingsPath := filepath.Join(dir, "settings.json")
+	qt.Assert(t, qt.IsNil(os.WriteFile(settingsPath, []byte(`{}`), 0o600)))
+
+	_, first, err := Wire(settingsPath, binPath)
+	qt.Assert(t, qt.IsNil(err))
+	qt.Assert(t, qt.IsNil(os.WriteFile(settingsPath, first, 0o600)))
+
+	_, second, err := Wire(settingsPath, binPath)
+	qt.Assert(t, qt.IsNil(err))
+
+	entries := settingsPostToolUse(t, second)
+	qt.Assert(t, qt.HasLen(entries, 1))
+	qt.Check(t, qt.Equals(entries[0].Hooks[0].Command, binPath))
+}
+
+func TestWireReplacesOldBiomeOnlyHook(t *testing.T) {
+	dir := t.TempDir()
+	settingsPath := filepath.Join(dir, "settings.json")
+	old := `{
+		"hooks": {
+			"PostToolUse": [
+				{
+					"matcher": "Write|Edit",
+					"hooks": [{"type": "command", "command": "biome check --write \"$FILE\""}]
+				}
+			]
+		}
+	}`
+	qt.Assert(t, qt.IsNil(os.WriteFile(settingsPath, []byte(old), 0o600)))
+
+	_, after, err := Wire(settingsPath, binPath)
+	qt.Assert(t, qt.IsNil(err))
+
+	entries := settingsPostToolUse(t, after)
+	qt.Assert(t, qt.HasLen(entries, 1))
+	qt.Check(t, qt.Equals(entries[0].Matcher, "Write|Edit|NotebookEdit"))
+	qt.Check(t, qt.Equals(entries[0].Hooks[0].Command, binPath))
+}
+
+func TestWirePreservesUnrelatedHooks(t *testing.T) {
+	dir := t.TempDir()
+	settingsPath := filepath.Join(dir, "settings.json")
+	existing := `{
+		"hooks": {
+			"PreToolUse": [
+				{"matcher": "Bash", "hooks": [{"type": "command", "command": "guard.sh"}]}
+			],
+			"PostToolUse": [
+				{"matcher": "Bash", "hooks": [{"type": "command", "command": "log.sh"}]}
+			]
+		}
+	}`
+	qt.Assert(t, qt.IsNil(os.WriteFile(settingsPath, []byte(existing), 0o600)))
+
+	_, after, err := Wire(settingsPath, binPath)
+	qt.Assert(t, qt.IsNil(err))
+
+	var top map[string]json.RawMessage
+	qt.Assert(t, qt.IsNil(json.Unmarshal(after, &top)))
+	var hooks map[string]json.RawMessage
+	qt.Assert(t, qt.IsNil(json.Unmarshal(top["hooks"], &hooks)))
+	_, hasPreToolUse := hooks["PreToolUse"]
+	qt.Check(t, qt.IsTrue(hasPreToolUse))
+
+	entries := settingsPostToolUse(t, after)
+	qt.Assert(t, qt.HasLen(entries, 2))
+	qt.Check(t, qt.Equals(entries[0].Matcher, "Bash"))
+	qt.Check(t, qt.Equals(entries[0].Hooks[0].Command, "log.sh"))
+	qt.Check(t, qt.Equals(entries[1].Hooks[0].Command, binPath))
+}
+
+func TestInstallDryRunDoesNotWrite(t *testing.T) {
+	dir := t.TempDir()
+	settingsPath := filepath.Join(dir, "settings.json")
+	qt.Assert(t, qt.IsNil(os.WriteFile(settingsPath, []byte(`{}`), 0o600)))
+
+	var out strings.Builder
+	err := Install(Options{BinPath: binPath, SettingsPath: settingsPath}, true, &out)
+	qt.Assert(t, qt.IsNil(err))
+
+	raw, err := os.ReadFile(settingsPath)
+	qt.Assert(t, qt.IsNil(err))
+	qt.Check(t, qt.Equals(string(raw), "{}"))
+	qt.Check(t, qt.StringContains(out.String(), "dry-run"))
+}
+
+func TestInstallWritesSettings(t *testing.T) {
+	dir := t.TempDir()
+	settingsPath := filepath.Join(dir, "settings.json")
+
+	var out strings.Builder
+	err := Install(Options{BinPath: binPath, SettingsPath: settingsPath}, false, &out)
+	qt.Assert(t, qt.IsNil(err))
+
+	entries := settingsPostToolUse(t, readFile(t, settingsPath))
+	qt.Assert(t, qt.HasLen(entries, 1))
+	qt.Check(t, qt.Equals(entries[0].Hooks[0].Command, binPath))
+}
+
+func readFile(t *testing.T, path string) []byte {
+	t.Helper()
+	raw, err := os.ReadFile(path)
+	qt.Assert(t, qt.IsNil(err))
+	return raw
+}

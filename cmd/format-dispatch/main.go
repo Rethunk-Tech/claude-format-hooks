@@ -28,10 +28,33 @@ import (
 	"github.com/Rethunk-Tech/claude-format-hooks/internal/config"
 	"github.com/Rethunk-Tech/claude-format-hooks/internal/dispatch"
 	"github.com/Rethunk-Tech/claude-format-hooks/internal/hookio"
+	"github.com/Rethunk-Tech/claude-format-hooks/internal/installer"
 )
 
 func main() {
+	if len(os.Args) > 1 && os.Args[1] == "--install" {
+		os.Exit(runInstall(os.Args[2:]))
+	}
 	os.Exit(run())
+}
+
+// runInstall wires format-dispatch into the installing user's
+// settings.json, replacing install.sh's jq-based mutation of the same
+// file. `--dry-run` (as the sole remaining argument) previews the change
+// without writing it.
+func runInstall(args []string) int {
+	dryRun := len(args) > 0 && args[0] == "--dry-run"
+
+	opts, err := installer.DefaultOptions()
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "format-dispatch --install: %v\n", err)
+		return 1
+	}
+	if err := installer.Install(opts, dryRun, os.Stdout); err != nil {
+		fmt.Fprintf(os.Stderr, "format-dispatch --install: %v\n", err)
+		return 1
+	}
+	return 0
 }
 
 // run contains all logic and always returns 0, except for a genuine

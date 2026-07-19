@@ -15,8 +15,6 @@ required.
 ### Prerequisites
 
 - [Go](https://go.dev/) (see the `go` version in [go.mod](go.mod))
-- [`jq`](https://jqlang.org/), used by `install.sh` to wire up
-  `settings.json`
 - Optional: [`bun`](https://bun.sh/) (provides `bunx`) for the
   bunx-dispatched formatters — biome, prettier, taplo, markdownlint-cli2.
   Without it, files handled by those formatters are silently skipped;
