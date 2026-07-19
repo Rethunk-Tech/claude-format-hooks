@@ -7,6 +7,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- Native in-process Go formatter (`.go`, via stdlib `go/format.Source`) —
+  the same engine `gofmt` itself is built on, so output matches exactly
+  with no subprocess. Unlike JSON, there's no fidelity trade-off to weigh:
+  Go source has exactly one canonical formatting.
+
 ### Fixed
 
 - `format-dispatch --install`/`--uninstall` silently ignored any argument

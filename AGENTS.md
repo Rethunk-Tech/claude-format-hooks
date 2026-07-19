@@ -37,7 +37,7 @@ cost is process startup, which is repeated every single invocation:
 | Bash + jq | ~5–15ms |
 | Python | ~30–60ms (worse behind a venv/pyenv shim) |
 
-Two formatters are implemented **natively in-process**, skipping the
+Three formatters are implemented **natively in-process**, skipping the
 subprocess entirely:
 
 - **JSON** — `encoding/json.Indent`, chosen deliberately over
@@ -49,6 +49,10 @@ subprocess entirely:
 - **Shell scripts** — [`mvdan.cc/sh/v3`](https://pkg.go.dev/mvdan.cc/sh/v3),
   the actual parser/printer package the `shfmt` binary itself is built on.
   Output matches `shfmt` exactly; there's no subprocess to spawn at all.
+- **Go** — stdlib `go/format.Source`, the same formatting engine `gofmt`
+  itself is built on. Unlike JSON, there's no fidelity trade-off to weigh
+  at all: Go source has exactly one canonical formatting, so this is an
+  even safer native candidate than JSON was.
 
 Everything else stays external, on purpose, after actually testing the
 native alternatives rather than assuming:
@@ -81,7 +85,7 @@ tool. Only the two native formatters needed their own config story (see
 | [`internal/hookio/`](internal/hookio/) | Decodes the `PostToolUse` JSON payload into a file path |
 | [`internal/config/`](internal/config/) | Resolves per-file indent settings: built-in defaults -> user config -> `.editorconfig` |
 | [`internal/dispatch/`](internal/dispatch/) | Extension -> `Formatter` registry, vendored-dir list, disabled-extension filtering |
-| [`internal/formatters/`](internal/formatters/) | One `Formatter` implementation per file type (native: `json.go`, `shell.go`; external: `biome.go`, `bunxtool.go`, `sqlfluff.go`); `exec.go` holds the shared subprocess-run + diagnostic-truncation helper |
+| [`internal/formatters/`](internal/formatters/) | One `Formatter` implementation per file type (native: `json.go`, `shell.go`, `golang.go`; external: `biome.go`, `bunxtool.go`, `sqlfluff.go`); `exec.go` holds the shared subprocess-run + diagnostic-truncation helper |
 | [`internal/installer/`](internal/installer/) | Wires/unwires format-dispatch's `PostToolUse` hook in `~/.claude/settings.json` (`format-dispatch --install`/`--uninstall`), replacing `install.sh`'s old `jq` filter; `orderedmap.go` preserves the file's existing key order across the rewrite and a `.bak` backup is written before any real change |
 
 ## Invariants

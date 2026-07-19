@@ -24,6 +24,7 @@ type Registry struct {
 func NewRegistry(cfg config.Config) *Registry {
 	json := formatters.NewJSON(cfg)
 	shell := formatters.NewShell(cfg)
+	golang := formatters.NewGo()
 	biome := formatters.NewBiome()
 	markdown := formatters.NewMarkdown()
 	toml := formatters.NewTOML()
@@ -35,6 +36,8 @@ func NewRegistry(cfg config.Config) *Registry {
 
 		".sh":   shell,
 		".bash": shell,
+
+		".go": golang,
 
 		".ts":  biome,
 		".tsx": biome,

@@ -14,7 +14,7 @@ func TestSupported(t *testing.T) {
 	r := NewRegistry(config.Default())
 
 	supported := []string{
-		".json", ".sh", ".bash",
+		".json", ".sh", ".bash", ".go",
 		".ts", ".tsx", ".js", ".jsx", ".mjs", ".cjs", ".css", ".jsonc",
 		".md", ".mdx", ".toml", ".yaml", ".yml", ".html", ".sql",
 	}

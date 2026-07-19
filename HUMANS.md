@@ -88,6 +88,7 @@ hanging on stdin — safe to run by hand while debugging.
 | --- | --- | --- |
 | `.json` | `encoding/json.Indent` | yes |
 | `.sh`, `.bash` | `mvdan.cc/sh/v3` | yes |
+| `.go` | `go/format.Source` | yes |
 | `.ts`, `.tsx`, `.js`, `.jsx`, `.mjs`, `.cjs`, `.css`, `.jsonc` | `biome check --write` | no (bunx) |
 | `.md`, `.mdx` | `markdownlint-cli2 --fix` | no (bunx) |
 | `.toml` | `taplo format` | no (bunx) |
