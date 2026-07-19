@@ -55,12 +55,7 @@ func (f jsonFormatter) Format(_ context.Context, _, abs string) Result {
 		return Result{}
 	}
 
-	info, err := os.Stat(abs)
-	mode := os.FileMode(0o644)
-	if err == nil {
-		mode = info.Mode()
-	}
-	if err := os.WriteFile(abs, out, mode); err != nil {
+	if err := writeFormatted(abs, out, 0o644); err != nil {
 		return Result{Err: fmt.Errorf("write: %w", err)}
 	}
 	return Result{}

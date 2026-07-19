@@ -37,12 +37,7 @@ func (goFormatter) Format(_ context.Context, _, abs string) Result {
 		return Result{}
 	}
 
-	info, statErr := os.Stat(abs)
-	mode := os.FileMode(0o644)
-	if statErr == nil {
-		mode = info.Mode()
-	}
-	if err := os.WriteFile(abs, out, mode); err != nil { //nolint:gosec // abs is the file this formatter was invoked to format, by design
+	if err := writeFormatted(abs, out, 0o644); err != nil {
 		return Result{Err: fmt.Errorf("write: %w", err)}
 	}
 	return Result{}
