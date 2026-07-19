@@ -363,6 +363,27 @@ func TestInstallWritesSettings(t *testing.T) {
 	qt.Check(t, qt.Equals(entries[0].Hooks[0].Command, binPath))
 }
 
+func TestWriteAtomicWritesContentAndLeavesNoTempFile(t *testing.T) {
+	dir := t.TempDir()
+	path := filepath.Join(dir, "f.json")
+
+	qt.Assert(t, qt.IsNil(writeAtomic(path, []byte(`{"a":1}`), 0o600)))
+
+	qt.Check(t, qt.DeepEquals(readFile(t, path), []byte(`{"a":1}`)))
+	_, err := os.Stat(path + ".tmp")
+	qt.Check(t, qt.IsTrue(os.IsNotExist(err)), qt.Commentf("a successful write must not leave its temp file behind"))
+}
+
+func TestWriteAtomicOverwritesExistingFile(t *testing.T) {
+	dir := t.TempDir()
+	path := filepath.Join(dir, "f.json")
+	qt.Assert(t, qt.IsNil(os.WriteFile(path, []byte(`{"old":true}`), 0o600)))
+
+	qt.Assert(t, qt.IsNil(writeAtomic(path, []byte(`{"new":true}`), 0o600)))
+
+	qt.Check(t, qt.DeepEquals(readFile(t, path), []byte(`{"new":true}`)))
+}
+
 func readFile(t *testing.T, path string) []byte {
 	t.Helper()
 	raw, err := os.ReadFile(path)
