@@ -157,10 +157,14 @@ func runInstall(args []string, uninstall bool) int {
 // run contains all logic and always returns 0, except for a genuine
 // inability to even read stdin (which should never happen under Claude
 // Code, but exiting non-zero there is at least diagnosable rather than
-// silently swallowed).
+// silently swallowed). It reads as a sequence of guard checks, each
+// setting logOutcome before returning; resolveTarget, projectDisables,
+// and buildRegistry hold the checks' actual logic so each is independently
+// testable and this function stays a readable top-level flow.
 func run(stdin io.Reader) int {
+	start := time.Now()
 	var logPath, logFormatter, logOutcome string
-	defer func() { logInvocation(logPath, logFormatter, logOutcome) }()
+	defer func() { logInvocation(logPath, logFormatter, logOutcome, time.Since(start)) }()
 
 	raw, err := io.ReadAll(stdin)
 	if err != nil {
@@ -176,14 +180,7 @@ func run(stdin io.Reader) int {
 		return 0
 	}
 
-	cfg, cfgErr := config.Load(configPath())
-	if cfgErr != nil {
-		// A broken user config must never turn this into a blocking
-		// hook — fall back to defaults and say why on stderr.
-		fmt.Fprintf(os.Stderr, "format-dispatch: config: %v (using defaults)\n", cfgErr)
-		cfg = config.Default()
-	}
-	registry := dispatch.NewRegistry(cfg)
+	registry := buildRegistry()
 
 	// Instant no-op path for unsupported (or user-disabled) extensions:
 	// no filesystem access at all beyond the two cheap calls below.
@@ -194,50 +191,18 @@ func run(stdin io.Reader) int {
 	}
 	logFormatter = registry.Name(ext)
 
-	abs := path
-	if !filepath.IsAbs(abs) {
-		if a, err := filepath.Abs(abs); err == nil {
-			abs = a
-		}
-	}
-
-	if info, err := os.Stat(abs); err != nil || info.IsDir() {
-		logOutcome = "skip: stat failed or is a directory"
-		return 0
-	}
-
-	projectRoot := os.Getenv("CLAUDE_PROJECT_DIR")
-	if projectRoot == "" {
-		if wd, err := os.Getwd(); err == nil {
-			projectRoot = wd
-		} else {
-			projectRoot = filepath.Dir(abs)
-		}
-	}
-
-	if !within(abs, projectRoot) {
-		logOutcome = "skip: outside project root"
-		return 0
-	}
-	rel, err := filepath.Rel(projectRoot, abs)
-	if err != nil {
-		logOutcome = "skip: relative path error"
-		return 0
-	}
-	if dispatch.InVendoredDir(rel) {
-		logOutcome = "skip: vendored directory"
+	abs, projectRoot, skipReason := resolveTarget(path)
+	if skipReason != "" {
+		logOutcome = skipReason
 		return 0
 	}
 
 	// A project can opt a specific formatter out for itself (e.g. it
 	// already runs its own pre-commit prettier with different rules)
-	// without every operator changing their global config. Same schema,
-	// same Load/IsDisabled as the user-level config; a malformed project
-	// file is ignored (diagnostic to stderr) rather than blocking, for the
-	// same reason a malformed user config falls back above.
-	if projectCfg, err := config.Load(filepath.Join(projectRoot, projectConfigFile)); err != nil {
+	// without every operator changing their global config.
+	if disabled, err := projectDisables(projectRoot, ext); err != nil {
 		fmt.Fprintf(os.Stderr, "format-dispatch: project config: %v (ignoring)\n", err)
-	} else if projectCfg.IsDisabled(ext) {
+	} else if disabled {
 		logOutcome = "skip: disabled by project config"
 		return 0
 	}
@@ -265,13 +230,79 @@ func run(stdin io.Reader) int {
 	return 0
 }
 
+// buildRegistry loads the user-level config and builds the formatter
+// registry from it. A malformed config must never turn this into a
+// blocking hook — it falls back to defaults and says why on stderr.
+func buildRegistry() *dispatch.Registry {
+	cfg, err := config.Load(configPath())
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "format-dispatch: config: %v (using defaults)\n", err)
+		cfg = config.Default()
+	}
+	return dispatch.NewRegistry(cfg)
+}
+
+// resolveTarget resolves path to an absolute path and its project root,
+// and applies every project-boundary guard shared by every dispatch-bound
+// file: existence (and not-a-directory), containment within projectRoot,
+// and exclusion from vendored directories. skipReason is empty on
+// success; otherwise it's why run() should skip this file, suitable for
+// the invocation log as-is.
+func resolveTarget(path string) (abs, projectRoot, skipReason string) {
+	abs = path
+	if !filepath.IsAbs(abs) {
+		if a, err := filepath.Abs(abs); err == nil {
+			abs = a
+		}
+	}
+
+	if info, err := os.Stat(abs); err != nil || info.IsDir() {
+		return abs, "", "skip: stat failed or is a directory"
+	}
+
+	projectRoot = os.Getenv("CLAUDE_PROJECT_DIR")
+	if projectRoot == "" {
+		if wd, err := os.Getwd(); err == nil {
+			projectRoot = wd
+		} else {
+			projectRoot = filepath.Dir(abs)
+		}
+	}
+
+	if !within(abs, projectRoot) {
+		return abs, projectRoot, "skip: outside project root"
+	}
+	rel, err := filepath.Rel(projectRoot, abs)
+	if err != nil {
+		return abs, projectRoot, "skip: relative path error"
+	}
+	if dispatch.InVendoredDir(rel) {
+		return abs, projectRoot, "skip: vendored directory"
+	}
+	return abs, projectRoot, ""
+}
+
+// projectDisables reports whether ext is opted out for this project via
+// projectConfigFile at projectRoot. Same schema, same Load/IsDisabled as
+// the user-level config. A malformed project config returns a non-nil
+// err — the caller prints it and proceeds as if nothing were disabled,
+// rather than blocking formatting.
+func projectDisables(projectRoot, ext string) (disabled bool, err error) {
+	cfg, err := config.Load(filepath.Join(projectRoot, projectConfigFile))
+	if err != nil {
+		return false, err
+	}
+	return cfg.IsDisabled(ext), nil
+}
+
 // logInvocation appends one line to $CLAUDE_FORMAT_HOOKS_LOG, if set — an
-// opt-in troubleshooting aid for "why didn't my file get formatted",
-// silent (a no-op) otherwise, matching the hook's own silent-on-success
-// contract. A failure to open or write the log is swallowed: logging must
-// never be the reason a hook invocation fails. The file grows unbounded —
-// meant for a short debugging session, not left on permanently.
-func logInvocation(path, formatterName, outcome string) {
+// opt-in troubleshooting aid for "why didn't my file get formatted" (and
+// "why is it slow", via duration), silent (a no-op) otherwise, matching
+// the hook's own silent-on-success contract. A failure to open or write
+// the log is swallowed: logging must never be the reason a hook
+// invocation fails. The file grows unbounded — meant for a short
+// debugging session, not left on permanently.
+func logInvocation(path, formatterName, outcome string, duration time.Duration) {
 	logPath := os.Getenv("CLAUDE_FORMAT_HOOKS_LOG")
 	if logPath == "" {
 		return
@@ -281,8 +312,8 @@ func logInvocation(path, formatterName, outcome string) {
 		return
 	}
 	defer func() { _ = f.Close() }()
-	_, _ = fmt.Fprintf(f, "%s path=%q formatter=%q outcome=%q\n",
-		time.Now().UTC().Format(time.RFC3339), path, formatterName, outcome)
+	_, _ = fmt.Fprintf(f, "%s path=%q formatter=%q outcome=%q duration=%q\n",
+		time.Now().UTC().Format(time.RFC3339), path, formatterName, outcome, duration.Round(time.Microsecond))
 }
 
 // configPath returns the installing user's config file location:

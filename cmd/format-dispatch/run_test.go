@@ -9,6 +9,7 @@ import (
 	"runtime"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/go-quicktest/qt"
 )
@@ -259,7 +260,7 @@ func TestLogInvocationNoopWhenEnvUnset(t *testing.T) {
 	t.Setenv("CLAUDE_FORMAT_HOOKS_LOG", "")
 	logPath := filepath.Join(t.TempDir(), "format-dispatch.log")
 
-	logInvocation("/some/file.json", "json", "ok")
+	logInvocation("/some/file.json", "json", "ok", time.Millisecond)
 
 	_, err := os.Stat(logPath)
 	qt.Check(t, qt.IsTrue(os.IsNotExist(err)), qt.Commentf("logInvocation must not write anywhere when unset"))
@@ -269,7 +270,7 @@ func TestLogInvocationSwallowsWriteFailure(t *testing.T) {
 	// A directory can't be opened for writing as a regular file — this
 	// must not panic or otherwise surface.
 	t.Setenv("CLAUDE_FORMAT_HOOKS_LOG", t.TempDir())
-	logInvocation("/some/file.json", "json", "ok")
+	logInvocation("/some/file.json", "json", "ok", time.Millisecond)
 }
 
 func TestRunLogsInvocationWhenEnvSet(t *testing.T) {
