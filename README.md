@@ -21,7 +21,9 @@ in-process; everything else routes to the real project-config-aware tool
 ## Quick start
 
 ```bash
-git clone git@github.com:Rethunk-Tech/claude-format-hooks.git && cd claude-format-hooks && ./install.sh
+git clone git@github.com:Rethunk-Tech/claude-format-hooks.git
+cd claude-format-hooks
+./install.sh
 ```
 
 Full install steps, prerequisites, and configuration: [HUMANS.md](HUMANS.md).

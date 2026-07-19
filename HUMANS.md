@@ -75,11 +75,10 @@ rm ~/.claude/hooks/format-dispatch
 | `.yaml`, `.yml`, `.html` | `prettier --write` | no (bunx) |
 | `.sql` | `sqlfluff fix` | no (system binary) |
 
-Any other extension is an instant no-op. Files under `node_modules/`,
-`.next/`, `.yarn/`, `.git/`, `.agents/`, `dist/`, `build/`, `coverage/`,
-`test-results/`, `vendor/`, or `.venv/` (anywhere in the path) are always
-skipped, as are files outside `$CLAUDE_PROJECT_DIR`. None of the
-formatters require their own project config file to exist first — a
+Any other extension is an instant no-op. Vendored/build directories and
+anything outside `$CLAUDE_PROJECT_DIR` are always skipped — see
+[AGENTS.md § Invariants](AGENTS.md#invariants) for the exact list. None of
+the formatters require their own project config file to exist first — a
 `.ts` file in a project with no `biome.json` still gets formatted, using
 biome's built-in defaults.
 
@@ -113,8 +112,7 @@ Three layers, in increasing priority:
 **Nothing happened after I wrote a file.** That's the default, silent
 success — check the extension is in the [supported table](#supported-extensions)
 above and not in your `disabled` list. If the file lives under a
-vendored directory (`node_modules/`, `dist/`, ...) it's skipped on
-purpose.
+vendored directory, it's skipped on purpose.
 
 **A diagnostic showed up on stderr.** The formatter ran and failed (e.g.
 malformed syntax it couldn't safely fix). The message is truncated to 10

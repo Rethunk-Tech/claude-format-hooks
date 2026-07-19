@@ -7,48 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-### Fixed
+### Added
 
-- `cmd/format-dispatch/main.go`'s `within()` boundary check now resolves
-  symlinks (`filepath.EvalSymlinks`) on both the target path and
-  `$CLAUDE_PROJECT_DIR` before comparing, so a symlink inside the project
-  that points outside it can no longer slip past the boundary check as a
-  pure string-prefix match.
-- `biome` formatter and `install.sh`'s bunx prewarm invoked the npm package
-  literally named `biome` — an unrelated, abandoned (2016, v0.3.3)
-  environment-variable manager — instead of `@biomejs/biome`. Every
-  `.ts`/`.tsx`/`.js`/`.jsx`/`.mjs`/`.cjs`/`.css`/`.jsonc` write was
-  dispatching to the wrong CLI.
-- External formatter invocations (`biome`, `markdownlint-cli2`, `taplo`,
-  `prettier`, `sqlfluff`) now pass `--` before the target file path, so a
-  file name beginning with `-` can't be parsed as a flag by the underlying
-  CLI (argument injection).
-- `truncate()` could split a multi-byte UTF-8 character when cutting a
-  diagnostic to `maxChars`, emitting invalid UTF-8 to stderr for non-ASCII
-  formatter/linter output; it now backs off to the nearest rune boundary.
-
-### Changed
-
-- `install.sh`'s `settings.json` wiring (the `jq` filter that removed a
-  stale/old-biome-only `PostToolUse` entry and appended the new one) moved
-  into a native `format-dispatch --install [--dry-run]` Go subcommand
-  using `encoding/json`, matching the "native Go over external tools" bar
-  the rest of this project holds itself to. `install.sh` is now a thin
-  wrapper: it still builds the binary and pre-warms `bunx`'s cache (no Go
-  equivalent for that step), then delegates to `--install`. `jq` is no
-  longer a prerequisite.
-- README: dropped the meta/narrative "generalizes a hand-written
-  per-project hook" framing in favor of describing what the tool does.
-- De-duplicated the build/vet/lint/test command block that had drifted
-  out of sync between AGENTS.md and CONTRIBUTING.md (CONTRIBUTING.md's
-  copy didn't mention the new coverage floor); AGENTS.md § Commands is
-  now the single canonical copy, CONTRIBUTING.md points to it.
-- Added GitHub repo topics (`claude-code`, `hooks`, `formatter`, `linter`,
-  `golang`, `developer-tools`, `cli`, `biome`, `prettier`) — previously
-  unset.
-
-### Added (test coverage)
-
+- Unit tests for `internal/installer`'s `settings.json` mutation logic:
+  fresh install, missing settings file, idempotent re-install, replacing
+  the old narrow biome-only hook, and preserving unrelated `hooks.*`
+  entries — none of which had coverage under the old `jq` implementation.
 - Unit tests for `internal/dispatch`, `internal/config`, `internal/hookio`
   (0% -> 100% each), `cmd/format-dispatch`'s `within()`/`configPath()`
   helpers, and a shell-formatter idempotency suite mirroring the existing
@@ -58,13 +22,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   this gap can't silently recur.
 - `gosec` added to `.golangci.yml`'s linter set, given this tool's entire
   job is subprocess execution and file writes from external input.
-- Unit tests for `internal/installer`'s `settings.json` mutation logic:
-  fresh install, missing settings file, idempotent re-install, replacing
-  the old narrow biome-only hook, and preserving unrelated `hooks.*`
-  entries — none of which had coverage under the old `jq` implementation.
-
-### Added
-
 - Initial `format-dispatch` `PostToolUse` hook: native in-process formatters
   for JSON (`encoding/json.Indent`, key-order preserving) and shell scripts
   (`mvdan.cc/sh/v3`, matches `shfmt` output exactly), plus external
@@ -93,8 +50,45 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `gomod` + `github-actions` updates), issue templates (bug report,
   feature request), and a pull request template.
 
+### Changed
+
+- `install.sh`'s `settings.json` wiring (the `jq` filter that removed a
+  stale/old-biome-only `PostToolUse` entry and appended the new one) moved
+  into a native `format-dispatch --install [--dry-run]` Go subcommand
+  using `encoding/json`, matching the "native Go over external tools" bar
+  the rest of this project holds itself to. `install.sh` is now a thin
+  wrapper: it still builds the binary and pre-warms `bunx`'s cache (no Go
+  equivalent for that step), then delegates to `--install`. `jq` is no
+  longer a prerequisite.
+- README: dropped the meta/narrative "generalizes a hand-written
+  per-project hook" framing in favor of describing what the tool does.
+- De-duplicated the build/vet/lint/test command block that had drifted
+  out of sync between AGENTS.md and CONTRIBUTING.md (CONTRIBUTING.md's
+  copy didn't mention the new coverage floor); AGENTS.md § Commands is
+  now the single canonical copy, CONTRIBUTING.md points to it.
+- Added GitHub repo topics (`claude-code`, `hooks`, `formatter`, `linter`,
+  `golang`, `developer-tools`, `cli`, `biome`, `prettier`) — previously
+  unset.
+
 ### Fixed
 
+- `cmd/format-dispatch/main.go`'s `within()` boundary check now resolves
+  symlinks (`filepath.EvalSymlinks`) on both the target path and
+  `$CLAUDE_PROJECT_DIR` before comparing, so a symlink inside the project
+  that points outside it can no longer slip past the boundary check as a
+  pure string-prefix match.
+- `biome` formatter and `install.sh`'s bunx prewarm invoked the npm package
+  literally named `biome` — an unrelated, abandoned (2016, v0.3.3)
+  environment-variable manager — instead of `@biomejs/biome`. Every
+  `.ts`/`.tsx`/`.js`/`.jsx`/`.mjs`/`.cjs`/`.css`/`.jsonc` write was
+  dispatching to the wrong CLI.
+- External formatter invocations (`biome`, `markdownlint-cli2`, `taplo`,
+  `prettier`, `sqlfluff`) now pass `--` before the target file path, so a
+  file name beginning with `-` can't be parsed as a flag by the underlying
+  CLI (argument injection).
+- `truncate()` could split a multi-byte UTF-8 character when cutting a
+  diagnostic to `maxChars`, emitting invalid UTF-8 to stderr for non-ASCII
+  formatter/linter output; it now backs off to the nearest rune boundary.
 - JSON formatter: a source file already ending in `}\n` gained an extra
   blank line on every reformat (non-idempotent, ever-growing) — trailing
   whitespace is now trimmed before appending exactly one newline.

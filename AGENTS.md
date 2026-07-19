@@ -77,11 +77,12 @@ tool. Only the two native formatters needed their own config story (see
 
 | Path | Role |
 | --- | --- |
-| [`cmd/format-dispatch/`](cmd/format-dispatch/) | Entrypoint: stdin parsing, extension gate, vendored-dir/project-root checks, timeout, exit-0 contract |
+| [`cmd/format-dispatch/`](cmd/format-dispatch/) | Entrypoint: stdin parsing, extension gate, vendored-dir/project-root checks, timeout, exit-0 contract; also dispatches `--install` to `internal/installer` |
 | [`internal/hookio/`](internal/hookio/) | Decodes the `PostToolUse` JSON payload into a file path |
 | [`internal/config/`](internal/config/) | Resolves per-file indent settings: built-in defaults -> user config -> `.editorconfig` |
 | [`internal/dispatch/`](internal/dispatch/) | Extension -> `Formatter` registry, vendored-dir list, disabled-extension filtering |
 | [`internal/formatters/`](internal/formatters/) | One `Formatter` implementation per file type (native: `json.go`, `shell.go`; external: `biome.go`, `bunxtool.go`, `sqlfluff.go`); `exec.go` holds the shared subprocess-run + diagnostic-truncation helper |
+| [`internal/installer/`](internal/installer/) | Wires format-dispatch into `~/.claude/settings.json` as a `PostToolUse` hook (`format-dispatch --install`), replacing `install.sh`'s old `jq` filter |
 
 ## Invariants
 
