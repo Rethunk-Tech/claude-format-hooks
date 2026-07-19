@@ -103,6 +103,31 @@ func (r *Registry) Supported(ext string) bool {
 	return ok
 }
 
+// knownExtensions is the full extension superset registered across every
+// formatter, independent of any user or project config: Disabled can only
+// remove entries from a Registry's byExt map, never add ones outside this
+// set. Built once from a Registry constructed with an empty Config (so
+// nothing is filtered out) — computing it this way, instead of duplicating
+// the extension list from NewRegistry, means the two can never drift.
+var knownExtensions = func() map[string]bool {
+	r := NewRegistry(config.Config{})
+	exts := make(map[string]bool, len(r.byExt))
+	for ext := range r.byExt {
+		exts[ext] = true
+	}
+	return exts
+}()
+
+// KnownExtension reports whether ext is ever handled by any formatter,
+// regardless of user or project config. Unlike Supported, this needs no
+// Registry (and so no config load) to answer — callers can use it to skip
+// loading config entirely for an extension no formatter will ever touch,
+// keeping that path a true instant no-op: no file read, not just no
+// subprocess.
+func KnownExtension(ext string) bool {
+	return knownExtensions[strings.ToLower(ext)]
+}
+
 // InVendoredDir reports whether relPath (relative to the project root)
 // passes through a directory that should never be auto-formatted.
 func InVendoredDir(relPath string) bool {

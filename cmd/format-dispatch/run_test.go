@@ -254,6 +254,24 @@ func TestRunProjectConfigDisablesFormatter(t *testing.T) {
 	qt.Check(t, qt.Equals(readFile(t, abs), src), qt.Commentf("project-disabled extension must not be formatted"))
 }
 
+func TestRunUserConfigDisablesFormatter(t *testing.T) {
+	projectRoot := t.TempDir()
+	abs := filepath.Join(projectRoot, "f.json")
+	src := `{"b":1,"a":2}`
+	writeFile(t, abs, src)
+	configPath := filepath.Join(t.TempDir(), "claude-format-hooks.json")
+	writeFile(t, configPath, `{"disabled": [".json"]}`)
+
+	t.Setenv("CLAUDE_PROJECT_DIR", projectRoot)
+	t.Setenv("CLAUDE_FORMAT_HOOKS_CONFIG", configPath)
+	logPath := filepath.Join(t.TempDir(), "format-dispatch.log")
+	t.Setenv("CLAUDE_FORMAT_HOOKS_LOG", logPath)
+
+	qt.Check(t, qt.Equals(run(strings.NewReader(payload(abs))), 0))
+	qt.Check(t, qt.Equals(readFile(t, abs), src), qt.Commentf("user-disabled extension must not be formatted"))
+	qt.Check(t, qt.StringContains(readFile(t, logPath), `outcome="skip: disabled by config"`))
+}
+
 func TestRunProjectConfigMalformedFallsBackAndWarns(t *testing.T) {
 	projectRoot := t.TempDir()
 	abs := filepath.Join(projectRoot, "f.json")

@@ -74,6 +74,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `--dryrun`, or a stray extra argument) instead of erroring — it now
   prints usage and exits 1, matching the top-level unrecognized-flag
   behavior.
+- `run()` loaded the user's config file (an `os.ReadFile`) on *every*
+  invocation before checking whether the extension had a formatter at
+  all — so every write to a `.py`, `.rs`, or other never-formatted file
+  paid a file read the documented "an unsupported extension is an
+  instant no-op: one `filepath.Ext` call and one map lookup, nothing
+  else" contract explicitly promised it wouldn't. Added
+  `dispatch.KnownExtension`, a config-independent check against the
+  static extension superset (derived from a `Registry` built with an
+  empty `Config`, so it can't drift from `NewRegistry`'s own list), and
+  moved it before `buildRegistry()`. Config is now loaded only for
+  extensions that could possibly be handled; a since-disabled extension
+  gets a new, more accurate invocation-log outcome
+  (`skip: disabled by config`) instead of being lumped in with
+  `skip: unsupported extension`.
 
 ## [0.2.0] - 2026-07-19
 

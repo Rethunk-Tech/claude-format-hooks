@@ -38,6 +38,20 @@ func TestSupportedRespectsDisabled(t *testing.T) {
 	qt.Check(t, qt.IsTrue(r.Supported(".json")), qt.Commentf("unrelated ext stays enabled"))
 }
 
+func TestKnownExtension(t *testing.T) {
+	qt.Check(t, qt.IsTrue(KnownExtension(".json")), qt.Commentf("registered by every Config, including empty"))
+	qt.Check(t, qt.IsTrue(KnownExtension(".JSON")), qt.Commentf("case-insensitive"))
+	qt.Check(t, qt.IsFalse(KnownExtension(".py")), qt.Commentf("no formatter registered"))
+	qt.Check(t, qt.IsFalse(KnownExtension("")))
+}
+
+func TestKnownExtensionIgnoresDisabled(t *testing.T) {
+	// Disabled only removes entries from a Registry's byExt map at
+	// construction time — it can never widen or narrow the static
+	// superset KnownExtension answers from.
+	qt.Check(t, qt.IsTrue(KnownExtension(".sql")))
+}
+
 func TestName(t *testing.T) {
 	r := NewRegistry(config.Default())
 
