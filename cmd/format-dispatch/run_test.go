@@ -9,46 +9,37 @@ import (
 	"runtime"
 	"strings"
 	"testing"
+
+	"github.com/go-quicktest/qt"
 )
 
 func captureStderr(t *testing.T, fn func()) string {
 	t.Helper()
 	orig := os.Stderr
 	r, w, err := os.Pipe()
-	if err != nil {
-		t.Fatal(err)
-	}
+	qt.Assert(t, qt.IsNil(err))
 	os.Stderr = w
 	defer func() { os.Stderr = orig }()
 
 	fn()
 
-	if err := w.Close(); err != nil {
-		t.Fatal(err)
-	}
+	qt.Assert(t, qt.IsNil(w.Close()))
 	var buf bytes.Buffer
-	if _, err := io.Copy(&buf, r); err != nil {
-		t.Fatal(err)
-	}
+	_, err = io.Copy(&buf, r)
+	qt.Assert(t, qt.IsNil(err))
 	return buf.String()
 }
 
 func writeFile(t *testing.T, path, content string) {
 	t.Helper()
-	if err := os.MkdirAll(filepath.Dir(path), 0o700); err != nil {
-		t.Fatal(err)
-	}
-	if err := os.WriteFile(path, []byte(content), 0o600); err != nil { //nolint:gosec // test fixture
-		t.Fatal(err)
-	}
+	qt.Assert(t, qt.IsNil(os.MkdirAll(filepath.Dir(path), 0o700)))
+	qt.Assert(t, qt.IsNil(os.WriteFile(path, []byte(content), 0o600))) //nolint:gosec // test fixture
 }
 
 func readFile(t *testing.T, path string) string {
 	t.Helper()
 	b, err := os.ReadFile(path) //nolint:gosec // test fixture
-	if err != nil {
-		t.Fatal(err)
-	}
+	qt.Assert(t, qt.IsNil(err))
 	return string(b)
 }
 
@@ -61,28 +52,19 @@ type errReader struct{}
 func (errReader) Read([]byte) (int, error) { return 0, errors.New("boom") }
 
 func TestRunReadStdinError(t *testing.T) {
-	got := run(errReader{})
-	if got != 1 {
-		t.Errorf("run() = %d, want 1 on a stdin read failure", got)
-	}
+	qt.Check(t, qt.Equals(run(errReader{}), 1))
 }
 
 func TestRunEmptyPayloadIsNoop(t *testing.T) {
-	if got := run(strings.NewReader(`{}`)); got != 0 {
-		t.Errorf("run() = %d, want 0", got)
-	}
+	qt.Check(t, qt.Equals(run(strings.NewReader(`{}`)), 0))
 }
 
 func TestRunUnsupportedExtensionIsNoop(t *testing.T) {
 	abs := filepath.Join(t.TempDir(), "f.xyz")
 	writeFile(t, abs, "irrelevant")
 
-	if got := run(strings.NewReader(payload(abs))); got != 0 {
-		t.Errorf("run() = %d, want 0", got)
-	}
-	if got := readFile(t, abs); got != "irrelevant" {
-		t.Errorf("file was modified for an unsupported extension: %q", got)
-	}
+	qt.Check(t, qt.Equals(run(strings.NewReader(payload(abs))), 0))
+	qt.Check(t, qt.Equals(readFile(t, abs), "irrelevant"))
 }
 
 func TestRunOutsideProjectRootIsSkipped(t *testing.T) {
@@ -92,12 +74,8 @@ func TestRunOutsideProjectRootIsSkipped(t *testing.T) {
 	writeFile(t, abs, `{"b":1,"a":2}`)
 
 	t.Setenv("CLAUDE_PROJECT_DIR", projectRoot)
-	if got := run(strings.NewReader(payload(abs))); got != 0 {
-		t.Errorf("run() = %d, want 0", got)
-	}
-	if got := readFile(t, abs); got != `{"b":1,"a":2}` {
-		t.Errorf("file outside CLAUDE_PROJECT_DIR was formatted: %q", got)
-	}
+	qt.Check(t, qt.Equals(run(strings.NewReader(payload(abs))), 0))
+	qt.Check(t, qt.Equals(readFile(t, abs), `{"b":1,"a":2}`))
 }
 
 func TestRunVendoredDirIsSkipped(t *testing.T) {
@@ -106,12 +84,8 @@ func TestRunVendoredDirIsSkipped(t *testing.T) {
 	writeFile(t, abs, `{"b":1,"a":2}`)
 
 	t.Setenv("CLAUDE_PROJECT_DIR", projectRoot)
-	if got := run(strings.NewReader(payload(abs))); got != 0 {
-		t.Errorf("run() = %d, want 0", got)
-	}
-	if got := readFile(t, abs); got != `{"b":1,"a":2}` {
-		t.Errorf("file under node_modules was formatted: %q", got)
-	}
+	qt.Check(t, qt.Equals(run(strings.NewReader(payload(abs))), 0))
+	qt.Check(t, qt.Equals(readFile(t, abs), `{"b":1,"a":2}`))
 }
 
 func TestRunDispatchesToJSONFormatter(t *testing.T) {
@@ -120,13 +94,8 @@ func TestRunDispatchesToJSONFormatter(t *testing.T) {
 	writeFile(t, abs, `{"b":1,"a":2}`)
 
 	t.Setenv("CLAUDE_PROJECT_DIR", projectRoot)
-	if got := run(strings.NewReader(payload(abs))); got != 0 {
-		t.Errorf("run() = %d, want 0", got)
-	}
-	want := "{\n  \"b\": 1,\n  \"a\": 2\n}\n"
-	if got := readFile(t, abs); got != want {
-		t.Errorf("file = %q, want %q", got, want)
-	}
+	qt.Check(t, qt.Equals(run(strings.NewReader(payload(abs))), 0))
+	qt.Check(t, qt.Equals(readFile(t, abs), "{\n  \"b\": 1,\n  \"a\": 2\n}\n"))
 }
 
 func TestRunPrintsDiagnosticOnFormatterFailure(t *testing.T) {
@@ -136,9 +105,7 @@ func TestRunPrintsDiagnosticOnFormatterFailure(t *testing.T) {
 	toolDir := t.TempDir()
 	script := filepath.Join(toolDir, "bunx")
 	body := "#!/bin/sh\ni=1\nwhile [ $i -le 20 ]; do echo \"line $i\"; i=$((i+1)); done\nexit 1\n"
-	if err := os.WriteFile(script, []byte(body), 0o755); err != nil { //nolint:gosec // test fixture
-		t.Fatal(err)
-	}
+	qt.Assert(t, qt.IsNil(os.WriteFile(script, []byte(body), 0o755))) //nolint:gosec // test fixture
 	t.Setenv("PATH", toolDir)
 
 	projectRoot := t.TempDir()
@@ -150,13 +117,8 @@ func TestRunPrintsDiagnosticOnFormatterFailure(t *testing.T) {
 	stderr := captureStderr(t, func() {
 		got = run(strings.NewReader(payload(abs)))
 	})
-	if got != 0 {
-		t.Errorf("run() = %d, want 0 even on formatter failure", got)
-	}
-	if !strings.Contains(stderr, "fixer failed") || !strings.Contains(stderr, "line 1") {
-		t.Errorf("stderr = %q, want it to contain the truncated diagnostic", stderr)
-	}
-	if strings.Contains(stderr, "line 11") {
-		t.Errorf("stderr = %q, want output truncated to 10 lines", stderr)
-	}
+	qt.Check(t, qt.Equals(got, 0))
+	qt.Check(t, qt.StringContains(stderr, "fixer failed"))
+	qt.Check(t, qt.StringContains(stderr, "line 1"))
+	qt.Check(t, qt.IsFalse(strings.Contains(stderr, "line 11")), qt.Commentf("want output truncated to 10 lines"))
 }

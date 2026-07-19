@@ -4,15 +4,14 @@ import (
 	"strings"
 	"testing"
 	"unicode/utf8"
+
+	"github.com/go-quicktest/qt"
 )
 
 func TestTruncateLineLimit(t *testing.T) {
 	out := []byte("one\ntwo\nthree\nfour\nfive")
 	got := truncate(out, 3, 500)
-	want := "one\ntwo\nthree"
-	if got != want {
-		t.Fatalf("got %q, want %q", got, want)
-	}
+	qt.Check(t, qt.Equals(got, "one\ntwo\nthree"))
 }
 
 func TestTruncateCharLimitIsUTF8Safe(t *testing.T) {
@@ -20,18 +19,12 @@ func TestTruncateCharLimitIsUTF8Safe(t *testing.T) {
 	// offset would land mid-rune.
 	line := strings.Repeat("é", 10) // 20 bytes
 	got := truncate([]byte(line), 10, 15)
-	if !utf8.ValidString(got) {
-		t.Fatalf("truncated output is not valid UTF-8: %q", got)
-	}
-	if len(got) > 15 {
-		t.Fatalf("truncated output exceeds maxChars: %d bytes: %q", len(got), got)
-	}
+	qt.Check(t, qt.IsTrue(utf8.ValidString(got)), qt.Commentf("truncated output is not valid UTF-8: %q", got))
+	qt.Check(t, qt.IsTrue(len(got) <= 15), qt.Commentf("truncated output exceeds maxChars: %d bytes: %q", len(got), got))
 }
 
 func TestTruncateUnderLimitsUnchanged(t *testing.T) {
 	out := []byte("short diagnostic")
 	got := truncate(out, 10, 500)
-	if got != "short diagnostic" {
-		t.Fatalf("got %q, want unchanged input", got)
-	}
+	qt.Check(t, qt.Equals(got, "short diagnostic"))
 }

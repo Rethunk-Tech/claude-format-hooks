@@ -5,7 +5,10 @@ import (
 	"os"
 	"path/filepath"
 	"runtime"
+	"strings"
 	"testing"
+
+	"github.com/go-quicktest/qt"
 )
 
 // writeFakeTool puts an executable named name on a fresh PATH containing
@@ -19,9 +22,7 @@ func writeFakeTool(t *testing.T, name, body string) {
 	dir := t.TempDir()
 	path := filepath.Join(dir, name)
 	script := "#!/bin/sh\n" + body + "\n"
-	if err := os.WriteFile(path, []byte(script), 0o755); err != nil { //nolint:gosec // test fixture, not the file under format
-		t.Fatalf("write fake %s: %v", name, err)
-	}
+	qt.Assert(t, qt.IsNil(os.WriteFile(path, []byte(script), 0o755))) //nolint:gosec // test fixture, not the file under format
 	t.Setenv("PATH", dir)
 }
 
@@ -42,9 +43,7 @@ func TestExternalFormatterNames(t *testing.T) {
 		{NewSQLFluff(), "sqlfluff"},
 	}
 	for _, tc := range cases {
-		if got := tc.f.Name(); got != tc.want {
-			t.Errorf("Name() = %q, want %q", got, tc.want)
-		}
+		qt.Check(t, qt.Equals(tc.f.Name(), tc.want))
 	}
 }
 
@@ -53,9 +52,7 @@ func TestBunxFormattersSkipWhenBunxMissing(t *testing.T) {
 	abs := filepath.Join(t.TempDir(), "f.txt")
 	for _, f := range []Formatter{NewBiome(), NewMarkdown(), NewTOML(), NewPrettier()} {
 		res := f.Format(context.Background(), t.TempDir(), abs)
-		if !res.Skipped {
-			t.Errorf("%s: Skipped = false, want true when bunx is not on PATH", f.Name())
-		}
+		qt.Check(t, qt.IsTrue(res.Skipped), qt.Commentf("%s should skip when bunx is not on PATH", f.Name()))
 	}
 }
 
@@ -63,9 +60,7 @@ func TestSQLFluffSkipsWhenMissing(t *testing.T) {
 	clearPath(t)
 	abs := filepath.Join(t.TempDir(), "f.sql")
 	res := NewSQLFluff().Format(context.Background(), t.TempDir(), abs)
-	if !res.Skipped {
-		t.Errorf("Skipped = false, want true when sqlfluff is not on PATH")
-	}
+	qt.Check(t, qt.IsTrue(res.Skipped))
 }
 
 func TestBiomeFormatSuccess(t *testing.T) {
@@ -73,9 +68,9 @@ func TestBiomeFormatSuccess(t *testing.T) {
 	dir := t.TempDir()
 	abs := filepath.Join(dir, "f.ts")
 	res := NewBiome().Format(context.Background(), dir, abs)
-	if res.Err != nil || res.Diagnostic != "" || res.Skipped {
-		t.Errorf("Format() = %+v, want a clean success", res)
-	}
+	qt.Check(t, qt.IsNil(res.Err))
+	qt.Check(t, qt.Equals(res.Diagnostic, ""))
+	qt.Check(t, qt.IsFalse(res.Skipped))
 }
 
 func TestBiomeFormatFailureTruncatesDiagnostic(t *testing.T) {
@@ -83,12 +78,9 @@ func TestBiomeFormatFailureTruncatesDiagnostic(t *testing.T) {
 	dir := t.TempDir()
 	abs := filepath.Join(dir, "f.ts")
 	res := NewBiome().Format(context.Background(), dir, abs)
-	if res.Diagnostic == "" {
-		t.Fatal("Diagnostic empty, want the truncated failure output")
-	}
-	if got := len(splitLines(res.Diagnostic)); got > 10 {
-		t.Errorf("diagnostic has %d lines, want <=10", got)
-	}
+	qt.Assert(t, qt.Not(qt.Equals(res.Diagnostic, "")))
+	qt.Check(t, qt.IsTrue(strings.Count(res.Diagnostic, "\n")+1 <= 10),
+		qt.Commentf("diagnostic has more than 10 lines: %q", res.Diagnostic))
 }
 
 func TestSQLFluffFormatSuccessAndFailure(t *testing.T) {
@@ -98,48 +90,24 @@ func TestSQLFluffFormatSuccessAndFailure(t *testing.T) {
 	t.Run("success", func(t *testing.T) {
 		writeFakeTool(t, "sqlfluff", "exit 0")
 		res := NewSQLFluff().Format(context.Background(), dir, abs)
-		if res.Err != nil || res.Diagnostic != "" {
-			t.Errorf("Format() = %+v, want a clean success", res)
-		}
+		qt.Check(t, qt.IsNil(res.Err))
+		qt.Check(t, qt.Equals(res.Diagnostic, ""))
 	})
 
 	t.Run("failure with no output falls back to the process error", func(t *testing.T) {
 		writeFakeTool(t, "sqlfluff", "exit 1")
 		res := NewSQLFluff().Format(context.Background(), dir, abs)
-		if res.Diagnostic == "" {
-			t.Fatal("Diagnostic empty, want the process error as fallback")
-		}
+		qt.Check(t, qt.Not(qt.Equals(res.Diagnostic, "")))
 	})
 }
 
 func TestFindUpward(t *testing.T) {
 	root := t.TempDir()
 	sub := filepath.Join(root, "a", "b")
-	if err := os.MkdirAll(sub, 0o700); err != nil {
-		t.Fatal(err)
-	}
+	qt.Assert(t, qt.IsNil(os.MkdirAll(sub, 0o700)))
 	marker := filepath.Join(root, "a", "biome.json")
-	if err := os.WriteFile(marker, []byte("{}"), 0o600); err != nil {
-		t.Fatal(err)
-	}
+	qt.Assert(t, qt.IsNil(os.WriteFile(marker, []byte("{}"), 0o600)))
 
-	if got := findUpward(sub, root, "biome.json", "biome.jsonc"); got != filepath.Join(root, "a") {
-		t.Errorf("findUpward() = %q, want %q", got, filepath.Join(root, "a"))
-	}
-	if got := findUpward(root, root, "nope.json"); got != "" {
-		t.Errorf("findUpward() = %q, want \"\" when nothing matches up to root", got)
-	}
-}
-
-func splitLines(s string) []string {
-	var lines []string
-	start := 0
-	for i, c := range s {
-		if c == '\n' {
-			lines = append(lines, s[start:i])
-			start = i + 1
-		}
-	}
-	lines = append(lines, s[start:])
-	return lines
+	qt.Check(t, qt.Equals(findUpward(sub, root, "biome.json", "biome.jsonc"), filepath.Join(root, "a")))
+	qt.Check(t, qt.Equals(findUpward(root, root, "nope.json"), ""))
 }

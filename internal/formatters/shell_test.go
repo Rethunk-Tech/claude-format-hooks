@@ -6,6 +6,8 @@ import (
 	"path/filepath"
 	"testing"
 
+	"github.com/go-quicktest/qt"
+
 	"github.com/Rethunk-Tech/claude-format-hooks/internal/config"
 )
 
@@ -24,28 +26,20 @@ func TestShellFormatterIdempotent(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			dir := t.TempDir()
 			path := filepath.Join(dir, "t.sh")
-			if err := os.WriteFile(path, []byte(tc.src), 0o600); err != nil {
-				t.Fatal(err)
-			}
+			qt.Assert(t, qt.IsNil(os.WriteFile(path, []byte(tc.src), 0o600)))
 
 			f := NewShell(config.Default())
 			ctx := context.Background()
 
 			f.Format(ctx, dir, path)
 			first, err := os.ReadFile(path)
-			if err != nil {
-				t.Fatal(err)
-			}
+			qt.Assert(t, qt.IsNil(err))
 
 			f.Format(ctx, dir, path)
 			second, err := os.ReadFile(path)
-			if err != nil {
-				t.Fatal(err)
-			}
+			qt.Assert(t, qt.IsNil(err))
 
-			if string(first) != string(second) {
-				t.Fatalf("not idempotent:\nfirst:  %q\nsecond: %q", first, second)
-			}
+			qt.Check(t, qt.DeepEquals(first, second), qt.Commentf("not idempotent"))
 		})
 	}
 }
@@ -54,9 +48,7 @@ func TestShellFormatterUsesTabsWhenConfigured(t *testing.T) {
 	dir := t.TempDir()
 	path := filepath.Join(dir, "t.sh")
 	src := "#!/bin/sh\nif true; then\necho hi\nfi\n"
-	if err := os.WriteFile(path, []byte(src), 0o600); err != nil {
-		t.Fatal(err)
-	}
+	qt.Assert(t, qt.IsNil(os.WriteFile(path, []byte(src), 0o600)))
 
 	cfg := config.Default()
 	cfg.Shell.UseTabs = true
@@ -64,28 +56,18 @@ func TestShellFormatterUsesTabsWhenConfigured(t *testing.T) {
 	NewShell(cfg).Format(context.Background(), dir, path)
 
 	out, err := os.ReadFile(path)
-	if err != nil {
-		t.Fatal(err)
-	}
+	qt.Assert(t, qt.IsNil(err))
 	want := "#!/bin/sh\nif true; then\n\techo hi\nfi\n"
-	if string(out) != want {
-		t.Fatalf("got %q, want %q", out, want)
-	}
+	qt.Check(t, qt.Equals(string(out), want))
 }
 
 func TestShellFormatterSkipsInvalidSyntax(t *testing.T) {
 	dir := t.TempDir()
 	path := filepath.Join(dir, "t.sh")
 	src := "#!/bin/sh\nif true; then\necho hi\n" // missing `fi`
-	if err := os.WriteFile(path, []byte(src), 0o600); err != nil {
-		t.Fatal(err)
-	}
+	qt.Assert(t, qt.IsNil(os.WriteFile(path, []byte(src), 0o600)))
 
 	result := NewShell(config.Default()).Format(context.Background(), dir, path)
-	if !result.Skipped {
-		t.Fatalf("Format on invalid shell syntax: got Skipped=%v, want true", result.Skipped)
-	}
-	if result.Err != nil {
-		t.Fatalf("Format on invalid shell syntax: got Err=%v, want nil", result.Err)
-	}
+	qt.Check(t, qt.IsTrue(result.Skipped))
+	qt.Check(t, qt.IsNil(result.Err))
 }
