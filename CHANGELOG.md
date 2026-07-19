@@ -7,6 +7,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+
+- Modernized manual loops onto the standard `slices`/`maps` packages
+  (available since Go 1.21; go.mod is on 1.26.5): `dispatch.NewRegistry`'s
+  disabled-extension filter now uses `maps.DeleteFunc`;
+  `dispatch.InVendoredDir`, `config.IsDisabled`, `biome.findUpward`, and
+  `installer`'s `hasBin`/`keepEntry` now use `slices.ContainsFunc`; and
+  `installer.Wire`/`Unwire`'s filter-by-append loops (with the
+  `entries[:0:0]` zero-capacity idiom) now use `slices.DeleteFunc`. No
+  behavior change.
+
 ### Fixed
 
 - Shell formatter: a non-positive `shell.indentSize` (via user config or

@@ -5,6 +5,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"slices"
 )
 
 // biomeFormatter shells out to `bunx @biomejs/biome check --write` for JS/TS/JSX/
@@ -45,10 +46,11 @@ func (biomeFormatter) Format(ctx context.Context, projectRoot, abs string) Resul
 func findUpward(dir, root string, names ...string) string {
 	root = filepath.Clean(root)
 	for {
-		for _, n := range names {
-			if _, err := os.Stat(filepath.Join(dir, n)); err == nil {
-				return dir
-			}
+		if slices.ContainsFunc(names, func(n string) bool {
+			_, err := os.Stat(filepath.Join(dir, n))
+			return err == nil
+		}) {
+			return dir
 		}
 		if dir == root || dir == "/" || dir == "." {
 			break

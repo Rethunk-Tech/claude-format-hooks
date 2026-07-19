@@ -20,6 +20,7 @@ package config
 import (
 	"encoding/json"
 	"os"
+	"slices"
 	"strings"
 
 	"mvdan.cc/editorconfig"
@@ -77,12 +78,7 @@ func Load(path string) (Config, error) {
 // is case-insensitive, since extensions are matched case-insensitively
 // everywhere else (filepath.Ext preserves the source file's casing).
 func (c Config) IsDisabled(ext string) bool {
-	for _, d := range c.Disabled {
-		if strings.EqualFold(d, ext) {
-			return true
-		}
-	}
-	return false
+	return slices.ContainsFunc(c.Disabled, func(d string) bool { return strings.EqualFold(d, ext) })
 }
 
 // IndentSpec is a resolved indent width/style for one file.

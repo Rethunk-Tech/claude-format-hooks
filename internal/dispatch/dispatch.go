@@ -4,7 +4,9 @@ package dispatch
 
 import (
 	"context"
+	"maps"
 	"path/filepath"
+	"slices"
 	"strings"
 
 	"github.com/Rethunk-Tech/claude-format-hooks/internal/config"
@@ -56,11 +58,7 @@ func NewRegistry(cfg config.Config) *Registry {
 
 		".sql": sql,
 	}
-	for ext := range all {
-		if cfg.IsDisabled(ext) {
-			delete(all, ext)
-		}
-	}
+	maps.DeleteFunc(all, func(ext string, _ formatters.Formatter) bool { return cfg.IsDisabled(ext) })
 	return &Registry{byExt: all}
 }
 
@@ -92,12 +90,8 @@ func (r *Registry) Supported(ext string) bool {
 // InVendoredDir reports whether relPath (relative to the project root)
 // passes through a directory that should never be auto-formatted.
 func InVendoredDir(relPath string) bool {
-	for _, seg := range strings.Split(filepath.ToSlash(relPath), "/") {
-		if vendoredDirs[seg] {
-			return true
-		}
-	}
-	return false
+	segs := strings.Split(filepath.ToSlash(relPath), "/")
+	return slices.ContainsFunc(segs, func(seg string) bool { return vendoredDirs[seg] })
 }
 
 // Dispatch routes abs to the formatter registered for its extension.

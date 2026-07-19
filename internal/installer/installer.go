@@ -10,6 +10,7 @@ import (
 	"io"
 	"os"
 	"path/filepath"
+	"slices"
 	"strings"
 )
 
@@ -133,12 +134,7 @@ func Wire(settingsPath, binPath string) (before, after []byte, err error) {
 		return nil, nil, err
 	}
 
-	kept := entries[:0:0]
-	for _, e := range entries {
-		if keepEntry(e, binPath) {
-			kept = append(kept, e)
-		}
-	}
+	kept := slices.DeleteFunc(entries, func(e PostToolUseEntry) bool { return !keepEntry(e, binPath) })
 	kept = append(kept, PostToolUseEntry{
 		Matcher: matcherAll,
 		Hooks: []HookCommand{{
@@ -168,12 +164,7 @@ func Unwire(settingsPath, binPath string) (before, after []byte, err error) {
 		return nil, nil, err
 	}
 
-	kept := entries[:0:0]
-	for _, e := range entries {
-		if !hasBin(e, binPath) {
-			kept = append(kept, e)
-		}
-	}
+	kept := slices.DeleteFunc(entries, func(e PostToolUseEntry) bool { return hasBin(e, binPath) })
 
 	after, err = renderSettings(top, hooks, kept)
 	if err != nil {
@@ -184,12 +175,7 @@ func Unwire(settingsPath, binPath string) (before, after []byte, err error) {
 
 // hasBin reports whether e has a hook command pointing at binPath.
 func hasBin(e PostToolUseEntry, binPath string) bool {
-	for _, h := range e.Hooks {
-		if h.Command == binPath {
-			return true
-		}
-	}
-	return false
+	return slices.ContainsFunc(e.Hooks, func(h HookCommand) bool { return h.Command == binPath })
 }
 
 // keepEntry reports whether an existing PostToolUse entry should survive
@@ -203,12 +189,7 @@ func keepEntry(e PostToolUseEntry, binPath string) bool {
 	if e.Matcher != matcherOld {
 		return true
 	}
-	for _, h := range e.Hooks {
-		if strings.Contains(h.Command, oldBiomeMark) {
-			return false
-		}
-	}
-	return true
+	return !slices.ContainsFunc(e.Hooks, func(h HookCommand) bool { return strings.Contains(h.Command, oldBiomeMark) })
 }
 
 // Install wires the PostToolUse hook into opts.SettingsPath. If dryRun,
