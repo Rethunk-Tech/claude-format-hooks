@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"io"
 	"os"
 	"path/filepath"
@@ -296,7 +297,10 @@ func TestRunLogsInvocationWhenEnvSet(t *testing.T) {
 	qt.Check(t, qt.Equals(run(strings.NewReader(payload(abs))), 0))
 
 	log := readFile(t, logPath)
-	qt.Check(t, qt.StringContains(log, abs))
+	// abs is %q-quoted in the log line, so on Windows its backslashes are
+	// doubled — compare against the same %q form logInvocation actually
+	// writes, not the raw path.
+	qt.Check(t, qt.StringContains(log, fmt.Sprintf("path=%q", abs)))
 	qt.Check(t, qt.StringContains(log, `formatter="json"`))
 	qt.Check(t, qt.StringContains(log, `outcome="ok"`))
 }
