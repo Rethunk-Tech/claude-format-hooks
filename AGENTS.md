@@ -1,0 +1,118 @@
+# AGENTS.md - Developer / LLM Onboarding
+
+`claude-format-hooks` is a [Claude Code](https://claude.com/claude-code)
+`PostToolUse` hook: a single global Go binary (`format-dispatch`) that
+formats/lints a file right after Write/Edit/NotebookEdit writes it, with no
+per-repo setup required. **Operators:** see [HUMANS.md](HUMANS.md).
+
+## Commands
+
+```bash
+go build ./...
+go vet ./...
+gofmt -l .
+golangci-lint run ./...
+go test -race -cover ./...
+```
+
+Single package: `go test -race -v ./internal/formatters/...`. Single test:
+`go test -race -v -run TestJSONFormatterIdempotent ./internal/formatters`.
+
+CI ([`.github/workflows/ci.yml`](.github/workflows/ci.yml)) runs the same
+checks, plus `govulncheck`, on every push and pull request to `main`.
+
+## Architecture
+
+This hook runs on *every* file write in a session. Its own dispatch logic
+(read stdin, extract a path, switch on extension) is trivial — the real
+cost is process startup, which is repeated every single invocation:
+
+| Runtime | Cold-start overhead |
+| --- | --- |
+| Go (this binary) | ~1–3ms |
+| Bash + jq | ~5–15ms |
+| Python | ~30–60ms (worse behind a venv/pyenv shim) |
+
+Two formatters are implemented **natively in-process**, skipping the
+subprocess entirely:
+
+- **JSON** — `encoding/json.Indent`, chosen deliberately over
+  Unmarshal+Marshal: `Indent` re-indents at the byte level without
+  building an object graph, so it preserves source key order exactly. A
+  round-trip through `map[string]interface{}` would silently alphabetize
+  every object's keys, since `encoding/json.Marshal` sorts map keys —
+  that's not what "format" means for a file a human authored.
+- **Shell scripts** — [`mvdan.cc/sh/v3`](https://pkg.go.dev/mvdan.cc/sh/v3),
+  the actual parser/printer package the `shfmt` binary itself is built on.
+  Output matches `shfmt` exactly; there's no subprocess to spawn at all.
+
+Everything else stays external, on purpose, after actually testing the
+native alternatives rather than assuming:
+
+- **YAML** — `gopkg.in/yaml.v3`'s `Node` round-trip was prototyped against
+  a real workflow file in this fleet. It stripped every blank line and
+  re-indented list items under mapping keys — a real, surprising diff, not
+  a safe formatting operation. Stays on `prettier`.
+- **TOML** — no mature Go library does comment/structure-preserving
+  reformatting the way `taplo` does; a naive parse+re-encode would lose
+  comments and reorder keys. Stays on `taplo` via `bunx`.
+- **HTML** — reformatting through any tree-based parser risks restructuring
+  markup per the HTML5 tree-construction algorithm (implied tag closing,
+  element repositioning). `prettier` already has this exact failure mode
+  against hand-authored custom-element markup — a native Go attempt would
+  not improve on it. Stays on `prettier`.
+- **TS/TSX/JS/JSX/CSS/JSONC** — `biome` is Rust with no Go bindings.
+- **SQL** — `sqlfluff` is Python; no Go equivalent exists.
+
+External formatters already read their own project config (`biome.json`,
+`.prettierrc`, `.sqlfluff`, ...) automatically, since we invoke the real
+tool. Only the two native formatters needed their own config story (see
+[HUMANS.md](HUMANS.md#configuration)).
+
+## Layout
+
+| Path | Role |
+| --- | --- |
+| [`cmd/format-dispatch/`](cmd/format-dispatch/) | Entrypoint: stdin parsing, extension gate, vendored-dir/project-root checks, timeout, exit-0 contract |
+| [`internal/hookio/`](internal/hookio/) | Decodes the `PostToolUse` JSON payload into a file path |
+| [`internal/config/`](internal/config/) | Resolves per-file indent settings: built-in defaults -> user config -> `.editorconfig` |
+| [`internal/dispatch/`](internal/dispatch/) | Extension -> `Formatter` registry, vendored-dir list, disabled-extension filtering |
+| [`internal/formatters/`](internal/formatters/) | One `Formatter` implementation per file type (native: `json.go`, `shell.go`; external: `biome.go`, `bunxtool.go`, `sqlfluff.go`); `exec.go` holds the shared subprocess-run + diagnostic-truncation helper |
+
+## Invariants
+
+Unchanged from the hand-written per-project hooks this replaces:
+
+- **Silent on success** — nothing printed, saves tokens in the transcript.
+- **On failure**, a truncated (≤10 lines / 500 chars) diagnostic goes to
+  stderr so a broken fixer is still debuggable; if the failing command
+  produced no output at all, the diagnostic falls back to the process
+  error itself rather than an empty string.
+- **Always exits 0.** A `PostToolUse` hook runs after the tool call
+  already succeeded — it must never be the reason a Write/Edit/
+  NotebookEdit call reports failure.
+- **An unsupported extension is an instant no-op** — one `filepath.Ext`
+  call and one map lookup, nothing else — no `stat`, no `exec.LookPath`,
+  no subprocess.
+- **Every formatter runs unconditionally within scope** — no formatter
+  requires its own project config file to exist first. A `.ts` file in a
+  project with no `biome.json` still gets formatted with biome's built-in
+  defaults, the same way a `.md` file with no `.markdownlint.json` gets
+  formatted with markdownlint-cli2's defaults. Do not reintroduce a
+  config-presence gate on any formatter (biome had one; it was removed —
+  see `CHANGELOG.md`).
+- Files under `node_modules/`, `.next/`, `.yarn/`, `.git/`, `.agents/`,
+  `dist/`, `build/`, `coverage/`, `test-results/`, `vendor/`, or `.venv/`
+  (anywhere in the path), or outside `$CLAUDE_PROJECT_DIR`, are always
+  skipped (`dispatch.InVendoredDir`, `main.within`).
+
+## Conventions
+
+- No drive-by refactors; match the style of the file being touched.
+- New formatters implement the `formatters.Formatter` interface
+  ([`formatter.go`](internal/formatters/formatter.go)) and register in
+  `dispatch.NewRegistry` ([`dispatch.go`](internal/dispatch/dispatch.go)).
+- Prefer a native implementation only after actually testing it against a
+  real file from this fleet, per the Architecture rationale above — do not
+  assume a Go library is formatting-fidelity-safe without checking.
+- Commit conventions, PR checklist: [CONTRIBUTING.md](CONTRIBUTING.md).

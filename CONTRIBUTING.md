@@ -1,0 +1,57 @@
+# Contributing
+
+Thanks for helping improve **claude-format-hooks**.
+
+## Before you start
+
+- **Architecture and conventions:** [AGENTS.md](AGENTS.md)
+- **Operators (install, config, troubleshooting):** [HUMANS.md](HUMANS.md)
+
+## Prerequisites
+
+- [Go](https://go.dev/) (see the `go` version in [go.mod](go.mod))
+- [`golangci-lint`](https://golangci-lint.run/) v2.9.0+ (CI pins this
+  version; see [`.golangci.yml`](.golangci.yml))
+- Optional: `bun` (`bunx`) and `sqlfluff` if you're changing an external
+  formatter and want to exercise it locally — see
+  [HUMANS.md](HUMANS.md#prerequisites)
+
+## Build and test
+
+```bash
+go build ./...
+go vet ./...
+gofmt -l .
+golangci-lint run ./...
+go test -race -cover ./...
+```
+
+CI ([`.github/workflows/ci.yml`](.github/workflows/ci.yml)) runs the same
+checks, plus `govulncheck`, on every push and pull request to `main`.
+
+Single package or test:
+
+```bash
+go test -race -v ./internal/formatters/...
+go test -race -v -run TestJSONFormatterIdempotent ./internal/formatters
+```
+
+## Pull requests
+
+Use the PR template. No unrelated refactors or scope creep — match the
+style of the file being touched (see [AGENTS.md](AGENTS.md#conventions)).
+If you add or change a formatter, update the
+[supported-extensions table](HUMANS.md#supported-extensions) in
+HUMANS.md and the [layout table](AGENTS.md#layout) in AGENTS.md if the
+package layout changed, and add a `CHANGELOG.md` entry under
+`[Unreleased]`.
+
+## Security
+
+Report vulnerabilities via [SECURITY.md](SECURITY.md) (private advisory),
+not a public issue.
+
+## License
+
+By contributing, you agree that your contributions are licensed under the
+[MIT License](LICENSE) that applies to this project.
