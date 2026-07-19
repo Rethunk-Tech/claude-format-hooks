@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.1.0] - 2026-07-19
+
 ### Added
 
 - Unit tests for `internal/installer`'s `settings.json` mutation logic:
@@ -106,4 +108,5 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   so a new govulncheck release can't fail a PR with no corresponding code
   change.
 
-[Unreleased]: https://github.com/Rethunk-Tech/claude-format-hooks/commits/main
+[Unreleased]: https://github.com/Rethunk-Tech/claude-format-hooks/compare/v0.1.0...HEAD
+[0.1.0]: https://github.com/Rethunk-Tech/claude-format-hooks/releases/tag/v0.1.0
