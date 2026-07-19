@@ -5,6 +5,9 @@ import (
 	"os"
 	"path/filepath"
 	"slices"
+	"time"
+
+	"github.com/Rethunk-Tech/claude-format-hooks/internal/diskcache"
 )
 
 // biomeFormatter shells out to `bunx @biomejs/biome check --write` for JS/TS/JSX/
@@ -29,7 +32,7 @@ func (biomeFormatter) Format(ctx context.Context, projectRoot, abs string) Resul
 		return Result{Skipped: true}
 	}
 
-	cfgDir := findUpward(filepath.Dir(abs), projectRoot, "biome.json", "biome.jsonc")
+	cfgDir := cachedFindUpward(filepath.Dir(abs), projectRoot, "biome.json", "biome.jsonc")
 	if cfgDir == "" {
 		cfgDir = projectRoot
 	}
@@ -39,6 +42,37 @@ func (biomeFormatter) Format(ctx context.Context, projectRoot, abs string) Resul
 		return Result{Diagnostic: diag}
 	}
 	return Result{}
+}
+
+// findUpwardCacheTTL is how long a resolved (or unresolved) config
+// directory is trusted before cachedFindUpward re-walks the tree. The
+// directory a biome.json/biome.jsonc lives in — or its absence entirely
+// — practically never changes mid-session, so this is generous compared
+// to binPathCacheTTL; a stale hit just costs one extra walk after expiry,
+// never a wrong result.
+const findUpwardCacheTTL = 30 * time.Second
+
+// cachedFindUpward wraps findUpward with a short-TTL disk cache: each
+// format-dispatch invocation is a fresh process (see AGENTS.md's
+// cold-start rationale), and this walk otherwise repeats on every single
+// file written under the same directory during a session — e.g. a large
+// multi-file edit across one package. An empty result (no config found
+// anywhere up to root) is cached too, which is the common case for a
+// project with no biome.json at all.
+func cachedFindUpward(dir, root string, names ...string) string {
+	cacheDir, ok := diskcache.Dir()
+	if !ok {
+		return findUpward(dir, root, names...)
+	}
+
+	key := diskcache.Key("findupward", append([]string{root, dir}, names...)...)
+	if cached, hit := diskcache.Get(cacheDir, key, findUpwardCacheTTL); hit {
+		return cached
+	}
+
+	found := findUpward(dir, root, names...)
+	diskcache.Set(cacheDir, key, found)
+	return found
 }
 
 // findUpward walks from dir up to (and including) root looking for any of

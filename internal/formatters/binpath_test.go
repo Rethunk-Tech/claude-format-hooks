@@ -8,10 +8,12 @@ import (
 	"time"
 
 	"github.com/go-quicktest/qt"
+
+	"github.com/Rethunk-Tech/claude-format-hooks/internal/diskcache"
 )
 
 func TestLookPathFindsRealBinary(t *testing.T) {
-	isolateBinCache(t)
+	isolateDiskCache(t)
 	writeFakeTool(t, "findable-tool", "exit 0")
 
 	path, err := lookPath("findable-tool")
@@ -20,20 +22,20 @@ func TestLookPathFindsRealBinary(t *testing.T) {
 }
 
 func TestLookPathCachesMissAndPersistsAMarker(t *testing.T) {
-	isolateBinCache(t)
+	isolateDiskCache(t)
 	clearPath(t)
 
 	_, err := lookPath("still-missing-tool")
 	qt.Assert(t, qt.IsNotNil(err))
 
-	path, ok := markerPath("still-missing-tool")
+	dir, ok := diskcache.Dir()
 	qt.Assert(t, qt.IsTrue(ok))
-	_, statErr := os.Stat(path)
+	_, statErr := os.Stat(filepath.Join(dir, "missing-still-missing-tool"))
 	qt.Check(t, qt.IsNil(statErr), qt.Commentf("a miss should persist a marker to disk"))
 }
 
 func TestLookPathFreshMissMasksASubsequentInstall(t *testing.T) {
-	isolateBinCache(t)
+	isolateDiskCache(t)
 	clearPath(t)
 
 	_, err := lookPath("was-missing-then-installed")
@@ -47,14 +49,15 @@ func TestLookPathFreshMissMasksASubsequentInstall(t *testing.T) {
 }
 
 func TestLookPathRechecksAfterTTLExpires(t *testing.T) {
-	isolateBinCache(t)
+	isolateDiskCache(t)
 	writeFakeTool(t, "was-missing-now-stale", "exit 0")
 
-	path, ok := markerPath("was-missing-now-stale")
+	dir, ok := diskcache.Dir()
 	qt.Assert(t, qt.IsTrue(ok))
-	qt.Assert(t, qt.IsNil(os.MkdirAll(filepath.Dir(path), 0o700)))
+	path := filepath.Join(dir, "missing-was-missing-now-stale")
+	qt.Assert(t, qt.IsNil(os.MkdirAll(dir, 0o700)))
 	stale := time.Now().Add(-2 * binPathCacheTTL).Unix()
-	qt.Assert(t, qt.IsNil(os.WriteFile(path, []byte(strconv.FormatInt(stale, 10)), 0o600))) //nolint:gosec // test fixture
+	qt.Assert(t, qt.IsNil(os.WriteFile(path, []byte(strconv.FormatInt(stale, 10)+"\n"), 0o600))) //nolint:gosec // test fixture
 
 	got, err := lookPath("was-missing-now-stale")
 	qt.Check(t, qt.IsNil(err), qt.Commentf("a stale marker must not mask a now-installed binary"))
@@ -62,28 +65,20 @@ func TestLookPathRechecksAfterTTLExpires(t *testing.T) {
 }
 
 func TestLookPathSuccessClearsAStaleMarker(t *testing.T) {
-	isolateBinCache(t)
+	isolateDiskCache(t)
 	writeFakeTool(t, "clears-its-marker", "exit 0")
 
-	path, ok := markerPath("clears-its-marker")
+	dir, ok := diskcache.Dir()
 	qt.Assert(t, qt.IsTrue(ok))
-	qt.Assert(t, qt.IsNil(os.MkdirAll(filepath.Dir(path), 0o700)))
-	qt.Assert(t, qt.IsNil(os.WriteFile(path, []byte("123"), 0o600))) //nolint:gosec // test fixture, deliberately stale/bogus
+	path := filepath.Join(dir, "missing-clears-its-marker")
+	qt.Assert(t, qt.IsNil(os.MkdirAll(dir, 0o700)))
+	qt.Assert(t, qt.IsNil(os.WriteFile(path, []byte("123\n"), 0o600))) //nolint:gosec // test fixture, deliberately stale/bogus
 
 	_, err := lookPath("clears-its-marker")
 	qt.Assert(t, qt.IsNil(err))
 
 	_, statErr := os.Stat(path)
 	qt.Check(t, qt.IsTrue(os.IsNotExist(statErr)), qt.Commentf("a successful lookup should clear any marker left behind"))
-}
-
-func TestCacheDirHonorsEnvOverride(t *testing.T) {
-	want := t.TempDir()
-	t.Setenv("CLAUDE_FORMAT_HOOKS_CACHE", want)
-
-	dir, ok := cacheDir()
-	qt.Check(t, qt.IsTrue(ok))
-	qt.Check(t, qt.Equals(dir, want))
 }
 
 func TestLookPathDegradesGracefullyWithNoCacheDirAvailable(t *testing.T) {
@@ -95,7 +90,7 @@ func TestLookPathDegradesGracefullyWithNoCacheDirAvailable(t *testing.T) {
 	t.Setenv("XDG_CACHE_HOME", "")
 	t.Setenv("HOME", "")
 
-	_, ok := cacheDir()
+	_, ok := diskcache.Dir()
 	qt.Assert(t, qt.IsFalse(ok), qt.Commentf("test environment must be able to force this for the assertions below to be meaningful"))
 
 	clearPath(t)

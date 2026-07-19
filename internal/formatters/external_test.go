@@ -4,10 +4,14 @@ import (
 	"os"
 	"path/filepath"
 	"runtime"
+	"strconv"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/go-quicktest/qt"
+
+	"github.com/Rethunk-Tech/claude-format-hooks/internal/diskcache"
 )
 
 // writeFakeTool puts an executable named name on a fresh PATH containing
@@ -30,14 +34,15 @@ func clearPath(t *testing.T) {
 	t.Setenv("PATH", t.TempDir())
 }
 
-// isolateBinCache points lookPath's on-disk "missing binary" cache at a
-// fresh, empty temp dir for the duration of the test. Without this,
+// isolateDiskCache points every internal/diskcache-backed lookup (missing
+// binaries, biome's resolved config directory, EditorConfig resolution)
+// at a fresh, empty temp dir for the duration of the test. Without this,
 // every test in this file would share the real OS cache directory: a
 // miss cached by one test (e.g. clearPath's empty PATH) would leak into
 // another test that expects the same binary name to be found moments
 // later, and — worse — would write real files under the developer's own
 // cache directory when running `go test` locally.
-func isolateBinCache(t *testing.T) {
+func isolateDiskCache(t *testing.T) {
 	t.Helper()
 	t.Setenv("CLAUDE_FORMAT_HOOKS_CACHE", t.TempDir())
 }
@@ -62,7 +67,7 @@ func TestExternalFormatterNames(t *testing.T) {
 }
 
 func TestBunxFormattersSkipWhenBunxMissing(t *testing.T) {
-	isolateBinCache(t)
+	isolateDiskCache(t)
 	clearPath(t)
 	abs := filepath.Join(t.TempDir(), "f.txt")
 	for _, f := range []Formatter{NewBiome(), NewMarkdown(), NewTOML(), NewPrettier()} {
@@ -72,7 +77,7 @@ func TestBunxFormattersSkipWhenBunxMissing(t *testing.T) {
 }
 
 func TestBunxFormatterSuccessAndFailure(t *testing.T) {
-	isolateBinCache(t)
+	isolateDiskCache(t)
 	dir := t.TempDir()
 	abs := filepath.Join(dir, "f.md")
 
@@ -91,7 +96,7 @@ func TestBunxFormatterSuccessAndFailure(t *testing.T) {
 }
 
 func TestSQLFluffSkipsWhenMissing(t *testing.T) {
-	isolateBinCache(t)
+	isolateDiskCache(t)
 	clearPath(t)
 	abs := filepath.Join(t.TempDir(), "f.sql")
 	res := NewSQLFluff().Format(t.Context(), t.TempDir(), abs)
@@ -99,7 +104,7 @@ func TestSQLFluffSkipsWhenMissing(t *testing.T) {
 }
 
 func TestBiomeFormatSuccess(t *testing.T) {
-	isolateBinCache(t)
+	isolateDiskCache(t)
 	writeFakeTool(t, "bunx", "exit 0")
 	dir := t.TempDir()
 	abs := filepath.Join(dir, "f.ts")
@@ -110,7 +115,7 @@ func TestBiomeFormatSuccess(t *testing.T) {
 }
 
 func TestBiomeFormatFailureTruncatesDiagnostic(t *testing.T) {
-	isolateBinCache(t)
+	isolateDiskCache(t)
 	writeFakeTool(t, "bunx", `i=1; while [ $i -le 20 ]; do echo "line $i"; i=$((i+1)); done; exit 1`)
 	dir := t.TempDir()
 	abs := filepath.Join(dir, "f.ts")
@@ -121,7 +126,7 @@ func TestBiomeFormatFailureTruncatesDiagnostic(t *testing.T) {
 }
 
 func TestSQLFluffFormatSuccessAndFailure(t *testing.T) {
-	isolateBinCache(t)
+	isolateDiskCache(t)
 	dir := t.TempDir()
 	abs := filepath.Join(dir, "f.sql")
 
@@ -140,7 +145,7 @@ func TestSQLFluffFormatSuccessAndFailure(t *testing.T) {
 }
 
 func TestPythonFormatterSkipsWhenBothMissing(t *testing.T) {
-	isolateBinCache(t)
+	isolateDiskCache(t)
 	clearPath(t)
 	abs := filepath.Join(t.TempDir(), "f.py")
 	res := NewPython().Format(t.Context(), t.TempDir(), abs)
@@ -148,7 +153,7 @@ func TestPythonFormatterSkipsWhenBothMissing(t *testing.T) {
 }
 
 func TestPythonFormatterPrefersRuffOverBlack(t *testing.T) {
-	isolateBinCache(t)
+	isolateDiskCache(t)
 	dir := t.TempDir()
 	path := filepath.Join(dir, "ruff")
 	qt.Assert(t, qt.IsNil(os.WriteFile(path, []byte("#!/bin/sh\nexit 0\n"), 0o755))) //nolint:gosec // test fixture
@@ -163,7 +168,7 @@ func TestPythonFormatterPrefersRuffOverBlack(t *testing.T) {
 }
 
 func TestPythonFormatterFallsBackToBlack(t *testing.T) {
-	isolateBinCache(t)
+	isolateDiskCache(t)
 	writeFakeTool(t, "black", "exit 0")
 	abs := filepath.Join(t.TempDir(), "f.py")
 	res := NewPython().Format(t.Context(), t.TempDir(), abs)
@@ -172,7 +177,7 @@ func TestPythonFormatterFallsBackToBlack(t *testing.T) {
 }
 
 func TestPythonFormatterFailure(t *testing.T) {
-	isolateBinCache(t)
+	isolateDiskCache(t)
 	writeFakeTool(t, "ruff", "exit 1")
 	abs := filepath.Join(t.TempDir(), "f.py")
 	res := NewPython().Format(t.Context(), t.TempDir(), abs)
@@ -180,7 +185,7 @@ func TestPythonFormatterFailure(t *testing.T) {
 }
 
 func TestRustFormatterSkipsWhenMissing(t *testing.T) {
-	isolateBinCache(t)
+	isolateDiskCache(t)
 	clearPath(t)
 	abs := filepath.Join(t.TempDir(), "f.rs")
 	res := NewRust().Format(t.Context(), t.TempDir(), abs)
@@ -188,7 +193,7 @@ func TestRustFormatterSkipsWhenMissing(t *testing.T) {
 }
 
 func TestRustFormatterSuccessAndFailure(t *testing.T) {
-	isolateBinCache(t)
+	isolateDiskCache(t)
 	dir := t.TempDir()
 	abs := filepath.Join(dir, "f.rs")
 
@@ -207,7 +212,7 @@ func TestRustFormatterSuccessAndFailure(t *testing.T) {
 }
 
 func TestTerraformFormatterSkipsWhenMissing(t *testing.T) {
-	isolateBinCache(t)
+	isolateDiskCache(t)
 	clearPath(t)
 	abs := filepath.Join(t.TempDir(), "f.tf")
 	res := NewTerraform().Format(t.Context(), t.TempDir(), abs)
@@ -215,7 +220,7 @@ func TestTerraformFormatterSkipsWhenMissing(t *testing.T) {
 }
 
 func TestTerraformFormatterSuccessAndFailure(t *testing.T) {
-	isolateBinCache(t)
+	isolateDiskCache(t)
 	dir := t.TempDir()
 	abs := filepath.Join(dir, "f.tf")
 
@@ -231,6 +236,46 @@ func TestTerraformFormatterSuccessAndFailure(t *testing.T) {
 		res := NewTerraform().Format(t.Context(), dir, abs)
 		qt.Check(t, qt.Not(qt.Equals(res.Diagnostic, "")))
 	})
+}
+
+func TestCachedFindUpwardMatchesFindUpward(t *testing.T) {
+	isolateDiskCache(t)
+	root := t.TempDir()
+	sub := filepath.Join(root, "a", "b")
+	qt.Assert(t, qt.IsNil(os.MkdirAll(sub, 0o700)))
+	marker := filepath.Join(root, "a", "biome.json")
+	qt.Assert(t, qt.IsNil(os.WriteFile(marker, []byte("{}"), 0o600)))
+
+	qt.Check(t, qt.Equals(cachedFindUpward(sub, root, "biome.json", "biome.jsonc"), filepath.Join(root, "a")))
+}
+
+func TestCachedFindUpwardCachesAFreshMissAgainstANewlyCreatedConfig(t *testing.T) {
+	isolateDiskCache(t)
+	root := t.TempDir()
+
+	qt.Check(t, qt.Equals(cachedFindUpward(root, root, "biome.json", "biome.jsonc"), ""),
+		qt.Commentf("no config exists yet"))
+
+	qt.Assert(t, qt.IsNil(os.WriteFile(filepath.Join(root, "biome.json"), []byte("{}"), 0o600)))
+	qt.Check(t, qt.Equals(cachedFindUpward(root, root, "biome.json", "biome.jsonc"), ""),
+		qt.Commentf("a fresh cached miss must still mask a config file that appears moments later"))
+}
+
+func TestCachedFindUpwardRechecksAfterTTLExpires(t *testing.T) {
+	isolateDiskCache(t)
+	root := t.TempDir()
+
+	cacheDir, ok := diskcache.Dir()
+	qt.Assert(t, qt.IsTrue(ok))
+	key := diskcache.Key("findupward", root, root, "biome.json", "biome.jsonc")
+	diskcache.Set(cacheDir, key, "")
+	stalePath := filepath.Join(cacheDir, key)
+	stale := time.Now().Add(-2 * findUpwardCacheTTL).Unix()
+	qt.Assert(t, qt.IsNil(os.WriteFile(stalePath, []byte(strconv.FormatInt(stale, 10)+"\n"), 0o600))) //nolint:gosec // test fixture
+
+	qt.Assert(t, qt.IsNil(os.WriteFile(filepath.Join(root, "biome.json"), []byte("{}"), 0o600)))
+	qt.Check(t, qt.Equals(cachedFindUpward(root, root, "biome.json", "biome.jsonc"), root),
+		qt.Commentf("a stale cached miss must not mask a now-present config file"))
 }
 
 func TestFindUpward(t *testing.T) {

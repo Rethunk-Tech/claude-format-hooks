@@ -101,9 +101,10 @@ tool. Only the two native formatters needed their own config story (see
 | --- | --- |
 | [`cmd/format-dispatch/`](cmd/format-dispatch/) | Entrypoint: stdin parsing, extension gate, vendored-dir/project-root checks, project-level formatter opt-out, timeout, exit-0 contract; also dispatches `--install`/`--uninstall` to `internal/installer` |
 | [`internal/hookio/`](internal/hookio/) | Decodes the `PostToolUse` JSON payload into a file path |
-| [`internal/config/`](internal/config/) | Resolves per-file indent settings: built-in defaults -> user config -> `.editorconfig` |
+| [`internal/diskcache/`](internal/diskcache/) | Small disk-backed key/value cache with TTL-based expiry, shared by `internal/config` and `internal/formatters` (neither may import the other in the direction this package would require) — every result that's expensive to recompute on every invocation but rarely changes mid-session goes through here |
+| [`internal/config/`](internal/config/) | Resolves per-file indent settings: built-in defaults -> user config -> `.editorconfig`; the `.editorconfig` resolution itself is cached via `internal/diskcache` |
 | [`internal/dispatch/`](internal/dispatch/) | Extension -> `Formatter` registry, vendored-dir list, disabled-extension filtering |
-| [`internal/formatters/`](internal/formatters/) | One `Formatter` implementation per file type (native: `json.go`, `shell.go`, `golang.go`; external: `biome.go`, `bunxtool.go`, `sqlfluff.go`, `python.go`, `rust.go`, `terraform.go`); `exec.go` holds the shared subprocess-run + diagnostic-truncation helper; `binpath.go` holds the shared, disk-cached `lookPath` every external formatter uses instead of calling `exec.LookPath` directly; `writefile.go` holds the shared mode-preserving write every native formatter uses instead of its own stat-then-write |
+| [`internal/formatters/`](internal/formatters/) | One `Formatter` implementation per file type (native: `json.go`, `shell.go`, `golang.go`; external: `biome.go`, `bunxtool.go`, `sqlfluff.go`, `python.go`, `rust.go`, `terraform.go`); `exec.go` holds the shared subprocess-run + diagnostic-truncation helper; `binpath.go` holds the shared, cached `lookPath` every external formatter uses instead of calling `exec.LookPath` directly; `writefile.go` holds the shared mode-preserving write every native formatter uses instead of its own stat-then-write |
 | [`internal/installer/`](internal/installer/) | Wires/unwires format-dispatch's `PostToolUse` hook in `~/.claude/settings.json` (`format-dispatch --install`/`--uninstall`), replacing `install.sh`'s old `jq` filter; `orderedmap.go` preserves the file's existing key order across the rewrite and a `.bak` backup is written before any real change; both writes go through `writeAtomic` (temp file + rename) so a kill mid-write can never truncate the operator's live `settings.json` |
 
 ## Invariants
@@ -121,12 +122,17 @@ Unchanged from the hand-written per-project hooks this replaces:
 - **An unsupported extension is an instant no-op** — one `filepath.Ext`
   call and one map lookup, nothing else — no `stat`, no `exec.LookPath`,
   no subprocess, no config read.
-- **A missing external tool binary is remembered for a short TTL**
-  (`binPathCacheTTL`, `internal/formatters/binpath.go`) so a burst of
-  file writes doesn't re-walk `$PATH` for every one; the check reruns
-  after the TTL, so installing the tool mid-session is picked up without
-  restarting Claude Code. Every external formatter must go through
-  `formatters.lookPath`, never a bare `exec.LookPath`, to get this.
+- **Anything expensive that rarely changes mid-session is cached for a
+  short TTL via `internal/diskcache`**, not recomputed on every
+  invocation: a missing external tool binary (`binPathCacheTTL`,
+  `internal/formatters/binpath.go` — every external formatter must go
+  through `formatters.lookPath`, never a bare `exec.LookPath`), biome's
+  resolved config directory (`findUpwardCacheTTL`,
+  `internal/formatters/biome.go`), and EditorConfig resolution
+  (`editorconfigCacheTTL`, `internal/config/config.go`). Each check
+  reruns after its TTL, so a change made mid-session (installing the
+  missing tool, adding a config file) is picked up without restarting
+  Claude Code.
 - **Every formatter runs unconditionally within scope** — no formatter
   requires its own project config file to exist first. A `.ts` file in a
   project with no `biome.json` still gets formatted with biome's built-in

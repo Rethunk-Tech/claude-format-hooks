@@ -21,9 +21,13 @@ import (
 	"encoding/json"
 	"os"
 	"slices"
+	"strconv"
 	"strings"
+	"time"
 
 	"mvdan.cc/editorconfig"
+
+	"github.com/Rethunk-Tech/claude-format-hooks/internal/diskcache"
 )
 
 // JSON holds the user's indent preference for the native JSON formatter.
@@ -102,7 +106,39 @@ func ResolveShellIndent(cfg Config, abs string) IndentSpec {
 	return resolveIndent(abs, IndentSpec{Size: cfg.Shell.IndentSize, UseTabs: cfg.Shell.UseTabs})
 }
 
+// editorconfigCacheTTL is how long a resolved IndentSpec is trusted
+// before resolveIndent re-walks and re-parses .editorconfig for it. A
+// project's .editorconfig practically never changes mid-session, so a
+// stale hit just costs one extra resolution after expiry, never a wrong
+// result — same reasoning as findUpwardCacheTTL in
+// internal/formatters/biome.go.
+const editorconfigCacheTTL = 30 * time.Second
+
+// resolveIndent is cached (via internal/diskcache) on (abs, fallback):
+// each format-dispatch invocation is a fresh process (see AGENTS.md's
+// cold-start rationale), and editorconfig.Find's directory walk
+// otherwise repeats every time the same file is reformatted — a common
+// pattern when an agent edits one file several times in quick
+// succession.
 func resolveIndent(abs string, fallback IndentSpec) IndentSpec {
+	cacheDir, ok := diskcache.Dir()
+	if !ok {
+		return resolveIndentUncached(abs, fallback)
+	}
+
+	key := diskcache.Key("editorconfig", abs, strconv.Itoa(fallback.Size), strconv.FormatBool(fallback.UseTabs))
+	if cached, hit := diskcache.Get(cacheDir, key, editorconfigCacheTTL); hit {
+		if spec, ok := decodeIndentSpec(cached); ok {
+			return spec
+		}
+	}
+
+	spec := resolveIndentUncached(abs, fallback)
+	diskcache.Set(cacheDir, key, encodeIndentSpec(spec))
+	return spec
+}
+
+func resolveIndentUncached(abs string, fallback IndentSpec) IndentSpec {
 	section, err := editorconfig.Find(abs, nil)
 	if err != nil {
 		return fallback
@@ -119,4 +155,27 @@ func resolveIndent(abs string, fallback IndentSpec) IndentSpec {
 		spec.Size = size
 	}
 	return spec
+}
+
+// encodeIndentSpec/decodeIndentSpec serialize an IndentSpec to and from
+// the plain "size,tabs" string diskcache stores it as — no need for
+// JSON's overhead for a two-field value only this package ever reads.
+func encodeIndentSpec(spec IndentSpec) string {
+	tabs := "0"
+	if spec.UseTabs {
+		tabs = "1"
+	}
+	return strconv.Itoa(spec.Size) + "," + tabs
+}
+
+func decodeIndentSpec(s string) (IndentSpec, bool) {
+	size, tabs, found := strings.Cut(s, ",")
+	if !found {
+		return IndentSpec{}, false
+	}
+	n, err := strconv.Atoi(size)
+	if err != nil {
+		return IndentSpec{}, false
+	}
+	return IndentSpec{Size: n, UseTabs: tabs == "1"}, true
 }

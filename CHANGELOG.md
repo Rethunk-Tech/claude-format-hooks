@@ -51,6 +51,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `bunx`/`sqlfluff`/`ruff`/`black`/`rustfmt` re-walked `$PATH` on every
   single file write. The check reruns after the TTL, so installing the
   missing tool mid-session is picked up without restarting.
+- `internal/diskcache`: extracted the disk-backed TTL cache underlying
+  `lookPath` into its own package (shared by `internal/formatters` and
+  `internal/config`, which may not import each other in the direction
+  this would otherwise require), then used it for two more hot,
+  repeats-every-invocation paths that were flagged and initially passed
+  over as too marginal on their own, but were worth doing once the
+  cache mechanism itself was already shared infrastructure: biome's
+  upward walk for `biome.json`/`biome.jsonc` (`cachedFindUpward` in
+  `internal/formatters/biome.go` — also caches the common "no config
+  anywhere" case) and EditorConfig resolution for the two native
+  formatters (`internal/config/config.go`'s `resolveIndent`, keyed on
+  the file path so re-editing the same file benefits immediately). Both
+  use the same reasoning as the binary-lookup cache: the underlying
+  result rarely changes mid-session, so a stale hit just costs one
+  extra recompute after the TTL, never a wrong one.
 - `internal/formatters/writefile.go`: a shared `writeFormatted` helper
   (stat the existing file for its mode, fall back to a default, write)
   replacing three near-identical copies of the same block in `json.go`,
