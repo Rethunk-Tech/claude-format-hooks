@@ -72,6 +72,16 @@ at `~/.claude/hooks/format-dispatch` (or `$CLAUDE_HOOKS_BIN_DIR`'s
 binary); every other key and hook entry is left exactly as it was. A
 settings.json with no such entry is a no-op.
 
+### Other flags
+
+```bash
+format-dispatch --version    # print version and build info (for bug reports)
+format-dispatch --help       # usage
+```
+
+An unrecognized flag prints usage to stderr and exits 1, rather than
+hanging on stdin — safe to run by hand while debugging.
+
 ## Supported extensions
 
 | Extension | Formatter | Native? |

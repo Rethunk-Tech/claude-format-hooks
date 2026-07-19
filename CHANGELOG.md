@@ -9,6 +9,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- `format-dispatch --version` (via `runtime/debug.ReadBuildInfo`, no
+  ldflags needed) and `format-dispatch --help`/`-h`. An unrecognized flag
+  now prints usage to stderr and exits 1 instead of silently falling
+  through to reading stdin, which would otherwise hang forever in an
+  interactive terminal.
 - Test coverage for `installer.DefaultOptions`, `cmd/format-dispatch`'s
   `runInstall` (including its `installer.DefaultOptions` error path), the
   `json`/`shell` formatters' `Name()` methods, and the shared

@@ -23,6 +23,7 @@ import (
 	"io"
 	"os"
 	"path/filepath"
+	"runtime/debug"
 	"strings"
 	"time"
 
@@ -37,16 +38,75 @@ import (
 // generic context.DeadlineExceeded.
 var errFormatterTimeout = errors.New("formatter timed out after 25s")
 
+const usage = `format-dispatch is a Claude Code PostToolUse hook. Invoked with no
+arguments, it reads a hook payload from stdin and formats the file it names.
+
+Usage:
+  format-dispatch                    read a PostToolUse payload from stdin (normal hook invocation)
+  format-dispatch --install          wire this binary into ~/.claude/settings.json as a PostToolUse hook
+  format-dispatch --uninstall        remove it from ~/.claude/settings.json
+  format-dispatch --install --dry-run    preview the settings.json diff for either subcommand, without writing
+  format-dispatch --version          print version and build info
+  format-dispatch --help             show this help
+`
+
 func main() {
 	if len(os.Args) > 1 {
-		switch os.Args[1] {
-		case "--install":
-			os.Exit(runInstall(os.Args[2:], false))
-		case "--uninstall":
-			os.Exit(runInstall(os.Args[2:], true))
-		}
+		os.Exit(dispatchArgs(os.Args[1:]))
 	}
 	os.Exit(run(os.Stdin))
+}
+
+// dispatchArgs handles every non-empty os.Args[1:] form: the --install/
+// --uninstall subcommands, --version, --help/-h, and (as a fallback) an
+// unrecognized flag — printed as a usage error rather than silently falling
+// through to run(stdin), which would otherwise block forever waiting on
+// stdin in an interactive terminal.
+func dispatchArgs(args []string) int {
+	switch args[0] {
+	case "--install":
+		return runInstall(args[1:], false)
+	case "--uninstall":
+		return runInstall(args[1:], true)
+	case "--version":
+		fmt.Println(versionString())
+		return 0
+	case "--help", "-h":
+		fmt.Print(usage)
+		return 0
+	default:
+		fmt.Fprint(os.Stderr, usage)
+		return 1
+	}
+}
+
+// versionString reports the module version and VCS revision embedded by
+// `go build` (Go 1.18+), so `--version` needs no ldflags or manual bump —
+// it reflects whatever commit the binary was actually built from.
+func versionString() string {
+	info, ok := debug.ReadBuildInfo()
+	if !ok {
+		return "format-dispatch: unknown version (no build info embedded)"
+	}
+	version := info.Main.Version
+	var revision, dirty string
+	for _, s := range info.Settings {
+		switch s.Key {
+		case "vcs.revision":
+			revision = s.Value
+		case "vcs.modified":
+			if s.Value == "true" {
+				dirty = "-dirty"
+			}
+		}
+	}
+	if revision == "" {
+		return fmt.Sprintf("format-dispatch %s", version)
+	}
+	if len(revision) > 12 {
+		revision = revision[:12]
+	}
+	return fmt.Sprintf("format-dispatch %s (%s%s)", version, revision, dirty)
 }
 
 // runInstall wires format-dispatch into (--install) or removes it from

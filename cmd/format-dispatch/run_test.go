@@ -30,6 +30,53 @@ func captureStderr(t *testing.T, fn func()) string {
 	return buf.String()
 }
 
+func captureStdout(t *testing.T, fn func()) string {
+	t.Helper()
+	orig := os.Stdout
+	r, w, err := os.Pipe()
+	qt.Assert(t, qt.IsNil(err))
+	os.Stdout = w
+	defer func() { os.Stdout = orig }()
+
+	fn()
+
+	qt.Assert(t, qt.IsNil(w.Close()))
+	var buf bytes.Buffer
+	_, err = io.Copy(&buf, r)
+	qt.Assert(t, qt.IsNil(err))
+	return buf.String()
+}
+
+func TestDispatchArgsHelp(t *testing.T) {
+	for _, flag := range []string{"--help", "-h"} {
+		t.Run(flag, func(t *testing.T) {
+			var code int
+			stdout := captureStdout(t, func() { code = dispatchArgs([]string{flag}) })
+			qt.Check(t, qt.Equals(code, 0))
+			qt.Check(t, qt.StringContains(stdout, "Usage:"))
+		})
+	}
+}
+
+func TestDispatchArgsVersion(t *testing.T) {
+	var code int
+	stdout := captureStdout(t, func() { code = dispatchArgs([]string{"--version"}) })
+	qt.Check(t, qt.Equals(code, 0))
+	qt.Check(t, qt.StringContains(stdout, "format-dispatch"))
+}
+
+func TestDispatchArgsUnknownFlagPrintsUsageAndFails(t *testing.T) {
+	var code int
+	stderr := captureStderr(t, func() { code = dispatchArgs([]string{"--bogus"}) })
+	qt.Check(t, qt.Equals(code, 1))
+	qt.Check(t, qt.StringContains(stderr, "Usage:"))
+}
+
+func TestVersionStringReportsBuildInfo(t *testing.T) {
+	got := versionString()
+	qt.Check(t, qt.StringContains(got, "format-dispatch"))
+}
+
 func writeFile(t *testing.T, path, content string) {
 	t.Helper()
 	qt.Assert(t, qt.IsNil(os.MkdirAll(filepath.Dir(path), 0o700)))
