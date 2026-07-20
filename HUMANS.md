@@ -206,6 +206,18 @@ a cold `bunx` fetch (see the timeout note above). Unset it when done —
 the file isn't rotated or truncated, so it grows unbounded; this is
 meant for a short debugging session, not to be left on permanently.
 
+**Running under Cursor: the hook never seems to fire, with an
+`Error: MainThreadShellExec not initialized` in Cursor's own logs.**
+Cursor reads the same `~/.claude/settings.json` this installer wires the
+`PostToolUse` entry into, but as of Cursor 3.12.17 its hook-invocation
+plumbing can fail before `format-dispatch` ever runs — this reproduces on
+an in-scope `Write` to a plain `.ts` file, not just an out-of-scope tool
+call, and the error string isn't one this binary emits (it's silent on
+success and always exits 0). This is a bug in Cursor's own hook executor,
+not something `claude-format-hooks` can work around from the hook side —
+see [issue #4](https://github.com/Rethunk-Tech/claude-format-hooks/issues/4)
+for the evidence and report it upstream to Cursor if you hit it.
+
 ## See also
 
 - [AGENTS.md](AGENTS.md) — architecture and developer reference
