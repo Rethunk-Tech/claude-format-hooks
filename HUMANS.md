@@ -208,15 +208,19 @@ meant for a short debugging session, not to be left on permanently.
 
 **Running under Cursor: the hook never seems to fire, with an
 `Error: MainThreadShellExec not initialized` in Cursor's own logs.**
-Cursor reads the same `~/.claude/settings.json` this installer wires the
-`PostToolUse` entry into, but as of Cursor 3.12.17 its hook-invocation
-plumbing can fail before `format-dispatch` ever runs — this reproduces on
-an in-scope `Write` to a plain `.ts` file, not just an out-of-scope tool
-call, and the error string isn't one this binary emits (it's silent on
-success and always exits 0). This is a bug in Cursor's own hook executor,
-not something `claude-format-hooks` can work around from the hook side —
-see [issue #4](https://github.com/Rethunk-Tech/claude-format-hooks/issues/4)
-for the evidence and report it upstream to Cursor if you hit it.
+Cursor can pick up this installer's `PostToolUse` entry via its own
+"load hooks from third-party tools like Claude Code" compatibility path,
+but as of Cursor 3.12.17 (also reported on 3.9.8/3.10.20) its shell-exec
+host can still be initializing when a hook fires — a confirmed upstream
+Cursor bug, not something `claude-format-hooks` causes or can work
+around: the error string isn't one this binary emits (it's silent on
+success and always exits 0), and it reproduces on a plain in-scope
+`Write` to a `.ts` file, not just an unrelated tool call. **Workaround:**
+run "Developer: Reload Window" from Cursor's command palette to
+reinitialize the shell-exec host; some occurrences also self-resolve
+within a few minutes. See [issue #4](https://github.com/Rethunk-Tech/claude-format-hooks/issues/4)
+and the [upstream Cursor forum thread](https://forum.cursor.com/t/agent-shell-hard-locks-fail-closed-beforeshellexecution-mainthreadshellexec-not-initialized/165215)
+for details.
 
 ## See also
 
