@@ -26,6 +26,15 @@ func TestDefaultOptionsUsesEnvOverrides(t *testing.T) {
 	qt.Check(t, qt.Equals(opts.SettingsPath, settingsFile))
 }
 
+func TestDefaultOptionsReportsUserHomeDirError(t *testing.T) {
+	t.Setenv("HOME", "")
+	// os.UserHomeDir() reads USERPROFILE on Windows, not HOME.
+	t.Setenv("USERPROFILE", "")
+
+	_, err := DefaultOptions()
+	qt.Check(t, qt.IsNotNil(err))
+}
+
 func TestDefaultOptionsFallsBackUnderHome(t *testing.T) {
 	t.Setenv("CLAUDE_HOOKS_BIN_DIR", "")
 	t.Setenv("CLAUDE_SETTINGS_FILE", "")
@@ -71,6 +80,23 @@ func TestWireFreshInstall(t *testing.T) {
 	qt.Assert(t, qt.HasLen(entries[0].Hooks, 1))
 	qt.Check(t, qt.Equals(entries[0].Hooks[0].Command, binPath))
 	qt.Check(t, qt.Equals(entries[0].Hooks[0].Timeout, 30))
+}
+
+func TestWireReportsUnreadableSettingsFile(t *testing.T) {
+	// A directory is never IsNotExist but always fails os.ReadFile,
+	// distinguishing "missing" (silently treated as {}) from "exists but
+	// something else went wrong" (must propagate, not be swallowed).
+	dir := t.TempDir()
+
+	_, _, err := Wire(dir, binPath)
+	qt.Check(t, qt.IsNotNil(err))
+}
+
+func TestUnwireReportsUnreadableSettingsFile(t *testing.T) {
+	dir := t.TempDir()
+
+	_, _, err := Unwire(dir, binPath)
+	qt.Check(t, qt.IsNotNil(err))
 }
 
 func TestWireMissingSettingsFile(t *testing.T) {
@@ -279,6 +305,20 @@ func TestUninstallWritesSettings(t *testing.T) {
 
 	entries := settingsPostToolUse(t, readFile(t, settingsPath))
 	qt.Check(t, qt.HasLen(entries, 0))
+}
+
+func TestInstallPropagatesWireError(t *testing.T) {
+	dir := t.TempDir()
+	var out strings.Builder
+	err := Install(Options{BinPath: binPath, SettingsPath: dir}, false, &out)
+	qt.Check(t, qt.IsNotNil(err))
+}
+
+func TestUninstallPropagatesUnwireError(t *testing.T) {
+	dir := t.TempDir()
+	var out strings.Builder
+	err := Uninstall(Options{BinPath: binPath, SettingsPath: dir}, false, &out)
+	qt.Check(t, qt.IsNotNil(err))
 }
 
 func TestInstallNoOpWhenAlreadyWired(t *testing.T) {
