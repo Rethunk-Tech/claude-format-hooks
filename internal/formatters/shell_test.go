@@ -48,6 +48,13 @@ func TestShellFormatterIdempotent(t *testing.T) {
 	}
 }
 
+func TestShellFormatterReadErrorIsNotSkipped(t *testing.T) {
+	dir := t.TempDir()
+	res := NewShell(config.Default()).Format(t.Context(), dir, dir)
+	qt.Check(t, qt.IsNotNil(res.Err))
+	qt.Check(t, qt.IsFalse(res.Skipped))
+}
+
 func TestShellFormatterUsesTabsWhenConfigured(t *testing.T) {
 	dir := t.TempDir()
 	path := filepath.Join(dir, "t.sh")

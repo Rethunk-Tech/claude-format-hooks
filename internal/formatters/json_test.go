@@ -51,6 +51,15 @@ func TestJSONFormatterIdempotent(t *testing.T) {
 	}
 }
 
+func TestJSONFormatterReadErrorIsNotSkipped(t *testing.T) {
+	// A directory always fails os.ReadFile without being IsNotExist,
+	// distinguishing this from the "not valid JSON" Skipped path.
+	dir := t.TempDir()
+	res := NewJSON(config.Default()).Format(t.Context(), dir, dir)
+	qt.Check(t, qt.IsNotNil(res.Err))
+	qt.Check(t, qt.IsFalse(res.Skipped))
+}
+
 func TestJSONFormatterPreservesKeyOrder(t *testing.T) {
 	dir := t.TempDir()
 	path := filepath.Join(dir, "t.json")

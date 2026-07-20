@@ -95,6 +95,16 @@ func TestBunxFormatterSuccessAndFailure(t *testing.T) {
 	})
 }
 
+func TestTOMLFormatterSuccess(t *testing.T) {
+	isolateDiskCache(t)
+	writeFakeTool(t, "bunx", "exit 0")
+	dir := t.TempDir()
+	abs := filepath.Join(dir, "f.toml")
+	res := NewTOML().Format(t.Context(), dir, abs)
+	qt.Check(t, qt.IsNil(res.Err))
+	qt.Check(t, qt.Equals(res.Diagnostic, ""))
+}
+
 func TestSQLFluffSkipsWhenMissing(t *testing.T) {
 	isolateDiskCache(t)
 	clearPath(t)

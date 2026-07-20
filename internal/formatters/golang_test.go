@@ -44,6 +44,13 @@ func TestGoFormatterIdempotent(t *testing.T) {
 	}
 }
 
+func TestGoFormatterReadErrorIsNotSkipped(t *testing.T) {
+	dir := t.TempDir()
+	res := NewGo().Format(t.Context(), dir, dir)
+	qt.Check(t, qt.IsNotNil(res.Err))
+	qt.Check(t, qt.IsFalse(res.Skipped))
+}
+
 func TestGoFormatterReformatsIndentation(t *testing.T) {
 	dir := t.TempDir()
 	path := filepath.Join(dir, "t.go")
