@@ -14,9 +14,11 @@ formats/lints a file right after Write/Edit/NotebookEdit writes it
 ---
 
 `claude-format-hooks` is a single global Go binary (`format-dispatch`),
-with no per-repo setup required. Two formatters (JSON, shell) run natively
-in-process; everything else routes to the real project-config-aware tool
-(biome, prettier, taplo, markdownlint-cli2, sqlfluff).
+with no per-repo setup required. Three formatters (JSON, shell, Go) run
+natively in-process; everything else routes to the real,
+project-config-aware tool: biome, prettier, taplo, and markdownlint-cli2
+via `bunx`; `sqlfluff`, `ruff`/`black`, `rustfmt`, and `terraform fmt` as
+system binaries.
 
 ## Quick start
 
@@ -30,13 +32,14 @@ Full install steps, prerequisites, and configuration: [HUMANS.md](HUMANS.md).
 
 ## Highlights
 
-- **Native, in-process formatting for JSON and shell scripts** — no
+- **Native, in-process formatting for JSON, shell, and Go** — no
   subprocess, and (for JSON) source key order is preserved exactly instead
   of alphabetized by a naive Unmarshal+Marshal round-trip.
 - **Everything else routed to the real tool** — biome, markdownlint-cli2,
-  taplo, and prettier via `bunx`; `sqlfluff` for SQL — so project config
-  files are honored automatically, with no config-presence gate: every
-  supported extension formats in every project.
+  taplo, and prettier via `bunx`; `sqlfluff`, `ruff`/`black`, `rustfmt`,
+  and `terraform fmt` as system binaries — so project config files are
+  honored automatically, with no config-presence gate: every supported
+  extension formats in every project.
 - **Silent on success, exits 0 always** — a `PostToolUse` hook must never
   be the reason a Write/Edit/NotebookEdit call reports failure; failures
   surface as a truncated stderr diagnostic instead.
