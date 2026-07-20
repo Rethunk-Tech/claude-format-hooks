@@ -40,6 +40,16 @@ func TestLoad(t *testing.T) {
 		qt.Check(t, qt.DeepEquals(cfg.Disabled, []string{".sql"}))
 	})
 
+	t.Run("path exists but is unreadable returns defaults and an error", func(t *testing.T) {
+		// A directory is never IsNotExist but always fails a ReadFile,
+		// distinguishing the "missing" branch from the "exists but
+		// something else went wrong" branch.
+		dir := t.TempDir()
+		cfg, err := Load(dir)
+		qt.Check(t, qt.IsNotNil(err))
+		qt.Check(t, qt.DeepEquals(cfg, Default()))
+	})
+
 	t.Run("malformed file returns defaults and an error", func(t *testing.T) {
 		path := filepath.Join(t.TempDir(), "cfg.json")
 		qt.Assert(t, qt.IsNil(os.WriteFile(path, []byte(`{not valid json`), 0o600)))
