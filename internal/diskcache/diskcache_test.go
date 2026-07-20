@@ -19,6 +19,14 @@ func TestDirHonorsEnvOverride(t *testing.T) {
 	qt.Check(t, qt.Equals(dir, want))
 }
 
+func TestDirFallsBackToOSCacheDirWhenUnset(t *testing.T) {
+	t.Setenv("CLAUDE_FORMAT_HOOKS_CACHE", "")
+
+	dir, ok := Dir()
+	qt.Assert(t, qt.IsTrue(ok), qt.Commentf("the real test environment is expected to have a usable OS cache dir"))
+	qt.Check(t, qt.Equals(filepath.Base(dir), "claude-format-hooks"))
+}
+
 func TestDirDegradesGracefullyWithNoneAvailable(t *testing.T) {
 	t.Setenv("CLAUDE_FORMAT_HOOKS_CACHE", "")
 	// Force os.UserCacheDir to fail on every platform it supports:
@@ -75,6 +83,15 @@ func TestGetExpiresAfterMaxAge(t *testing.T) {
 
 	_, ok := Get(dir, "k", time.Minute)
 	qt.Check(t, qt.IsFalse(ok), qt.Commentf("an hour-old entry must not survive a one-minute TTL"))
+}
+
+func TestGetTreatsEntryWithNoNewlineAsAMiss(t *testing.T) {
+	dir := t.TempDir()
+	path := filepath.Join(dir, "k")
+	qt.Assert(t, qt.IsNil(os.WriteFile(path, []byte("no-newline-at-all"), 0o600))) //nolint:gosec // test fixture
+
+	_, ok := Get(dir, "k", time.Hour)
+	qt.Check(t, qt.IsFalse(ok))
 }
 
 func TestGetTreatsMalformedEntryAsAMiss(t *testing.T) {
