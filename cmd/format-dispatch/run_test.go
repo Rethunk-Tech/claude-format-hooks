@@ -9,6 +9,7 @@ import (
 	"os"
 	"path/filepath"
 	"runtime"
+	"runtime/debug"
 	"strings"
 	"testing"
 	"time"
@@ -78,6 +79,37 @@ func TestDispatchArgsUnknownFlagPrintsUsageAndFails(t *testing.T) {
 func TestVersionStringReportsBuildInfo(t *testing.T) {
 	got := versionString()
 	qt.Check(t, qt.StringContains(got, "format-dispatch"))
+}
+
+func TestVersionStringFrom(t *testing.T) {
+	cases := []struct {
+		name     string
+		settings []debug.BuildSetting
+		want     string
+	}{
+		{"no VCS metadata omits the parenthetical", nil, "format-dispatch v1.2.3"},
+		{
+			"revision longer than 12 chars is truncated",
+			[]debug.BuildSetting{{Key: "vcs.revision", Value: "abcdef0123456789"}},
+			"format-dispatch v1.2.3 (abcdef012345)",
+		},
+		{
+			"vcs.modified=true appends -dirty",
+			[]debug.BuildSetting{{Key: "vcs.revision", Value: "abc123"}, {Key: "vcs.modified", Value: "true"}},
+			"format-dispatch v1.2.3 (abc123-dirty)",
+		},
+		{
+			"vcs.modified=false appends nothing",
+			[]debug.BuildSetting{{Key: "vcs.revision", Value: "abc123"}, {Key: "vcs.modified", Value: "false"}},
+			"format-dispatch v1.2.3 (abc123)",
+		},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			info := &debug.BuildInfo{Main: debug.Module{Version: "v1.2.3"}, Settings: tc.settings}
+			qt.Check(t, qt.Equals(versionStringFrom(info), tc.want))
+		})
+	}
 }
 
 func TestDispatchArgsRoutesInstallAndUninstall(t *testing.T) {
@@ -184,6 +216,20 @@ func TestRunInstallRejectsUnrecognizedArgs(t *testing.T) {
 	}
 }
 
+func TestRunInstallReportsActionError(t *testing.T) {
+	dir := t.TempDir()
+	t.Setenv("CLAUDE_HOOKS_BIN_DIR", filepath.Join(dir, "bin"))
+	// A directory settings path is never IsNotExist but always fails the
+	// installer's read -- forcing Install/Uninstall to return an error
+	// runInstall must propagate, not swallow.
+	t.Setenv("CLAUDE_SETTINGS_FILE", dir)
+
+	var code int
+	stderr := captureStderr(t, func() { code = runInstall(nil, false) })
+	qt.Check(t, qt.Equals(code, 1))
+	qt.Check(t, qt.StringContains(stderr, "format-dispatch --install:"))
+}
+
 func TestRunInstallReportsDefaultOptionsError(t *testing.T) {
 	t.Setenv("HOME", "")
 	// os.UserHomeDir() reads USERPROFILE on Windows, not HOME — clearing
@@ -270,6 +316,23 @@ func TestRunUserConfigDisablesFormatter(t *testing.T) {
 	qt.Check(t, qt.Equals(run(strings.NewReader(payload(abs))), 0))
 	qt.Check(t, qt.Equals(readFile(t, abs), src), qt.Commentf("user-disabled extension must not be formatted"))
 	qt.Check(t, qt.StringContains(readFile(t, logPath), `outcome="skip: disabled by config"`))
+}
+
+func TestRunUserConfigMalformedFallsBackAndWarns(t *testing.T) {
+	projectRoot := t.TempDir()
+	abs := filepath.Join(projectRoot, "f.json")
+	writeFile(t, abs, `{"b":1,"a":2}`)
+	configPath := filepath.Join(t.TempDir(), "claude-format-hooks.json")
+	writeFile(t, configPath, `not valid json`)
+
+	t.Setenv("CLAUDE_PROJECT_DIR", projectRoot)
+	t.Setenv("CLAUDE_FORMAT_HOOKS_CONFIG", configPath)
+	var code int
+	stderr := captureStderr(t, func() { code = run(strings.NewReader(payload(abs))) })
+	qt.Check(t, qt.Equals(code, 0))
+	qt.Check(t, qt.StringContains(stderr, "config:"))
+	qt.Check(t, qt.Equals(readFile(t, abs), "{\n  \"b\": 1,\n  \"a\": 2\n}\n"),
+		qt.Commentf("a malformed user config must not block formatting"))
 }
 
 func TestRunProjectConfigMalformedFallsBackAndWarns(t *testing.T) {

@@ -94,6 +94,15 @@ func versionString() string {
 	if !ok {
 		return "format-dispatch: unknown version (no build info embedded)"
 	}
+	return versionStringFrom(info)
+}
+
+// versionStringFrom formats info, split out from versionString so tests
+// can exercise every branch (revision truncation, the dirty-worktree
+// suffix, the no-VCS-metadata case) against a fabricated *debug.BuildInfo
+// instead of whatever happens to be embedded in the test binary itself —
+// debug.ReadBuildInfo has no other seam to control that from a test.
+func versionStringFrom(info *debug.BuildInfo) string {
 	version := info.Main.Version
 	var revision, dirty string
 	for _, s := range info.Settings {
