@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.3.0] - 2026-07-19
+
 ### Added
 
 - Native in-process Go formatter (`.go`, via stdlib `go/format.Source`) —
@@ -95,6 +97,23 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   and `govulncheck` were split into their own `ubuntu-latest`-only job,
   since static analysis and vulnerability data don't vary by OS — running
   them per matrix leg would have tripled their cost for no signal.
+- `cmd/format-dispatch`'s `versionString` split into a thin wrapper plus
+  `versionStringFrom(info *debug.BuildInfo)`, the one seam
+  `debug.ReadBuildInfo` offers — its revision-truncation, dirty-suffix,
+  and no-VCS-metadata branches previously depended on whatever happened
+  to be embedded in the test binary itself (in practice, never populated
+  under `go test`), making them untestable without this. No behavior
+  change.
+- Closed a batch of genuinely easy test-coverage gaps across
+  `internal/diskcache`, `internal/config`, `internal/formatters`, and
+  `internal/installer` — mostly the "point at a directory instead of a
+  file" trick this repo already used to distinguish "missing" from
+  "exists but unreadable" error branches, plus a couple of malformed-JSON
+  cases in `orderedMap.UnmarshalJSON` pinned via a spike (calling it
+  through `json.Unmarshal`, which fully validates input before ever
+  delegating to a custom `Unmarshaler`, silently never reached the code
+  under test — verified before writing the assertions). Total coverage:
+  87.8% -> 92.9%.
 
 ### Fixed
 
@@ -235,6 +254,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 Initial release.
 
-[Unreleased]: https://github.com/Rethunk-Tech/claude-format-hooks/compare/v0.2.0...HEAD
+[Unreleased]: https://github.com/Rethunk-Tech/claude-format-hooks/compare/v0.3.0...HEAD
+[0.3.0]: https://github.com/Rethunk-Tech/claude-format-hooks/compare/v0.2.0...v0.3.0
 [0.2.0]: https://github.com/Rethunk-Tech/claude-format-hooks/compare/v0.1.0...v0.2.0
 [0.1.0]: https://github.com/Rethunk-Tech/claude-format-hooks/releases/tag/v0.1.0
