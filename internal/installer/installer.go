@@ -33,9 +33,15 @@ const (
 
 // HookCommand is one entry in a PostToolUse matcher's "hooks" array.
 type HookCommand struct {
-	Type          string   `json:"type"`
-	Command       string   `json:"command"`
-	Args          []string `json:"args"`
+	Type    string `json:"type"`
+	Command string `json:"command"`
+	// omitempty matters here: this hook takes no arguments, so without it a
+	// round-trip rewrote an existing `"args": []` as `"args": null`. That is
+	// not cosmetic -- Claude Code re-reads settings.json after a write, and
+	// the null was enough to change how it evaluated the file. Omitting the
+	// key entirely is both what the schema expects for "no arguments" and
+	// the only form that survives a rewrite unchanged.
+	Args          []string `json:"args,omitempty"`
 	Timeout       int      `json:"timeout,omitempty"`
 	StatusMessage string   `json:"statusMessage,omitempty"`
 }
