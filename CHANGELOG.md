@@ -12,6 +12,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `.proto` formatting via `buf format -w`, following the same
   system-binary pattern as `terraform fmt` and `rustfmt` (skipped silently
   when `buf` is not on `PATH`).
+- Windows release binaries (amd64 + arm64). CI already ran the full test
+  matrix on `windows-latest`, so the platform was being validated on every
+  push and then withheld from every release.
 
 - User-level markdownlint defaults. markdownlint-cli2 discovers config only
   by walking up from the linted file as far as the working directory, so a

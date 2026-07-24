@@ -13,15 +13,28 @@ jobs:
     runs-on: ubuntu-latest
     strategy:
       matrix:
+        # Mirrors the OS coverage ci.yml tests on. Windows was tested there
+        # but never shipped here, so a platform was being validated every
+        # push and then withheld from every release.
         include:
           - goos: linux
             goarch: amd64
+            ext: ""
           - goos: linux
             goarch: arm64
+            ext: ""
           - goos: darwin
             goarch: amd64
+            ext: ""
           - goos: darwin
             goarch: arm64
+            ext: ""
+          - goos: windows
+            goarch: amd64
+            ext: ".exe"
+          - goos: windows
+            goarch: arm64
+            ext: ".exe"
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
 
@@ -37,7 +50,7 @@ jobs:
           GOARCH: ${{ matrix.goarch }}
           CGO_ENABLED: "0"
         run: |
-          out="format-dispatch-${{ matrix.goos }}-${{ matrix.goarch }}"
+          out="format-dispatch-${{ matrix.goos }}-${{ matrix.goarch }}${{ matrix.ext }}"
           go build -trimpath -o "$out" ./cmd/format-dispatch
           sha256sum "$out" > "$out.sha256"
 
@@ -45,8 +58,8 @@ jobs:
         with:
           name: format-dispatch-${{ matrix.goos }}-${{ matrix.goarch }}
           path: |
-            format-dispatch-${{ matrix.goos }}-${{ matrix.goarch }}
-            format-dispatch-${{ matrix.goos }}-${{ matrix.goarch }}.sha256
+            format-dispatch-${{ matrix.goos }}-${{ matrix.goarch }}${{ matrix.ext }}
+            format-dispatch-${{ matrix.goos }}-${{ matrix.goarch }}${{ matrix.ext }}.sha256
 
   release:
     needs: build

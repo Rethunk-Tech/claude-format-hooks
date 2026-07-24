@@ -55,8 +55,8 @@ session, against the hook's 4s per-file timeout. This is best-effort: a
 failed pre-warm never fails the install, since the same fetch just retries
 on first use.
 
-**No Go toolchain?** Download the `linux`/`darwin` (amd64 or arm64)
-binary from the [latest release](https://github.com/Rethunk-Tech/claude-format-hooks/releases/latest)
+**No Go toolchain?** Download the `linux`/`darwin`/`windows` (amd64 or
+arm64) binary from the [latest release](https://github.com/Rethunk-Tech/claude-format-hooks/releases/latest)
 instead of building from source, place it at
 `~/.claude/hooks/format-dispatch`, `chmod +x` it, then run
 `~/.claude/hooks/format-dispatch --install` yourself — `install.sh`'s

@@ -27,9 +27,11 @@ vulnerability data don't vary by OS. Runs on every push and pull request to
 
 A tag push matching `v*` triggers
 [`.github/workflows/release.yml`](.github/workflows/release.yml): cross-
-compiles `format-dispatch` for linux/darwin (amd64+arm64) from a single
-`ubuntu-latest` runner (pure Go, no cgo) and publishes a GitHub Release
-with the binaries and their sha256sums via `gh release create`.
+compiles `format-dispatch` for linux/darwin/windows (amd64+arm64) from a
+single `ubuntu-latest` runner (pure Go, no cgo) and publishes a GitHub
+Release with the binaries and their sha256sums via `gh release create`.
+The target list mirrors the OS matrix `ci.yml` tests on — a platform that
+is worth testing every push is worth shipping.
 
 This is the canonical command reference — [CONTRIBUTING.md](CONTRIBUTING.md)
 points here instead of repeating it.
