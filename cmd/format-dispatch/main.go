@@ -171,6 +171,17 @@ func runInstall(args []string, uninstall bool) int {
 		fmt.Fprintf(os.Stderr, "format-dispatch %s: %v\n", label, err)
 		return 1
 	}
+
+	// Provision after the wiring, and only for a real --install: the
+	// settings.json change is what the operator asked for and must not be
+	// gated on a network round trip. --dry-run promises to write nothing,
+	// which includes not installing packages.
+	if !uninstall && !dryRun {
+		if err := installer.ProvisionTools(os.Stdout); err != nil {
+			fmt.Fprintf(os.Stderr, "format-dispatch %s: %v\n", label, err)
+			return 1
+		}
+	}
 	return 0
 }
 

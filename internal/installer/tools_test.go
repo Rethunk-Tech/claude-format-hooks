@@ -1,0 +1,118 @@
+package installer
+
+import (
+	"context"
+	"encoding/json"
+	"io"
+	"os"
+	"path/filepath"
+	"runtime"
+	"testing"
+
+	"github.com/go-quicktest/qt"
+)
+
+// fakeBun puts a stub `bun` on PATH so provisioning can be exercised
+// without touching the network or the operator's real global install.
+// script is the body of the stub.
+func fakeBun(t *testing.T, script string) {
+	t.Helper()
+	if runtime.GOOS == "windows" {
+		t.Skip("fake shell-script tools are POSIX-shell only")
+	}
+	dir := t.TempDir()
+	path := filepath.Join(dir, "bun")
+	qt.Assert(t, qt.IsNil(os.WriteFile(path, []byte("#!/bin/sh\n"+script+"\n"), 0o755))) //nolint:gosec // test stub must be executable
+	t.Setenv("PATH", dir)
+}
+
+// bunGlobalManifest points BUN_INSTALL at a temp tree and seeds the global
+// manifest with content, returning the manifest path.
+func bunGlobalManifest(t *testing.T, content string) string {
+	t.Helper()
+	root := t.TempDir()
+	dir := filepath.Join(root, "install", "global")
+	qt.Assert(t, qt.IsNil(os.MkdirAll(dir, 0o750)))
+	path := filepath.Join(dir, "package.json")
+	qt.Assert(t, qt.IsNil(os.WriteFile(path, []byte(content), 0o600)))
+	t.Setenv("BUN_INSTALL", root)
+	return path
+}
+
+func readManifest(t *testing.T, path string) map[string]any {
+	t.Helper()
+	raw, err := os.ReadFile(path) //nolint:gosec // path is the temp manifest this test wrote
+	qt.Assert(t, qt.IsNil(err))
+	var doc map[string]any
+	qt.Assert(t, qt.IsNil(json.Unmarshal(raw, &doc)))
+	return doc
+}
+
+func TestProvisionToolsIsANoOpWithoutBun(t *testing.T) {
+	// A machine with no bun is a supported configuration -- those formatters
+	// are simply skipped at format time -- so --install must not complain.
+	t.Setenv("PATH", t.TempDir())
+	qt.Check(t, qt.IsNil(ProvisionTools(io.Discard)))
+}
+
+func TestProvisionToolsSurvivesAFailedInstall(t *testing.T) {
+	// The settings.json wiring already succeeded by this point. A registry
+	// outage must not turn that into a failed install.
+	fakeBun(t, `echo "registry unreachable" >&2; exit 1`)
+	qt.Check(t, qt.IsNil(ProvisionTools(io.Discard)))
+}
+
+func TestApplyBunGlobalOverridesPreservesExistingDependencies(t *testing.T) {
+	// The global manifest is shared with whatever else the operator has
+	// installed globally. Clobbering their dependencies to pin ours would be
+	// a far worse bug than the advisory being pinned.
+	fakeBun(t, "exit 0")
+	manifest := bunGlobalManifest(t, `{"dependencies":{"some-other-tool":"^1.0.0"}}`)
+
+	qt.Assert(t, qt.IsNil(applyBunGlobalOverrides(context.Background(), io.Discard)))
+
+	doc := readManifest(t, manifest)
+	deps, ok := doc["dependencies"].(map[string]any)
+	qt.Assert(t, qt.IsTrue(ok))
+	qt.Check(t, qt.Equals(deps["some-other-tool"], "^1.0.0"))
+
+	overrides, ok := doc["overrides"].(map[string]any)
+	qt.Assert(t, qt.IsTrue(ok))
+	qt.Check(t, qt.Equals(overrides["js-yaml"], any(bunGlobalOverrides["js-yaml"])))
+}
+
+func TestApplyBunGlobalOverridesKeepsUnrelatedOverrides(t *testing.T) {
+	fakeBun(t, "exit 0")
+	manifest := bunGlobalManifest(t, `{"overrides":{"unrelated":"^2.0.0"}}`)
+
+	qt.Assert(t, qt.IsNil(applyBunGlobalOverrides(context.Background(), io.Discard)))
+
+	overrides, ok := readManifest(t, manifest)["overrides"].(map[string]any)
+	qt.Assert(t, qt.IsTrue(ok))
+	qt.Check(t, qt.Equals(overrides["unrelated"], "^2.0.0"))
+	qt.Check(t, qt.Equals(overrides["js-yaml"], any(bunGlobalOverrides["js-yaml"])))
+}
+
+func TestApplyBunGlobalOverridesSkipsTheReinstallWhenAlreadyPinned(t *testing.T) {
+	// Re-running --install is routine (it is how an operator picks up a new
+	// binary), so the steady state must not pay for a reinstall every time.
+	// The stub fails loudly to prove `bun install` was never invoked.
+	fakeBun(t, `echo "bun install should not have run" >&2; exit 1`)
+	pinned := `{"overrides":{"js-yaml":"` + bunGlobalOverrides["js-yaml"] + `"}}`
+	bunGlobalManifest(t, pinned)
+
+	qt.Check(t, qt.IsNil(applyBunGlobalOverrides(context.Background(), io.Discard)))
+}
+
+func TestApplyBunGlobalOverridesReportsAMissingManifest(t *testing.T) {
+	fakeBun(t, "exit 0")
+	t.Setenv("BUN_INSTALL", t.TempDir())
+
+	qt.Check(t, qt.IsNotNil(applyBunGlobalOverrides(context.Background(), io.Discard)))
+}
+
+func TestFirstLineTruncatesAtTheNewline(t *testing.T) {
+	qt.Check(t, qt.Equals(string(firstLine([]byte("first\nsecond\nthird"))), "first"))
+	qt.Check(t, qt.Equals(string(firstLine([]byte("only"))), "only"))
+	qt.Check(t, qt.Equals(string(firstLine(nil)), ""))
+}
