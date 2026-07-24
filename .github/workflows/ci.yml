@@ -61,6 +61,15 @@ jobs:
       - name: Build
         run: go build -trimpath -o format-dispatch ./cmd/format-dispatch
 
+      # Dogfood --check on this repo's own tree. Only the natively-formatted
+      # types (.json, .sh, .go) are actually verified here: the runner has no
+      # bunx, sqlfluff, or buf, and --check treats a missing tool as "no
+      # opinion" rather than a failure, so this cannot go red over a tool the
+      # job never installed. That is the same property that makes --check
+      # usable in a consumer's CI without provisioning a toolchain.
+      - name: Formatting check
+        run: ./format-dispatch --check .
+
   lint:
     runs-on: ubuntu-latest
     steps:
