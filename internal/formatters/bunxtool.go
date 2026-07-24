@@ -14,9 +14,18 @@ type bunxFormatter struct {
 }
 
 // NewMarkdown returns the bunxFormatter for .md/.mdx, via markdownlint-cli2.
+//
+// Passes the user-level base config (see markdownconfig.go) when one can be
+// resolved, so a project with no markdownlint config of its own gets sane
+// defaults instead of stock rules that fire on ordinary technical writing.
+// A project's own config still layers over it and wins.
 func NewMarkdown() Formatter {
 	return bunxFormatter{name: "markdownlint-cli2", args: func(abs string) []string {
-		return []string{"markdownlint-cli2", "--fix", "--", abs}
+		args := []string{"markdownlint-cli2"}
+		if cfg := userMarkdownlintConfig(); cfg != "" {
+			args = append(args, "--config", cfg)
+		}
+		return append(args, "--fix", "--", abs)
 	}}
 }
 

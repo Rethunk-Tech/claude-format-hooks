@@ -1,0 +1,55 @@
+{
+  // Base markdownlint configuration passed to every markdownlint-cli2 run
+  // via --config. A project's own .markdownlint-cli2.jsonc (or any other
+  // config file markdownlint-cli2 discovers) layers on top and wins, so this
+  // only decides what a project that has declared nothing gets.
+  //
+  // NOTE: this is the markdownlint-cli2 OPTIONS shape (rules nested under
+  // "config"), not a bare rules object. markdownlint-cli2 chooses which of
+  // the two to expect from the config FILENAME, so this only parses
+  // correctly while it is materialized as *.markdownlint-cli2.jsonc -- see
+  // userMarkdownlintConfigFile in markdownconfig.go. A mismatch is silent:
+  // the file is discarded and stock rules apply, with no error to explain
+  // why. markdownconfig_test.go pins both halves.
+  //
+  // The rules disabled below are the ones that are both commonly violated on
+  // purpose in technical writing and not auto-fixable. Because the hook
+  // surfaces any non-zero exit as a diagnostic, leaving one of those enabled
+  // turns every .md write into noise it cannot act on.
+  "config": {
+    "default": true,
+
+    // MD013 (line-length) fires on any long URL, table row, or code sample
+    // and cannot be auto-fixed -- wrapping is a judgement call about
+    // readability, not a mechanical transform.
+    "MD013": false,
+
+    // MD033 (no-inline-html) forbids raw HTML outright. Centered title
+    // banners at the top of a README are deliberate and widespread, so the
+    // elements that show up in that pattern are allowed rather than the rule
+    // being switched off entirely.
+    "MD033": {
+      "allowed_elements": ["h1", "div", "p", "img", "a", "br", "details", "summary"]
+    },
+
+    // MD060 (table-pipe-style) defaults to aligned padding, which forces
+    // every row of a table to the width of its widest cell. One long
+    // description cell then rewrites the whole table on each edit; compact
+    // keeps diffs proportional to the change.
+    "MD060": { "style": "compact" }
+  },
+
+  // Directories that are never the user's own prose. markdownlint-cli2
+  // applies these when it expands globs; the hook passes explicit file
+  // paths, so these matter for direct CLI runs rather than hook runs.
+  "ignores": [
+    "**/node_modules",
+    "**/vendor",
+    "**/dist",
+    "**/build",
+    "**/.next",
+    "**/target",
+    ".orchestrate",
+    ".playwright-mcp"
+  ]
+}
