@@ -148,7 +148,22 @@ func TestSQLFluffFormatSuccessAndFailure(t *testing.T) {
 	})
 
 	t.Run("failure with no output falls back to the process error", func(t *testing.T) {
+		// A silent non-zero exit is not the "violations remain" case
+		// sqlfluff.go suppresses -- sqlfluff always prints something when it
+		// really runs, so this means it died and must stay visible.
 		writeFakeTool(t, "sqlfluff", "exit 1")
+		res := NewSQLFluff().Format(t.Context(), dir, abs)
+		qt.Check(t, qt.Not(qt.Equals(res.Diagnostic, "")))
+	})
+
+	t.Run("unfixable violations are not a failure", func(t *testing.T) {
+		writeFakeTool(t, "sqlfluff", "echo '  [1 unfixable linting violations found]'; exit 1")
+		res := NewSQLFluff().Format(t.Context(), dir, abs)
+		qt.Check(t, qt.Equals(res.Diagnostic, ""), qt.Commentf("the file was still rewritten; nothing here can act on the remainder"))
+	})
+
+	t.Run("unparsable input is a failure", func(t *testing.T) {
+		writeFakeTool(t, "sqlfluff", "echo '  [1 templating/parsing errors found]'; exit 1")
 		res := NewSQLFluff().Format(t.Context(), dir, abs)
 		qt.Check(t, qt.Not(qt.Equals(res.Diagnostic, "")))
 	})
