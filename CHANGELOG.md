@@ -15,6 +15,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Windows release binaries (amd64 + arm64). CI already ran the full test
   matrix on `windows-latest`, so the platform was being validated on every
   push and then withheld from every release.
+- `--install` now provisions the bunx-dispatched formatters globally
+  (replacing `install.sh`'s cache pre-warm) and pins transitive
+  dependencies carrying an unpatched advisory, so no registry fetch ever
+  happens inside the per-file budget.
+
+### Fixed
+
+- `--install` no longer rewrites an existing `"args": []` as `"args": null`
+  in `settings.json`. The key is now omitted entirely, which is what the
+  schema expects for a hook that takes no arguments and the only form that
+  survives a rewrite unchanged.
+- The per-file formatter budget (25s) exceeded the timeout the installer
+  wrote into `settings.json` (30s) and both exceeded the intended 5s, so on
+  a correctly-configured install Claude Code killed the process before the
+  hook's own timeout could report why. Now 4s under a 5s harness limit.
 
 - User-level markdownlint defaults. markdownlint-cli2 discovers config only
   by walking up from the linted file as far as the working directory, so a

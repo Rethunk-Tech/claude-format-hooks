@@ -47,13 +47,17 @@ and adds (or replaces an existing narrower biome-only hook with) a
 schema's exec form (`command` + `args: []`) — no shell spawned to launch
 it, just the binary directly.
 
-If `bunx` is on `PATH`, the installer also pre-warms its package cache for
-biome, prettier, taplo, and markdownlint-cli2 (`bunx <pkg> --version`) —
-each is unpinned (floats to whatever version bunx resolves) and would
-otherwise pay a cold npm-registry fetch on the first file write of a
-session, against the hook's 4s per-file timeout. This is best-effort: a
-failed pre-warm never fails the install, since the same fetch just retries
-on first use.
+If `bun` is on `PATH`, `--install` also installs biome, prettier, taplo, and
+markdownlint-cli2 globally (`bun add -g`), putting their binaries on `PATH`
+where `bunx` reaches them immediately. Otherwise the first file write of a
+session pays a cold npm-registry fetch against the hook's 4s per-file
+timeout, which it will not fit inside. The same step pins transitive
+dependencies carrying an unpatched advisory, merging into bun's global
+manifest rather than replacing it, so anything else you installed globally
+is left alone.
+
+This is best-effort: a failed install never fails the install as a whole,
+since `bunx` still falls back to fetching on demand.
 
 **No Go toolchain?** Download the `linux`/`darwin`/`windows` (amd64 or
 arm64) binary from the [latest release](https://github.com/Rethunk-Tech/claude-format-hooks/releases/latest)
