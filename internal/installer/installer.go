@@ -20,7 +20,15 @@ const (
 	matcherOld   = "Write|Edit"
 	oldBiomeMark = "biome check --write"
 	statusMsg    = "format-dispatch..."
-	hookTimeout  = 30
+	// hookTimeout is the seconds Claude Code allows this hook before killing
+	// it. Formatting one file is sub-500ms work and the external tools are
+	// provisioned at install time rather than fetched on demand, so a
+	// generous budget buys nothing and only delays the operator's feedback
+	// when something is genuinely hung. Must stay ABOVE the binary's own
+	// formatterTimeout (cmd/format-dispatch/main.go) so that budget fires
+	// first and explains itself, rather than the harness killing the process
+	// with no diagnostic.
+	hookTimeout = 5
 )
 
 // HookCommand is one entry in a PostToolUse matcher's "hooks" array.

@@ -18,7 +18,6 @@ package main
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"io"
 	"os"
@@ -33,10 +32,22 @@ import (
 	"github.com/Rethunk-Tech/claude-format-hooks/internal/installer"
 )
 
-// errFormatterTimeout is context.Cause(ctx) once the per-file timeout below
-// fires, so a hung formatter's diagnostic says why instead of surfacing the
-// generic context.DeadlineExceeded.
-var errFormatterTimeout = errors.New("formatter timed out after 25s")
+// formatterTimeout bounds a single formatter run. Formatting one file is
+// sub-500ms work in practice, and the tools it shells out to are provisioned
+// at install time rather than fetched on demand, so anything approaching
+// this budget is hung rather than slow.
+//
+// It MUST stay below the `timeout` the installer writes into settings.json
+// (installer.hookTimeout): Claude Code kills the process at that limit, so a
+// budget above it can never fire and the operator gets a bare kill instead
+// of errFormatterTimeout's explanation. The gap absorbs process startup and
+// the write of the diagnostic itself.
+const formatterTimeout = 4 * time.Second
+
+// errFormatterTimeout is context.Cause(ctx) once formatterTimeout fires, so
+// a hung formatter's diagnostic says why instead of surfacing the generic
+// context.DeadlineExceeded.
+var errFormatterTimeout = fmt.Errorf("formatter timed out after %s", formatterTimeout)
 
 // projectConfigFile is a project-root dotfile (same schema as the user's
 // own ~/.claude/claude-format-hooks.json) letting a project opt a specific
@@ -221,7 +232,7 @@ func run(stdin io.Reader) int {
 		return 0
 	}
 
-	ctx, cancel := context.WithTimeoutCause(context.Background(), 25*time.Second, errFormatterTimeout)
+	ctx, cancel := context.WithTimeoutCause(context.Background(), formatterTimeout, errFormatterTimeout)
 	defer cancel()
 
 	result := registry.Dispatch(ctx, projectRoot, abs)

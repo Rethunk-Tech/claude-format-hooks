@@ -79,7 +79,15 @@ func TestWireFreshInstall(t *testing.T) {
 	qt.Check(t, qt.Equals(entries[0].Matcher, "Write|Edit|NotebookEdit"))
 	qt.Assert(t, qt.HasLen(entries[0].Hooks, 1))
 	qt.Check(t, qt.Equals(entries[0].Hooks[0].Command, binPath))
-	qt.Check(t, qt.Equals(entries[0].Hooks[0].Timeout, 30))
+	qt.Check(t, qt.Equals(entries[0].Hooks[0].Timeout, hookTimeout))
+
+	// The written timeout is what Claude Code kills the hook at, and it has
+	// to leave room for the binary's own formatterTimeout to fire first --
+	// otherwise a hung formatter is killed with no diagnostic explaining
+	// why. formatterTimeout lives in package main and can't be imported
+	// here, so this pins the settings.json side against a stale edit and
+	// main.go's comment carries the other half.
+	qt.Check(t, qt.IsTrue(hookTimeout > 4), qt.Commentf("must exceed cmd/format-dispatch's formatterTimeout"))
 }
 
 func TestWireReportsUnreadableSettingsFile(t *testing.T) {

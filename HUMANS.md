@@ -49,7 +49,7 @@ If `bunx` is on `PATH`, the installer also pre-warms its package cache for
 biome, prettier, taplo, and markdownlint-cli2 (`bunx <pkg> --version`) —
 each is unpinned (floats to whatever version bunx resolves) and would
 otherwise pay a cold npm-registry fetch on the first file write of a
-session, against the hook's 25s per-file timeout. This is best-effort: a
+session, against the hook's 4s per-file timeout. This is best-effort: a
 failed pre-warm never fails the install, since the same fetch just retries
 on first use.
 
@@ -209,8 +209,9 @@ directories that had a settings file when the session started.
 **A `.yaml`/`.toml`/`.md` file wasn't formatted even though the table says
 it should be.** Confirm `bunx` is on `PATH` (`command -v bunx`); those
 formatters are silently skipped without it. A first-ever `bunx` fetch on a
-machine can also be slow enough to hit the hook's 25s timeout — re-running
-`install.sh` pre-warms the cache for this.
+machine is easily slow enough to blow the hook's 4s timeout — re-running
+`format-dispatch --install` provisions the tools so no format-time fetch is
+needed.
 
 **I just installed `ruff`/`black`/`rustfmt`/`sqlfluff`/`bunx`, but the
 hook still skipped a file.** A missing tool's absence is cached on disk
