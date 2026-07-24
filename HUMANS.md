@@ -29,6 +29,8 @@ required.
   formatting.
 - Optional: [`terraform`](https://developer.hashicorp.com/terraform)
   (system binary) for `.tf` formatting.
+- Optional: [`buf`](https://buf.build/) (system binary) for `.proto`
+  formatting.
 
 ### Installation
 
@@ -112,6 +114,7 @@ hanging on stdin — safe to run by hand while debugging.
 | `.py` | `ruff format` (preferred) or `black` | no (system binary) |
 | `.rs` | `rustfmt` | no (system binary) |
 | `.tf` | `terraform fmt` | no (system binary) |
+| `.proto` | `buf format -w` | no (system binary) |
 
 Any other extension is an instant no-op. Vendored/build directories and
 anything outside `$CLAUDE_PROJECT_DIR` are always skipped — see

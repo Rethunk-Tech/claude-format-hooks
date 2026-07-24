@@ -17,7 +17,8 @@ formats/lints a file right after Write/Edit/NotebookEdit writes it
 with no per-repo setup required. Three formatters (JSON, shell, Go) run
 natively in-process; everything else routes to the real,
 project-config-aware tool: biome, prettier, taplo, and markdownlint-cli2
-via `bunx`; `sqlfluff`, `ruff`/`black`, `rustfmt`, and `terraform fmt` as
+via `bunx`; `sqlfluff`, `ruff`/`black`, `rustfmt`, `terraform fmt`, and
+`buf format` as
 system binaries.
 
 ## Quick start
@@ -37,7 +38,8 @@ Full install steps, prerequisites, and configuration: [HUMANS.md](HUMANS.md).
   of alphabetized by a naive Unmarshal+Marshal round-trip.
 - **Everything else routed to the real tool** — biome, markdownlint-cli2,
   taplo, and prettier via `bunx`; `sqlfluff`, `ruff`/`black`, `rustfmt`,
-  and `terraform fmt` as system binaries — so project config files are
+  `terraform fmt`, and `buf format` as system binaries — so project config
+  files are
   honored automatically, with no config-presence gate: every supported
   extension formats in every project.
 - **Silent on success, exits 0 always** — a `PostToolUse` hook must never

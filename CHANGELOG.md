@@ -9,6 +9,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- `.proto` formatting via `buf format -w`, following the same
+  system-binary pattern as `terraform fmt` and `rustfmt` (skipped silently
+  when `buf` is not on `PATH`).
+
 - User-level markdownlint defaults. markdownlint-cli2 discovers config only
   by walking up from the linted file as far as the working directory, so a
   project with none of its own fell back to stock rules — several of which

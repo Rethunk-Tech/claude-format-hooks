@@ -89,6 +89,11 @@ native alternatives rather than assuming:
 - **Terraform/HCL** — `terraform fmt`; no Go equivalent invokable
   in-process without vendoring HashiCorp's own `hclwrite`, and (like
   rustfmt) there's no competing tool to weigh.
+- **Protobuf** — `buf format -w`. buf is Go, but its formatter isn't
+  exposed as a stable importable package the way `go/format` is, and
+  vendoring the toolchain to save one subprocess would trade a large
+  dependency for a few milliseconds. Like terraform/rustfmt, it's the
+  canonical formatter for the language.
 
 External formatters already read their own project config (`biome.json`,
 `.prettierrc`, `.sqlfluff`, ...) automatically, since we invoke the real
