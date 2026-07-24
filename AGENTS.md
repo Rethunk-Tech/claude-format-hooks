@@ -92,8 +92,17 @@ native alternatives rather than assuming:
 
 External formatters already read their own project config (`biome.json`,
 `.prettierrc`, `.sqlfluff`, ...) automatically, since we invoke the real
-tool. Only the two native formatters needed their own config story (see
-[HUMANS.md](HUMANS.md#configuration)).
+tool. Two exceptions needed a config story of their own (see
+[HUMANS.md](HUMANS.md#configuration)):
+
+- The two **native** formatters have no project config file to consult at
+  all, so `internal/config` resolves their indent settings.
+- **markdownlint-cli2** discovers config only by walking up from the linted
+  file as far as the working directory — unlike `sqlfluff`, which merges
+  `~/.sqlfluff` before any project config, it has no user-level location.
+  `internal/formatters/markdownconfig.go` supplies the missing layer by
+  passing `--config` with a user-level base config, which a project's own
+  config still overrides rule by rule.
 
 ## Layout
 
@@ -104,7 +113,7 @@ tool. Only the two native formatters needed their own config story (see
 | [`internal/diskcache/`](internal/diskcache/) | Small disk-backed key/value cache with TTL-based expiry, shared by `internal/config` and `internal/formatters` (neither may import the other in the direction this package would require) — every result that's expensive to recompute on every invocation but rarely changes mid-session goes through here |
 | [`internal/config/`](internal/config/) | Resolves per-file indent settings: built-in defaults -> user config -> `.editorconfig`; the `.editorconfig` resolution itself is cached via `internal/diskcache` |
 | [`internal/dispatch/`](internal/dispatch/) | Extension -> `Formatter` registry, vendored-dir list, disabled-extension filtering |
-| [`internal/formatters/`](internal/formatters/) | One `Formatter` implementation per file type (native: `json.go`, `shell.go`, `golang.go`; external: `biome.go`, `bunxtool.go`, `sqlfluff.go`, `python.go`, `rust.go`, `terraform.go`); `exec.go` holds the shared subprocess-run + diagnostic-truncation helper; `binpath.go` holds the shared, cached `lookPath` every external formatter uses instead of calling `exec.LookPath` directly; `writefile.go` holds the shared mode-preserving write every native formatter uses instead of its own stat-then-write |
+| [`internal/formatters/`](internal/formatters/) | One `Formatter` implementation per file type (native: `json.go`, `shell.go`, `golang.go`; external: `biome.go`, `bunxtool.go`, `sqlfluff.go`, `python.go`, `rust.go`, `terraform.go`); `exec.go` holds the shared subprocess-run + diagnostic-truncation helper; `binpath.go` holds the shared, cached `lookPath` every external formatter uses instead of calling `exec.LookPath` directly; `writefile.go` holds the shared mode-preserving write every native formatter uses instead of its own stat-then-write; `markdownconfig.go` + `markdownlint-defaults.jsonc` supply markdownlint-cli2's missing user-level config layer |
 | [`internal/installer/`](internal/installer/) | Wires/unwires format-dispatch's `PostToolUse` hook in `~/.claude/settings.json` (`format-dispatch --install`/`--uninstall`), replacing `install.sh`'s old `jq` filter; `orderedmap.go` preserves the file's existing key order across the rewrite and a `.bak` backup is written before any real change; both writes go through `writeAtomic` (temp file + rename) so a kill mid-write can never truncate the operator's live `settings.json` |
 
 ## Invariants
@@ -137,7 +146,8 @@ Unchanged from the hand-written per-project hooks this replaces:
   requires its own project config file to exist first. A `.ts` file in a
   project with no `biome.json` still gets formatted with biome's built-in
   defaults, the same way a `.md` file with no `.markdownlint.json` gets
-  formatted with markdownlint-cli2's defaults. Do not reintroduce a
+  formatted against the user-level base config
+  (`internal/formatters/markdownconfig.go`). Do not reintroduce a
   config-presence gate on any formatter (biome had one; it was removed —
   see `CHANGELOG.md`).
 - Files under `node_modules/`, `.next/`, `.yarn/`, `.git/`, `.agents/`,

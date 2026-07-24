@@ -7,6 +7,23 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- User-level markdownlint defaults. markdownlint-cli2 discovers config only
+  by walking up from the linted file as far as the working directory, so a
+  project with none of its own fell back to stock rules — several of which
+  (notably `MD013` line-length) fire constantly on technical writing and
+  cannot be auto-fixed, turning every `.md` write into a diagnostic nothing
+  could act on. The hook now passes a base config via `--config`,
+  materialized once at
+  `~/.claude/claude-format-hooks.markdownlint-cli2.jsonc` so it stays
+  editable rather than locked in the binary. A project's own config still
+  layers on top and wins rule by rule.
+
+  This closes the gap that made projects carry a `.markdownlint-cli2.jsonc`
+  purely to silence defaults. `sqlfluff` needed no equivalent — it reads
+  `~/.sqlfluff` natively, ahead of any project config.
+
 ## [0.3.0] - 2026-07-19
 
 ### Added

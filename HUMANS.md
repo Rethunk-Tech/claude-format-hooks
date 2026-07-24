@@ -145,6 +145,30 @@ Three layers, in increasing priority:
    EditorConfig behaves. A missing or malformed config file never blocks
    a file write — the hook falls back to defaults and says why on stderr.
 
+### Markdown and SQL defaults
+
+These two external tools get a user-level base config, so a project does
+not need to carry its own just to avoid noise:
+
+- **Markdown** — `~/.claude/claude-format-hooks.markdownlint-cli2.jsonc` is
+  written on first use and passed to every run via `--config`. Edit it
+  freely; it is never overwritten once it exists, and deleting it restores
+  the built-in defaults on the next `.md` write. It turns off the rules
+  that fire constantly on technical writing and cannot be auto-fixed
+  (notably `MD013` line-length). A project's own
+  `.markdownlint-cli2.jsonc` layers on top and wins rule by rule.
+
+  The filename matters: markdownlint-cli2 picks a schema from it, and a
+  `.markdownlint.` infix means "bare rules object" while
+  `.markdownlint-cli2.` means "options object". Renaming the file to the
+  wrong shape makes it silently ignored, with no error.
+
+- **SQL** — `sqlfluff` reads `~/.sqlfluff` natively, before any project
+  config, so no hook support is needed. Create one to set at minimum a
+  `dialect`; without any reachable config `sqlfluff` hard-errors with "No
+  dialect was specified" and every `.sql` write reports that instead of
+  formatting.
+
 ### Project-level formatter opt-out
 
 A project can opt a specific formatter out for itself — e.g. it already
