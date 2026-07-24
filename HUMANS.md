@@ -127,6 +127,33 @@ the formatters require their own project config file to exist first — a
 `.ts` file in a project with no `biome.json` still gets formatted, using
 biome's built-in defaults.
 
+## Checking formatting in CI (`--check`)
+
+`format-dispatch --check PATH...` reports which files a formatter *would*
+change, without changing them, and exits 1 if there are any. Directories are
+walked; vendored directories and unsupported extensions are skipped.
+
+```bash
+format-dispatch --check .              # whole tree
+format-dispatch --check src docs/a.md  # specific paths
+```
+
+Exit codes are `0` (all formatted), `1` (some files need formatting), and
+`2` (bad invocation, e.g. no paths or a path that does not exist) — so a
+broken pipeline is distinguishable from a real failure.
+
+Two properties make this usable in a consumer's CI without provisioning a
+toolchain:
+
+- **A missing tool is not a failure.** A file whose formatter is not
+  installed is reported as fine, because nothing could have changed it. A
+  runner with no `bunx` still meaningfully checks `.json`, `.sh`, and `.go`.
+- **It checks formatting, not lint conformance.** The question is "would the
+  hook rewrite this file", the same one every local write answers. A
+  formatter that deliberately leaves violations it will not auto-fix does
+  not fail the build over them — otherwise CI would gate on something no
+  local write could ever repair.
+
 ## Configuration
 
 Three layers, in increasing priority:

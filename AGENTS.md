@@ -115,7 +115,7 @@ tool. Two exceptions needed a config story of their own (see
 
 | Path | Role |
 | --- | --- |
-| [`cmd/format-dispatch/`](cmd/format-dispatch/) | Entrypoint: stdin parsing, extension gate, vendored-dir/project-root checks, project-level formatter opt-out, timeout, exit-0 contract; also dispatches `--install`/`--uninstall` to `internal/installer` |
+| [`cmd/format-dispatch/`](cmd/format-dispatch/) | Entrypoint: stdin parsing, extension gate, vendored-dir/project-root checks, project-level formatter opt-out, timeout, exit-0 contract; also dispatches `--install`/`--uninstall` to `internal/installer`. `check.go` implements `--check`, the one path that deliberately does NOT exit 0 — it formats a copy beside each file and compares bytes, so it needs no per-tool dry-run flag and matches the hook's behavior exactly |
 | [`internal/hookio/`](internal/hookio/) | Decodes the `PostToolUse` JSON payload into a file path |
 | [`internal/diskcache/`](internal/diskcache/) | Small disk-backed key/value cache with TTL-based expiry, shared by `internal/config` and `internal/formatters` (neither may import the other in the direction this package would require) — every result that's expensive to recompute on every invocation but rarely changes mid-session goes through here |
 | [`internal/config/`](internal/config/) | Resolves per-file indent settings: built-in defaults -> user config -> `.editorconfig`; the `.editorconfig` resolution itself is cached via `internal/diskcache` |
@@ -134,7 +134,9 @@ Unchanged from the hand-written per-project hooks this replaces:
   error itself rather than an empty string.
 - **Always exits 0.** A `PostToolUse` hook runs after the tool call
   already succeeded — it must never be the reason a Write/Edit/
-  NotebookEdit call reports failure.
+  NotebookEdit call reports failure. `--check` is the one deliberate
+  exception: it is not a hook invocation, and exists precisely to fail a
+  build. It must never share the hook's exit path.
 - **An unsupported extension is an instant no-op** — one `filepath.Ext`
   call and one map lookup, nothing else — no `stat`, no `exec.LookPath`,
   no subprocess, no config read.

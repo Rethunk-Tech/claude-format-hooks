@@ -12,6 +12,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `.proto` formatting via `buf format -w`, following the same
   system-binary pattern as `terraform fmt` and `rustfmt` (skipped silently
   when `buf` is not on `PATH`).
+- `format-dispatch --check PATH...`, a non-mutating CI gate that reports
+  which files a formatter would change and exits 1 if any would. It answers
+  the same question every local write answers, so a repo can enforce
+  formatting in CI without installing the formatters — a file whose tool is
+  absent is reported as fine rather than failing the build. Exit 2 is
+  reserved for bad invocation so a broken pipeline stays distinguishable
+  from a real failure.
 - Windows release binaries (amd64 + arm64). CI already ran the full test
   matrix on `windows-latest`, so the platform was being validated on every
   push and then withheld from every release.
