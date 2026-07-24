@@ -63,6 +63,7 @@ Usage:
   format-dispatch --install          wire this binary into ~/.claude/settings.json as a PostToolUse hook
   format-dispatch --uninstall        remove it from ~/.claude/settings.json
   format-dispatch --install --dry-run    preview the settings.json diff for either subcommand, without writing
+  format-dispatch --check PATH...    report files a formatter would change, without changing them (exit 1 if any)
   format-dispatch --version          print version and build info
   format-dispatch --help             show this help
 `
@@ -85,6 +86,8 @@ func dispatchArgs(args []string) int {
 		return runInstall(args[1:], false)
 	case "--uninstall":
 		return runInstall(args[1:], true)
+	case "--check":
+		return runCheck(args[1:], os.Stdout, os.Stderr)
 	case "--version":
 		fmt.Println(versionString())
 		return 0
