@@ -22,7 +22,7 @@ type Registry struct {
 
 // NewRegistry builds the extension -> Formatter map, honoring cfg.Disabled.
 func NewRegistry(cfg config.Config) *Registry {
-	json := formatters.NewJSON(cfg)
+	json := formatters.NewJSONRouter(cfg)
 	shell := formatters.NewShell(cfg)
 	golang := formatters.NewGo()
 	biome := formatters.NewBiome()
@@ -55,7 +55,8 @@ func NewRegistry(cfg config.Config) *Registry {
 		".cts": biome,
 		".css": biome,
 		// .jsonc keeps comments, which json.Indent can't handle safely —
-		// route it to biome instead of the native json formatter.
+		// biome unconditionally, since a project without a biome config still
+		// needs something that parses comments.
 		".jsonc": biome,
 
 		".md":       markdown,
