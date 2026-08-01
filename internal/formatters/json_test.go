@@ -73,3 +73,42 @@ func TestJSONFormatterPreservesKeyOrder(t *testing.T) {
 	want := "{\n  \"zebra\": 1,\n  \"apple\": 2\n}\n"
 	qt.Check(t, qt.Equals(string(out), want), qt.Commentf("key order not preserved"))
 }
+
+func TestJSONRouterName(t *testing.T) {
+	qt.Check(t, qt.Equals(NewJSONRouter(config.Default()).Name(), "json"))
+}
+
+// Without a biome config the native formatter owns .json, so the file is
+// reformatted in-process with no external tool involved.
+func TestJSONRouterUsesNativeWithoutBiomeConfig(t *testing.T) {
+	isolateDiskCache(t)
+	dir := t.TempDir()
+	path := filepath.Join(dir, "t.json")
+	qt.Assert(t, qt.IsNil(os.WriteFile(path, []byte(`{"a":1}`), 0o600)))
+
+	res := NewJSONRouter(config.Default()).Format(t.Context(), dir, path)
+	qt.Assert(t, qt.IsFalse(res.Skipped))
+
+	got, err := os.ReadFile(path)
+	qt.Assert(t, qt.IsNil(err))
+	qt.Check(t, qt.Equals(string(got), "{\n  \"a\": 1\n}\n"))
+}
+
+// A biome config routes .json to biome, but biome needs bunx. Without it the
+// native formatter still runs: leaving the file untouched would be worse than
+// formatting it without biome's `expand` setting.
+func TestJSONRouterFallsBackToNativeWithoutBunx(t *testing.T) {
+	isolateDiskCache(t)
+	clearPath(t)
+	dir := t.TempDir()
+	qt.Assert(t, qt.IsNil(os.WriteFile(filepath.Join(dir, "biome.json"), []byte("{}\n"), 0o600)))
+	path := filepath.Join(dir, "t.json")
+	qt.Assert(t, qt.IsNil(os.WriteFile(path, []byte(`{"a":1}`), 0o600)))
+
+	res := NewJSONRouter(config.Default()).Format(t.Context(), dir, path)
+	qt.Assert(t, qt.IsFalse(res.Skipped))
+
+	got, err := os.ReadFile(path)
+	qt.Assert(t, qt.IsNil(err))
+	qt.Check(t, qt.Equals(string(got), "{\n  \"a\": 1\n}\n"))
+}
