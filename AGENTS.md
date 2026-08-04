@@ -174,3 +174,13 @@ Unchanged from the hand-written per-project hooks this replaces:
   real file from this fleet, per the Architecture rationale above — do not
   assume a Go library is formatting-fidelity-safe without checking.
 - Commit conventions, PR checklist: [CONTRIBUTING.md](CONTRIBUTING.md).
+
+## No CLI framework (decided v0.2.0, 2026-07-19)
+
+`cmd/format-dispatch/main.go` keeps its hand-rolled `dispatchArgs` switch. Cobra (+pflag), urfave/cli v3, alecthomas/kong, and peterbourgon/ff/ffcli were all researched and rejected.
+
+Cobra was the strongest candidate — the only one with real shell completion at no extra deps beyond pflag — for a measured **+28% binary size** (3008 KB → ~3860 KB) plus a 60–80 line rewrite and test restructuring.
+
+Rejected anyway because the flag surface (`--install` / `--uninstall` / `--dry-run` / `--version` / `--help`) is a rarely-used ops side door: ~99% of invocations are the zero-arg `PostToolUse` hook path reading stdin JSON, which no framework touches. There are no POSIX combined short-flags to parse, man-page generation is a build-time side tool under every candidate, and completion has little value for a binary Claude Code invokes programmatically.
+
+**Don't re-propose these** without a materially new argument — e.g. the CLI surface grows past ~3–4 flat subcommands, or users actually ask for completion.
