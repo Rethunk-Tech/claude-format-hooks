@@ -76,6 +76,18 @@ func TestDispatchRoutesToFormatter(t *testing.T) {
 	qt.Assert(t, qt.Equals(string(out), "{\n  \"b\": 1,\n  \"a\": 2\n}\n"))
 }
 
+func TestDispatchUsesCallerResolvedExtensionForExtensionlessPath(t *testing.T) {
+	dir := t.TempDir()
+	path := filepath.Join(dir, "script")
+	qt.Assert(t, qt.IsNil(os.WriteFile(path, []byte("#!/bin/sh\necho hi\n"), 0o755)))
+
+	r := NewRegistry(config.Default())
+	result := r.Dispatch(t.Context(), dir, path, ".sh")
+
+	qt.Assert(t, qt.IsNil(result.Err))
+	qt.Check(t, qt.Equals(result.Diagnostic, ""))
+}
+
 func TestInVendoredDir(t *testing.T) {
 	cases := []struct {
 		path string
