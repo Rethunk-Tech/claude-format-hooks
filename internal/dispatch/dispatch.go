@@ -91,19 +91,25 @@ func NewRegistry(cfg config.Config) *Registry {
 }
 
 // vendoredDirs are path segments never worth formatting: build output,
-// dependency trees, and VCS/tooling metadata.
+// dependency trees, language/tool caches, and VCS metadata.
 var vendoredDirs = map[string]bool{
-	"node_modules": true,
-	".next":        true,
-	".yarn":        true,
-	".git":         true,
-	".agents":      true,
-	"dist":         true,
-	"build":        true,
-	"coverage":     true,
-	"test-results": true,
-	"vendor":       true,
-	".venv":        true,
+	"node_modules":  true,
+	".next":         true,
+	".yarn":         true,
+	".git":          true,
+	".agents":       true,
+	"dist":          true,
+	"build":         true,
+	"coverage":      true,
+	"test-results":  true,
+	"vendor":        true,
+	".venv":         true,
+	".terraform":    true,
+	"__pycache__":   true,
+	".ruff_cache":   true,
+	".mypy_cache":   true,
+	".pytest_cache": true,
+	".tox":          true,
 }
 
 // Supported reports whether ext (as returned by filepath.Ext, e.g. ".ts")

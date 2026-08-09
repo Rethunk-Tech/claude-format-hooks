@@ -92,11 +92,18 @@ func TestInVendoredDir(t *testing.T) {
 		{"test-results/report.json", true},
 		{"vendor/github.com/foo/bar.go", true},
 		{".venv/lib/python.py", true},
+		{".terraform/providers/registry.terraform.io/hashicorp/aws/main.tf", true},
+		{"src/__pycache__/module.pyc", true},
+		{".ruff_cache/0.8.0/README.md", true},
+		{"src/.mypy_cache/3.12/module.meta.json", true},
+		{".pytest_cache/v/cache/nodeids", true},
+		{"tests/.tox/py312/bin/python", true},
 		// A directory name that merely contains a vendored segment as a
 		// substring, rather than matching a full path segment, must not
 		// be treated as vendored.
 		{"node_modules_extra/foo.js", false},
 		{"src/vendored/foo.ts", false},
+		{"target/generated.go", false},
 	}
 	for _, tc := range cases {
 		qt.Check(t, qt.Equals(InVendoredDir(tc.path), tc.want), qt.Commentf("path=%q", tc.path))
