@@ -237,7 +237,7 @@ Three layers, in increasing priority:
   and `buf`. `ruff/black` does not cover notebooks; use
   `ruff/black-notebook` separately for `.ipynb`.
 
-1. **The target project's `.editorconfig`** — if a section covers the
+3. **The target project's `.editorconfig`** — if a section covers the
    file being formatted, its `indent_style`/`indent_size` win over your
    personal config, the same way every editor and formatter that honors
    EditorConfig behaves. A missing or malformed config file never blocks
