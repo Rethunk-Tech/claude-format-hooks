@@ -37,8 +37,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `windows-latest`, so the platform was being validated on every push and
   then withheld from every release.
 - `--install` now provisions the bunx-dispatched formatters globally
-  (replacing `install.sh`'s cache pre-warm) and pins transitive
-  dependencies carrying an unpatched advisory, so no registry fetch ever
+  (replacing `install.sh`'s cache pre-warm), so no registry fetch ever
   happens inside the per-file budget.
 
 ### Fixed
@@ -77,6 +76,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - SQL defaults. On the first `.sql` write, format-dispatch materializes
   `~/.sqlfluff` with an ANSI dialect when it does not already exist. Existing
   user configuration is preserved, and project configuration still wins.
+
+- `markdownlint-cli2` now resolves the patched `js-yaml` 5.2.2 release, so
+  the installer no longer needs a global dependency override for
+  GHSA-pm4m-ph32-ghv5.
 
 ### Documentation
 

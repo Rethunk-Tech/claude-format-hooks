@@ -24,18 +24,12 @@ var bunTools = []string{
 	"markdownlint-cli2",
 }
 
-// bunGlobalOverrides pins transitive dependencies of the tools above that
-// carry an unpatched advisory. Bun honors an `overrides` key in the global
-// manifest exactly as it does in a project's, but only on `bun install` --
-// `bun add -g` rewrites the file and drops it, which is why provisioning
-// adds the packages first and applies overrides second.
-//
-//   - js-yaml: markdownlint-cli2 0.23.1 pins the vulnerable 5.2.1 exactly
-//     (GHSA-pm4m-ph32-ghv5, exponential parse time -> DoS). 5.2.2 is the
-//     patched release. Drop this once markdownlint-cli2 ships against it.
-var bunGlobalOverrides = map[string]string{
-	"js-yaml": "^5.2.2",
-}
+// bunGlobalOverrides lists optional transitive dependency overrides for the
+// tools above. Bun honors an `overrides` key in the global manifest exactly as
+// it does in a project's, but only on `bun install` -- `bun add -g` rewrites
+// the file and drops it, which is why provisioning adds the packages first
+// and applies overrides second.
+var bunGlobalOverrides = map[string]string{}
 
 // provisionTimeout bounds the whole provisioning step. Installing four
 // packages over a cold network is slow but bounded; a hung registry must
