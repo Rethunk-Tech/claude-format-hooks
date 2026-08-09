@@ -255,7 +255,7 @@ func run(stdin io.Reader) int {
 	ctx, cancel := context.WithTimeoutCause(context.Background(), formatterTimeout, errFormatterTimeout)
 	defer cancel()
 
-	result := registry.Dispatch(ctx, projectRoot, abs)
+	result := registry.Dispatch(ctx, projectRoot, abs, ext)
 
 	if result.Err != nil {
 		fmt.Fprintf(os.Stderr, "%s: %v\n", registry.Name(ext), result.Err)

@@ -155,11 +155,13 @@ func InVendoredDir(relPath string) bool {
 	return slices.ContainsFunc(segs, func(seg string) bool { return vendoredDirs[seg] })
 }
 
-// Dispatch routes abs to the formatter registered for its extension.
-// Callers must already have confirmed Supported(filepath.Ext(abs)) and
-// !InVendoredDir(...); Dispatch does not re-check either.
-func (r *Registry) Dispatch(ctx context.Context, projectRoot, abs string) formatters.Result {
-	f := r.byExt[strings.ToLower(filepath.Ext(abs))]
+// Dispatch routes abs to the formatter registered for ext.
+// Callers pass the already-resolved extension (which may differ from
+// filepath.Ext(abs) for extensionless shell-shebang paths) and must
+// already have confirmed Supported(ext) and !InVendoredDir(...);
+// Dispatch does not re-check either.
+func (r *Registry) Dispatch(ctx context.Context, projectRoot, abs, ext string) formatters.Result {
+	f := r.byExt[strings.ToLower(ext)]
 	return f.Format(ctx, projectRoot, abs)
 }
 

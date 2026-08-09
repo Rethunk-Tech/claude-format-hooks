@@ -64,7 +64,7 @@ func runCheck(args []string, out, errOut io.Writer) int {
 			continue
 		}
 		fileCtx, fileCancel := context.WithTimeoutCause(ctx, formatterTimeout, errFormatterTimeout)
-		changed, err := wouldReformat(fileCtx, registry, projectRoot, abs)
+		changed, err := wouldReformat(fileCtx, registry, projectRoot, abs, ext)
 		fileCancel()
 		if err != nil {
 			_, _ = fmt.Fprintf(errOut, "format-dispatch --check: %s: %v\n", abs, err)
@@ -131,7 +131,7 @@ func checkProjectRoot(paths []string, abs string) string {
 // resolves its config by walking up from the file (biome.json, .sqlfluff, a
 // project .markdownlint-cli2.jsonc), so formatting a copy in a temp
 // directory elsewhere would silently apply the wrong rules.
-func wouldReformat(ctx context.Context, registry *dispatch.Registry, projectRoot, abs string) (bool, error) {
+func wouldReformat(ctx context.Context, registry *dispatch.Registry, projectRoot, abs, ext string) (bool, error) {
 	original, err := os.ReadFile(abs) //nolint:gosec // abs is a path the caller asked to check, by design
 	if err != nil {
 		return false, err
@@ -148,7 +148,7 @@ func wouldReformat(ctx context.Context, registry *dispatch.Registry, projectRoot
 	// build for files it could never have formatted.
 	// Dispatch from the check's project root so config discovery matches the
 	// hook, even when the file being checked is nested below that root.
-	registry.Dispatch(ctx, projectRoot, scratch)
+	registry.Dispatch(ctx, projectRoot, scratch, ext)
 	if err := context.Cause(ctx); err != nil {
 		return false, err
 	}
