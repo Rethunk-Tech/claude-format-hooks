@@ -245,6 +245,23 @@ func TestFetchHTTPRejectsOversizedContentLength(t *testing.T) {
 	}
 }
 
+func TestFetchHTTPReportsOversizedNon2xx(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		w.Header().Set("Content-Length", fmt.Sprintf("%d", maxUpgradeDownloadBytes+1))
+		w.WriteHeader(http.StatusForbidden)
+		_, _ = w.Write([]byte("forbidden"))
+	}))
+	defer server.Close()
+
+	_, err := fetchHTTP(server.Client(), server.URL)
+	if err == nil || !strings.Contains(err.Error(), "HTTP") {
+		t.Fatalf("fetchHTTP error = %v, want HTTP error", err)
+	}
+	if strings.Contains(err.Error(), "exceeds maximum download size") {
+		t.Fatalf("fetchHTTP error = %v, want status error before size error", err)
+	}
+}
+
 func TestUpgradeOversizedBinaryLeavesInstalledBinaryUntouched(t *testing.T) {
 	oversized := bytes.Repeat([]byte("x"), maxUpgradeDownloadBytes+1)
 	server, _, _, _ := upgradeTestServer(t, oversized, nil)
