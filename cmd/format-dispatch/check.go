@@ -84,13 +84,16 @@ func runCheck(args []string, out, errOut io.Writer) int {
 			continue
 		}
 		projectRoot := checkProjectRoot(args, abs)
-		if disabled, err := projectDisables(projectRoot, ext); err != nil {
+		registryForFile := registry
+		if disabled, projectCfg, err := projectDisables(projectRoot, ext, registry.Name(ext)); err != nil {
 			_, _ = fmt.Fprintf(errOut, "format-dispatch --check: project config: %v (ignoring)\n", err)
 		} else if disabled {
 			continue
+		} else {
+			registryForFile = registryWithProjectConfig(registry, cfg, ext, projectCfg)
 		}
 		fileCtx, fileCancel := context.WithTimeoutCause(ctx, formatterTimeout, errFormatterTimeout)
-		changed, err := wouldReformat(fileCtx, registry, projectRoot, abs, ext)
+		changed, err := wouldReformat(fileCtx, registryForFile, projectRoot, abs, ext)
 		fileCancel()
 		if err != nil {
 			_, _ = fmt.Fprintf(errOut, "format-dispatch --check: %s: %v\n", abs, err)

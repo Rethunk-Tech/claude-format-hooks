@@ -484,6 +484,32 @@ func TestRunProjectConfigDisablesFormatter(t *testing.T) {
 	qt.Check(t, qt.Equals(readFile(t, abs), src), qt.Commentf("project-disabled extension must not be formatted"))
 }
 
+func TestRunProjectConfigDisablesFormatterByName(t *testing.T) {
+	projectRoot := t.TempDir()
+	abs := filepath.Join(projectRoot, "f.ts")
+	src := "const value={answer:42}\n"
+	writeFile(t, abs, src)
+	writeFile(t, filepath.Join(projectRoot, projectConfigFile), `{"disabledFormatters":["BIOME"]}`)
+
+	t.Setenv("CLAUDE_PROJECT_DIR", projectRoot)
+	qt.Check(t, qt.Equals(run(strings.NewReader(payload(abs))), 0))
+	qt.Check(t, qt.Equals(readFile(t, abs), src), qt.Commentf("project-disabled formatter must not be formatted"))
+}
+
+func TestRunProjectConfigDisablesBiomeForJSONRouter(t *testing.T) {
+	projectRoot := t.TempDir()
+	abs := filepath.Join(projectRoot, "f.json")
+	src := `{"b":1,"a":2}`
+	writeFile(t, abs, src)
+	writeFile(t, filepath.Join(projectRoot, "biome.json"), "{}\n")
+	writeFile(t, filepath.Join(projectRoot, projectConfigFile), `{"disabledFormatters":["biome"]}`)
+
+	t.Setenv("CLAUDE_PROJECT_DIR", projectRoot)
+	qt.Check(t, qt.Equals(run(strings.NewReader(payload(abs))), 0))
+	qt.Check(t, qt.Equals(readFile(t, abs), "{\n  \"b\": 1,\n  \"a\": 2\n}\n"),
+		qt.Commentf("project-disabled biome must leave the native JSON router enabled"))
+}
+
 func TestRunUserConfigDisablesFormatter(t *testing.T) {
 	projectRoot := t.TempDir()
 	abs := filepath.Join(projectRoot, "f.json")
@@ -500,6 +526,20 @@ func TestRunUserConfigDisablesFormatter(t *testing.T) {
 	qt.Check(t, qt.Equals(run(strings.NewReader(payload(abs))), 0))
 	qt.Check(t, qt.Equals(readFile(t, abs), src), qt.Commentf("user-disabled extension must not be formatted"))
 	qt.Check(t, qt.StringContains(readFile(t, logPath), `outcome="skip: disabled by config"`))
+}
+
+func TestRunUserConfigDisablesFormatterByName(t *testing.T) {
+	projectRoot := t.TempDir()
+	abs := filepath.Join(projectRoot, "f.ts")
+	src := "const value={answer:42}\n"
+	writeFile(t, abs, src)
+	configPath := filepath.Join(t.TempDir(), "claude-format-hooks.json")
+	writeFile(t, configPath, `{"disabledFormatters":["biome"]}`)
+
+	t.Setenv("CLAUDE_PROJECT_DIR", projectRoot)
+	t.Setenv("CLAUDE_FORMAT_HOOKS_CONFIG", configPath)
+	qt.Check(t, qt.Equals(run(strings.NewReader(payload(abs))), 0))
+	qt.Check(t, qt.Equals(readFile(t, abs), src), qt.Commentf("user-disabled formatter must not be formatted"))
 }
 
 func TestRunUserConfigMalformedFallsBackAndWarns(t *testing.T) {

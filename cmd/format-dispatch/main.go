@@ -264,7 +264,7 @@ func run(stdin io.Reader) int {
 		return 0
 	}
 
-	registry := buildRegistry()
+	registry, userCfg := buildRegistry()
 	if !registry.Supported(ext) {
 		logOutcome = "skip: disabled by config"
 		return 0
@@ -280,11 +280,13 @@ func run(stdin io.Reader) int {
 	// A project can opt a specific formatter out for itself (e.g. it
 	// already runs its own pre-commit prettier with different rules)
 	// without every operator changing their global config.
-	if disabled, err := projectDisables(projectRoot, ext); err != nil {
+	if disabled, projectCfg, err := projectDisables(projectRoot, ext, registry.Name(ext)); err != nil {
 		fmt.Fprintf(os.Stderr, "format-dispatch: project config: %v (ignoring)\n", err)
 	} else if disabled {
 		logOutcome = "skip: disabled by project config"
 		return 0
+	} else {
+		registry = registryWithProjectConfig(registry, userCfg, ext, projectCfg)
 	}
 
 	ctx, cancel := context.WithTimeoutCause(context.Background(), formatterTimeout, errFormatterTimeout)
@@ -313,13 +315,13 @@ func run(stdin io.Reader) int {
 // buildRegistry loads the user-level config and builds the formatter
 // registry from it. A malformed config must never turn this into a
 // blocking hook — it falls back to defaults and says why on stderr.
-func buildRegistry() *dispatch.Registry {
+func buildRegistry() (*dispatch.Registry, config.Config) {
 	cfg, err := config.Load(configPath())
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "format-dispatch: config: %v (using defaults)\n", err)
 		cfg = config.Default()
 	}
-	return dispatch.NewRegistry(cfg)
+	return dispatch.NewRegistry(cfg), cfg
 }
 
 // resolveTarget resolves path to an absolute path and its project root,
@@ -363,16 +365,28 @@ func resolveTarget(path string) (abs, projectRoot, skipReason string) {
 }
 
 // projectDisables reports whether ext is opted out for this project via
-// projectConfigFile at projectRoot. Same schema, same Load/IsDisabled as
-// the user-level config. A malformed project config returns a non-nil
-// err — the caller prints it and proceeds as if nothing were disabled,
-// rather than blocking formatting.
-func projectDisables(projectRoot, ext string) (disabled bool, err error) {
-	cfg, err := config.Load(filepath.Join(projectRoot, projectConfigFile))
+// projectConfigFile at projectRoot. Same schema, same Load and disabled-list
+// checks as the user-level config. A malformed project config returns a
+// non-nil err — the caller prints it and proceeds as if nothing were
+// disabled, rather than blocking formatting.
+func projectDisables(projectRoot, ext, formatterName string) (disabled bool, cfg config.Config, err error) {
+	cfg, err = config.Load(filepath.Join(projectRoot, projectConfigFile))
 	if err != nil {
-		return false, err
+		return false, config.Config{}, err
 	}
-	return cfg.IsDisabled(ext), nil
+	return cfg.IsDisabled(ext) || cfg.IsFormatterDisabled(formatterName), cfg, nil
+}
+
+// registryWithProjectConfig applies project formatter opt-outs that affect a
+// router's internal choice, while keeping extension-specific project opt-outs
+// in projectDisables.
+func registryWithProjectConfig(registry *dispatch.Registry, userCfg config.Config, ext string, projectCfg config.Config) *dispatch.Registry {
+	if !strings.EqualFold(ext, ".json") || !projectCfg.IsFormatterDisabled("biome") {
+		return registry
+	}
+	merged := userCfg
+	merged.DisabledFormatters = append(append([]string(nil), userCfg.DisabledFormatters...), projectCfg.DisabledFormatters...)
+	return dispatch.NewRegistry(merged)
 }
 
 // logInvocation appends one line to $CLAUDE_FORMAT_HOOKS_LOG, if set — an
