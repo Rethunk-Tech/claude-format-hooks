@@ -64,7 +64,9 @@ func runCheck(args []string, out, errOut io.Writer) int {
 		} else if disabled {
 			continue
 		}
-		changed, err := wouldReformat(ctx, registry, projectRoot, abs)
+		fileCtx, fileCancel := context.WithTimeoutCause(ctx, formatterTimeout, errFormatterTimeout)
+		changed, err := wouldReformat(fileCtx, registry, projectRoot, abs)
+		fileCancel()
 		if err != nil {
 			_, _ = fmt.Fprintf(errOut, "format-dispatch --check: %s: %v\n", abs, err)
 			return 2
@@ -134,6 +136,9 @@ func wouldReformat(ctx context.Context, registry *dispatch.Registry, projectRoot
 	// Dispatch from the check's project root so config discovery matches the
 	// hook, even when the file being checked is nested below that root.
 	registry.Dispatch(ctx, projectRoot, scratch)
+	if err := context.Cause(ctx); err != nil {
+		return false, err
+	}
 
 	formatted, err := os.ReadFile(scratch) //nolint:gosec // scratch is the temp copy this function just created
 	if err != nil {

@@ -5,6 +5,7 @@ import (
 	"os"
 	"path/filepath"
 	"testing"
+	"time"
 
 	"github.com/go-quicktest/qt"
 )
@@ -147,6 +148,25 @@ func TestCheckDispatchesNestedBiomeFromProjectRoot(t *testing.T) {
 	qt.Check(t, qt.Equals(readFile(t, marker), projectRoot),
 		qt.Commentf("nested checks must dispatch from the project root"))
 	qt.Check(t, qt.StringContains(out.String(), path))
+
+	hungPath := writeCheckFile(t, filepath.Join(projectRoot, "nested"), "hung.ts", "const value={answer:42}\n")
+	writeFile(t, path, "const value = { answer: 42 };\n")
+	timeoutScript := "#!/bin/sh\nprintf 'timeout:%s' \"$PWD\" > \"$FMTCHECK_MARKER\"\nexec /bin/sleep 30\n"
+	for _, name := range []string{"biome", "bunx"} {
+		tool := filepath.Join(toolDir, name)
+		qt.Assert(t, qt.IsNil(os.WriteFile(tool, []byte(timeoutScript), 0o755))) //nolint:gosec // test fixture
+	}
+	var timeoutOut, timeoutErrOut bytes.Buffer
+	started := time.Now()
+	code := runCheck([]string{hungPath}, &timeoutOut, &timeoutErrOut)
+	elapsed := time.Since(started)
+
+	qt.Check(t, qt.Equals(code, 2))
+	qt.Check(t, qt.IsTrue(elapsed < 10*time.Second),
+		qt.Commentf("a single hung formatter must use the per-file timeout, not checkTimeout"))
+	qt.Check(t, qt.Equals(readFile(t, marker), "timeout:"+projectRoot))
+	qt.Check(t, qt.StringContains(timeoutErrOut.String(), hungPath))
+	qt.Check(t, qt.StringContains(timeoutErrOut.String(), errFormatterTimeout.Error()))
 }
 
 func TestCollectCheckTargetsSkipsScratchFiles(t *testing.T) {
