@@ -10,6 +10,13 @@ expanded `vendoredDirs`; PATH-first bunx fallback; atomic native writes
 (symlink-safe + stale-skip); diskcache prune; sqlfluff `~/.sqlfluff`
 bootstrap. Multi-dot Terraform suffixes stayed deferred (below).
 
+Wave 2 (2026-08-09) landed: Windows `format-dispatch.exe` basename +
+legacy Wire/Unwire dedupe; extensionless shell-shebang peek (incl. CRLF)
+
++ `Dispatch(ext)` glue; `.ipynb` via ruff/black-notebook; docs/tests
+aligned. Deferred: multi-dot Terraform, `disabledFormatters`, `--check`
+shebang parity (below).
+
 ---
 
 ## Residual — Formatter coverage
@@ -20,15 +27,19 @@ bootstrap. Multi-dot Terraform suffixes stayed deferred (below).
 `terraform fmt` also formats `.tftest.hcl`, `.tfmock.hcl`, and
 `.tfquery.hcl`. A naive `".hcl"` registration would hit Packer/Nomad HCL.
 
+Absorb extension resolution into a shared `dispatch` helper (longest
+suffix + shebang already peeks in `main`) so `main.go` / `check.go` stop
+re-deriving `filepath.Ext` independently.
+
 **Traps**
 
-- Longest-suffix match; keep `disabled: [".hcl"]` vs
++ Longest-suffix match; keep `disabled: [".hcl"]` vs
   `disabled: [".tftest.hcl"]` coherent with `KnownExtension`.
-- Do not format `.tf.json` / `.tfvars.json`.
++ Do not format `.tf.json` / `.tfvars.json`.
 
 **Acceptance**
 
-- Multi-dot Terraform suffixes format via `terraform fmt`, or stay an
++ Multi-dot Terraform suffixes format via `terraform fmt`, or stay an
   explicit won't-fix with the `filepath.Ext` trap recorded in HUMANS.
 
 ### Retire `js-yaml` global override when upstream is fixed
@@ -39,7 +50,7 @@ bootstrap. Multi-dot Terraform suffixes stayed deferred (below).
 
 **Acceptance**
 
-- Override map empty (or without `js-yaml`) only after confirming the
++ Override map empty (or without `js-yaml`) only after confirming the
   published dependency tree; CHANGELOG notes the pin removal.
 
 ---
@@ -55,24 +66,23 @@ requires an explicit operator go.
 
 **Acceptance**
 
-- Identified failing check and root cause recorded.
-- A subsequent `main` push is green on ubuntu/macOS/Windows test + lint.
++ Identified failing check and root cause recorded.
++ A subsequent `main` push is green on ubuntu/macOS/Windows test + lint.
 
 ### Release-binary upgrade path
 
 No `format-dispatch --upgrade` / install.sh path that fetches the latest
-release artifact, verifies sha256, and replaces
-`~/.claude/hooks/format-dispatch`.
+release artifact, verifies sha256, and replaces the installed hook binary.
 
 **Traps**
 
-- Must verify sha256; Windows `.exe` naming must share the helper with
-  DefaultOptions (see Windows install path below).
-- Do not rewrite `settings.json` if already wired to the same path.
++ Must verify sha256; reuse `installer.HookBinaryBaseName` /
+  `HookBinaryPath` for Windows `.exe` vs POSIX naming.
++ Do not rewrite `settings.json` if already wired to the same path.
 
 **Acceptance**
 
-- Documented, tested download + hash verify + install; HUMANS no-Go links it.
++ Documented, tested download + hash verify + install; HUMANS no-Go links it.
 
 ### Fleet re-survey for the next zero-cost extensions
 
@@ -88,8 +98,8 @@ Re-reject Kotlin/XML/Lua/Gradle unless fleet evidence changed.
 
 **Acceptance**
 
-- Short survey note with counts and go/no-go per candidate.
-- Any "go" lands with dispatch registration + HUMANS row together.
++ Short survey note with counts and go/no-go per candidate.
++ Any "go" lands with dispatch registration + HUMANS row together.
 
 ### Config: disable by formatter name
 
@@ -98,76 +108,60 @@ Today `disabled` is extension-only. A parallel `disabledFormatters:
 
 **Traps**
 
-- `jsonRouter.Name()` returns `"json"` while biome may run underneath —
++ `jsonRouter.Name()` returns `"json"` while biome may run underneath —
   disabling `"biome"` must still skip the biome branch for `.json`, or
   document extension-only opt-out for `.json`.
 
 **Acceptance**
 
-- One config key disables all extensions registered to that formatter.
-- HUMANS example shows disabling biome without enumerating eight extensions.
++ One config key disables all extensions registered to that formatter.
++ HUMANS example shows disabling biome without enumerating eight extensions.
 
 ---
 
-## Residual — Hook claim vs capability
+## Residual — Hook / check parity
 
-### Format notebooks (`.ipynb`) on NotebookEdit
+### `--check` extensionless shebang parity
 
-Matcher advertises `NotebookEdit`; `.ipynb` is not in the registry.
-Prefer ruff-then-black (ruff formats notebooks by default since 0.6.0).
-
-**Traps**
-
-- Do not JSON round-trip the notebook; shell out.
-- Black without jupyter extra → skip, not spam.
-- Fleet-count first; if rare, document matcher/extension mismatch instead.
+Hook formats extensionless shell-shebang paths; `runCheck` still uses
+`filepath.Ext` only, so CI skips those files. Wave-2 contract deferred
+this to the same extension-resolution pass as multi-dot Terraform.
 
 **Acceptance**
 
-- NotebookEdit `.ipynb` formats Python cells when ruff/black available;
-  silent skip otherwise; HUMANS + registry + CHANGELOG together.
-
-### Windows install path must use `format-dispatch.exe`
-
-`DefaultOptions` / `install.sh` always build bare `format-dispatch`.
-Release assets are `format-dispatch-windows-*.exe`. Uninstall matches by
-exact string — basename mismatch breaks Wire/Unwire.
-
-**Acceptance**
-
-- On Windows, `BinPath` ends in `format-dispatch.exe`; HUMANS names the
-  `.exe` asset; shared helper with any future `--upgrade`.
++ `--check` and the hook agree on extensionless shell-shebang targets.
 
 ---
 
-## Residual — Extension refinements
+## Residual — Hardening (wave-2 audit carry-forwards)
 
-### Extensionless shebang scripts (optional)
+### Defensive nil skip in `Registry.Dispatch`
 
-Agents write `bin/do-thing` with `#!/usr/bin/env bash` and no extension →
-instant no-op. Narrow peek only when `ext == ""`.
+`Dispatch` indexes `byExt[ext]` with no nil guard; a caller that skips
+`Supported` panics the process. Prefer `Result{Skipped: true}` (or a
+clear Err) over nil deref.
 
-**Traps**
+### Tighten black notebook-missing heuristic
 
-- Read ≤256 bytes; only clear shell shebangs to `shellFormatter`.
-- Keep unsupported-extension fast path for every real extension.
-- Fleet count first; if rare, documented won't-fix.
+`blackNotebookSupportMissing` substring-matches `jupyter`/`notebook` in
+any diagnostic, which can silence unrelated black failures. Prefer
+exit-code/message patterns that only mean the jupyter extra is absent.
 
-**Acceptance**
+### Include notebook in `TestExternalFormatterNames`
 
-- Extensionless shell-shebang hook paths format via shfmt; `.ts`/`.md`
-  still zero I/O before map lookup.
+`external_test.go` lists external formatter names but omits
+`NewNotebook` / `ruff/black-notebook`.
 
 ---
 
 ## Explicitly out of scope (do not re-open without new evidence)
 
-- CLI framework (Cobra/urfave/kong/ffcli) — decided v0.2.0; see AGENTS.md.
-- Native YAML/TOML/HTML Go formatters — fidelity failures already recorded
++ CLI framework (Cobra/urfave/kong/ffcli) — decided v0.2.0; see AGENTS.md.
++ Native YAML/TOML/HTML Go formatters — fidelity failures already recorded
   in AGENTS.md Architecture.
-- Kotlin / XML / Lua / Gradle formatters — surveyed and passed over in
++ Kotlin / XML / Lua / Gradle formatters — surveyed and passed over in
   0.3.0.
-- Requiring per-tool project config before formatting — removed for biome;
++ Requiring per-tool project config before formatting — removed for biome;
   do not reintroduce.
-- Shared `internal/atomicfile` extract for installer + formatters — both
++ Shared `internal/atomicfile` extract for installer + formatters — both
   paths are atomic independently; extract only if a third caller appears.
