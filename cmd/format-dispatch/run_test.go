@@ -216,6 +216,46 @@ func TestRunInstallRejectsUnrecognizedArgs(t *testing.T) {
 	}
 }
 
+func TestRunUpgradeRejectsUnrecognizedArgs(t *testing.T) {
+	cases := []struct {
+		name       string
+		args       []string
+		wantSubstr string
+	}{
+		{"typo of --dry-run", []string{"--dryrun"}, "unrecognized argument"},
+		{"unrelated flag", []string{"--bogus"}, "unrecognized argument"},
+		{"extra arguments", []string{"--dry-run", "extra"}, "unexpected arguments"},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			dir := t.TempDir()
+			binDir := filepath.Join(dir, "bin")
+			t.Setenv("CLAUDE_HOOKS_BIN_DIR", binDir)
+			t.Setenv("CLAUDE_SETTINGS_FILE", filepath.Join(dir, "settings.json"))
+
+			var code int
+			stderr := captureStderr(t, func() { code = runUpgrade(tc.args) })
+			qt.Check(t, qt.Equals(code, 1))
+			qt.Check(t, qt.StringContains(stderr, tc.wantSubstr))
+			qt.Check(t, qt.StringContains(stderr, "format-dispatch --upgrade:"))
+			entries, err := os.ReadDir(binDir)
+			qt.Check(t, qt.IsTrue(os.IsNotExist(err) || len(entries) == 0),
+				qt.Commentf("rejected args must not write a binary"))
+		})
+	}
+}
+
+func TestDispatchArgsRoutesUpgrade(t *testing.T) {
+	dir := t.TempDir()
+	t.Setenv("CLAUDE_HOOKS_BIN_DIR", filepath.Join(dir, "bin"))
+	t.Setenv("CLAUDE_SETTINGS_FILE", filepath.Join(dir, "settings.json"))
+
+	var code int
+	stderr := captureStderr(t, func() { code = dispatchArgs([]string{"--upgrade", "--bogus"}) })
+	qt.Check(t, qt.Equals(code, 1))
+	qt.Check(t, qt.StringContains(stderr, "format-dispatch --upgrade:"))
+}
+
 func TestRunInstallReportsActionError(t *testing.T) {
 	dir := t.TempDir()
 	t.Setenv("CLAUDE_HOOKS_BIN_DIR", filepath.Join(dir, "bin"))

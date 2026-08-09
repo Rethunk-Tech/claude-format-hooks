@@ -12,8 +12,8 @@
 //   - Always exit 0. A PostToolUse hook runs after the tool already
 //     succeeded; it must never be the reason a Write/Edit/NotebookEdit
 //     call reports failure.
-//   - An unsupported extension is an instant no-op: one filepath.Ext call
-//     and one map lookup, nothing else — no stat, no exec.LookPath, no
+//   - An unsupported extension is an instant no-op: one ResolveExtension
+//     call and one map lookup, nothing else — no stat, no exec.LookPath, no
 //     subprocess. Extensionless files get one bounded shebang peek.
 package main
 
@@ -64,6 +64,8 @@ Usage:
   format-dispatch --install          wire this binary into ~/.claude/settings.json as a PostToolUse hook
   format-dispatch --uninstall        remove it from ~/.claude/settings.json
   format-dispatch --install --dry-run    preview the settings.json diff for either subcommand, without writing
+  format-dispatch --upgrade          download and replace this platform's latest release binary
+  format-dispatch --upgrade --dry-run    preview the binary upgrade without writing
   format-dispatch --check PATH...    report files a formatter would change, without changing them (exit 1 if any)
   format-dispatch --version          print version and build info
   format-dispatch --help             show this help
@@ -87,6 +89,8 @@ func dispatchArgs(args []string) int {
 		return runInstall(args[1:], false)
 	case "--uninstall":
 		return runInstall(args[1:], true)
+	case "--upgrade":
+		return runUpgrade(args[1:])
 	case "--check":
 		return runCheck(args[1:], os.Stdout, os.Stderr)
 	case "--version":
@@ -185,6 +189,37 @@ func runInstall(args []string, uninstall bool) int {
 			fmt.Fprintf(os.Stderr, "format-dispatch %s: %v\n", label, err)
 			return 1
 		}
+	}
+	return 0
+}
+
+// runUpgrade downloads the latest release binary for this platform, verifies
+// its checksum, and replaces the installed hook binary. It never rewrites
+// settings.json. `--dry-run` previews the plan without writing.
+func runUpgrade(args []string) int {
+	const label = "--upgrade"
+	var dryRun bool
+	switch len(args) {
+	case 0:
+	case 1:
+		if args[0] != "--dry-run" {
+			fmt.Fprintf(os.Stderr, "format-dispatch %s: unrecognized argument %q\n\n%s", label, args[0], usage)
+			return 1
+		}
+		dryRun = true
+	default:
+		fmt.Fprintf(os.Stderr, "format-dispatch %s: unexpected arguments %q\n\n%s", label, args, usage)
+		return 1
+	}
+
+	opts, err := installer.DefaultOptions()
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "format-dispatch %s: %v\n", label, err)
+		return 1
+	}
+	if err := installer.Upgrade(opts, dryRun, os.Stdout); err != nil {
+		fmt.Fprintf(os.Stderr, "format-dispatch %s: %v\n", label, err)
+		return 1
 	}
 	return 0
 }
