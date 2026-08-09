@@ -80,6 +80,7 @@ func TestBlackNotebookSupportMissingRejectsUnrelatedJupyterText(t *testing.T) {
 		"install jupyter",
 		"No module named jupyterlab",
 		"No module named jupyter_extra",
+		"No module named nbformat.core",
 	} {
 		qt.Check(t, qt.IsFalse(blackNotebookSupportMissing(diagnostic, "")),
 			qt.Commentf("diagnostic=%q", diagnostic))

@@ -82,7 +82,8 @@ func blackNotebookSupportMissing(diagnostic, raw string) bool {
 			for _, module := range []string{"nbformat", "jupyter"} {
 				if strings.HasPrefix(rest, module) {
 					end := len(module)
-					if end == len(rest) || !isIdentifierByte(rest[end]) {
+					if end == len(rest) ||
+						(!isIdentifierByte(rest[end]) && rest[end] != '.') {
 						return true
 					}
 				}
