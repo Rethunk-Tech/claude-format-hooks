@@ -63,8 +63,9 @@ Drift sites:
 
 ### Remove or explain the empty `hooks/` directory
 
-Repo-root `hooks/` is an empty tracked directory (no README, no files).
-Easy to confuse with Claude Code's `~/.claude/hooks` install target.
+Repo-root `hooks/` is an empty directory (currently untracked; no README,
+no files). Easy to confuse with Claude Code's `~/.claude/hooks` install
+target.
 
 **Traps**
 
@@ -166,7 +167,10 @@ bound).
 `--install` globally installs biome / prettier / taplo / markdownlint-cli2
 (`internal/installer/tools.go`), yet `biome.go` / `bunxtool.go` still
 always invoke `bunx <pkg> …`. That re-pays bunx resolution on every file
-inside the 4s `formatterTimeout`.
+inside the 4s `formatterTimeout`. `jsonRouter` (`json.go`) also gates the
+biome branch on `lookPath("bunx")` alone — once PATH preference lands, that
+gate must follow the same order or `.json` keeps paying bunx while `.ts`
+does not.
 
 **Traps**
 
@@ -184,6 +188,7 @@ inside the 4s `formatterTimeout`.
 
 - With `biome` on `PATH` and no network, a `.ts` write formats without
   invoking `bunx`.
+- Same for a `.json` under a biome config (`jsonRouter` biome branch).
 - Without the PATH binary but with `bunx`, behavior unchanged.
 - Name() / invocation log still identify the logical formatter (biome,
   prettier, …), not the launcher.
@@ -333,6 +338,323 @@ pre-commit.
   instance.
 - HUMANS example shows disabling biome without enumerating eight
   extensions.
+
+---
+
+## Round 5 — Hook claim vs capability
+
+### Format notebooks (`.ipynb`) on NotebookEdit
+
+Installer matcher is `Write|Edit|NotebookEdit` (`internal/installer/
+installer.go`), and `hookio.Payload.FilePath` already falls back to
+`tool_input.notebook_path`. `.ipynb` is not in `dispatch.NewRegistry`, so
+every NotebookEdit is an instant no-op after `KnownExtension` — the
+matcher advertises a path the binary never takes.
+
+Upstream: `ruff format` formats notebooks by default (since 0.6.0); Black
+needs `black[jupyter]` and detects `.ipynb` by extension. Prefer the same
+ruff-then-black order as `python.go`, not a third tool.
+
+**Traps**
+
+- Do not round-trip the whole notebook through `encoding/json` — that
+  reorders cell/metadata keys and can drop fields formatters preserve.
+  Shell out; let ruff/black own the cell walk.
+- Black without the jupyter extra exits non-zero on `.ipynb` — treat that
+  as skip (or a clear diagnostic once), not a repeating fixer-failed
+  spam; ruff-first avoids the common case.
+- `--check` scratch copies must keep the `.ipynb` extension (`copyBeside`
+  already preserves the basename).
+- Fleet count before landing: if NotebookEdit traffic is rare, document
+  the matcher/extension mismatch in HUMANS instead of adding a formatter.
+
+**Acceptance**
+
+- A NotebookEdit payload whose path ends in `.ipynb` formats Python cells
+  when `ruff` (or jupyter-capable `black`) is on `PATH`.
+- Without either tool, silent skip (same as `.py` today).
+- HUMANS table + dispatch registry updated together; CHANGELOG notes the
+  matcher/extension gap closing.
+
+### Windows install path must use `format-dispatch.exe`
+
+`installer.DefaultOptions` and `install.sh` always build
+`$BIN_DIR/format-dispatch` with no `.exe`. Release assets are
+`format-dispatch-windows-amd64.exe` (see `.github/workflows/release.yml`).
+`Wire`/`Unwire` match `HookCommand.Command` by exact string equality
+(`hasBin`), so a Windows operator who renames the release binary correctly
+still gets a settings entry that does not match what `DefaultOptions`
+later uninstalls — and a from-source `install.sh` on Windows produces a
+non-`.exe` name CreateProcess may not resolve the way operators expect.
+
+**Traps**
+
+- Only append `.exe` when `runtime.GOOS == "windows"` (or when the built
+  artifact already has it) — never on linux/darwin.
+- Uninstall must resolve the same basename Install wired; a one-time
+  migration that also removes a bare `format-dispatch` entry on Windows
+  avoids leaving a duplicate matcher.
+- Round 4 `--upgrade` must share this naming helper — do not fork a third
+  copy of the basename rule.
+
+**Acceptance**
+
+- On Windows, `DefaultOptions().BinPath` ends in `format-dispatch.exe`.
+- `install.sh` (or a small Go helper it calls) writes that name when
+  building on Windows.
+- HUMANS no-Go download blurb names the `.exe` asset and the on-disk
+  basename.
+
+---
+
+## Round 6 — Write durability and `--check` hygiene
+
+### Atomic writes for native formatters
+
+`formatters.writeFormatted` (`writefile.go`) uses `os.WriteFile` in place.
+`installer.writeAtomic` already does temp-file + rename so a kill cannot
+truncate `settings.json`. A SIGKILL mid-format on a large `.json`/`.sh`/
+`.go` can leave the operator's source truncated — the same class of bug,
+on a hotter path.
+
+**Traps**
+
+- Temp file must stay in `filepath.Dir(abs)` so rename does not cross
+  filesystems (installer already documents this).
+- Preserve mode: stat first, write temp with that mode, rename — same
+  contract `writeFormatted` claims today (`TestShellFormatterPreservesExecutableBit`).
+- Do not change external formatters' own in-place writes (`biome
+  --write`, `prettier --write`, …); only the native helper.
+- Extracting a shared helper into e.g. `internal/atomicfile` is fine if
+  `installer` and `formatters` both need it — avoid an import cycle
+  through `diskcache`/`config`.
+
+**Acceptance**
+
+- Killing the process between temp write and rename leaves the original
+  file bytes intact.
+- Mode-preservation test still passes on Unix; Windows coverage unchanged
+  in spirit.
+
+### Ignore leftover `.fmtcheck-*` scratch files
+
+`wouldReformat` / `copyBeside` (`check.go`) write
+`.fmtcheck-<rand>-<base>` beside the target and delete on defer. A
+hard-kill mid-check leaves orphans; the next `format-dispatch --check .`
+can collect them as ordinary targets (they keep the real extension) and
+report bogus "would reformat" noise — or worse, format the orphan in
+place via a later hook write if someone opens it.
+
+**Traps**
+
+- Match the `.fmtcheck-` prefix on the basename only, not anywhere in
+  the path (a legitimate `fmtcheck-report.json` must not be skipped).
+- Cleanup-on-start is optional; skip-on-collect is the minimum.
+- Do not add a broad `.*` ignore — only this known scratch prefix.
+
+**Acceptance**
+
+- `collectCheckTargets` never returns a path whose basename starts with
+  `.fmtcheck-`.
+- Document the prefix in the `--check` comment block so a future
+  scratch scheme does not collide.
+
+### Bound each `--check` file with `formatterTimeout`
+
+`runCheck` uses one `checkTimeout` (15m) for the whole walk. A single
+hung `bunx`/networked tool can burn the entire budget and fail the job
+with a generic deadline, with no indication which file stuck. The hook
+path already uses `formatterTimeout` (4s) per file for this reason.
+
+**Traps**
+
+- Nested contexts: per-file timeout under the run-wide timeout; either
+  firing must surface which limit hit (file path + cause).
+- Absent-tool skips must stay fast — do not wait the full 4s on a
+  negative `lookPath` cache hit.
+- Keep 15m (or similar) as the wall clock for large trees; only the
+  per-file bound is new.
+
+**Acceptance**
+
+- A deliberately hung formatter on one file fails/skips that file (or
+  ends the run with that path named) without consuming the full 15m.
+- Well-behaved trees still exit 0/1 as today within budget.
+
+### Prune expired `diskcache` entries
+
+`diskcache.Get` treats expired entries as misses but never deletes them.
+`editorconfig` keys include the absolute file path, so a long-lived
+cache dir accumulates one file per edited path forever. Same for
+find-upward keys under busy monorepos.
+
+**Traps**
+
+- Prune must stay best-effort and never fail a format — same swallow
+  policy as `Set`.
+- Do not hold a lock across the whole directory; a simple "on Set/Get,
+  occasionally sweep entries older than max(TTLs)" or size cap is enough.
+- `$CLAUDE_FORMAT_HOOKS_CACHE` overrides must still work; never wipe a
+  directory that is not clearly ours (stick to files matching `Key`'s
+  `namespace-` prefix pattern).
+
+**Acceptance**
+
+- After TTL expiry, a subsequent Get/Set eventually removes the stale
+  file (or a documented explicit sweep runs at most once per process).
+- HUMANS troubleshooting "delete the cache dir" remains valid as a
+  manual escape hatch.
+
+---
+
+## Round 7 — Extension and skip-list refinements
+
+### Register `.pyi` on the Python formatter
+
+`pythonFormatter` (`python.go`) only registers `.py`. Ruff's formatter
+explicitly treats `.pyi` stub spacing; Black formats stubs too. Stub
+writes from agents are common in typed Python trees and currently no-op.
+
+**Traps**
+
+- Same ruff-then-black PATH order; no new tool.
+- Do not add `.pyw` / `.pyx` without evidence — `.pyx` is Cython, not
+  safe for black/ruff format.
+- Project opt-out `disabled: [".py"]` must not silently disable `.pyi`
+  unless we document them as one formatter family (ties to Round 4
+  disable-by-formatter-name).
+
+**Acceptance**
+
+- `.pyi` writes go through `ruff format` / `black` when present.
+- HUMANS table lists `.pyi` beside `.py`.
+
+### Extend `vendoredDirs` with safe language caches
+
+`dispatch.vendoredDirs` covers JS/Next/yarn/git/agents/dist/build/
+coverage/test-results/vendor/.venv. After adding `.tf`/`.rs`/`.py`
+formatters, generated trees those ecosystems create are still walked:
+
+| Segment | Why |
+| --- | --- |
+| `.terraform` | provider plugins + state-shaped JSON/HCL noise |
+| `__pycache__` | `.pyc` adjacent; agents sometimes drop `.py` beside caches |
+| `.ruff_cache` / `.mypy_cache` / `.pytest_cache` / `.tox` | tool caches |
+
+**Traps**
+
+- Do **not** add bare `target` — Rust's `target/` collides with ordinary
+  package names (`app/target/...`) and would false-skip real sources.
+  Revisit only with a Rust-specific heuristic (e.g. `target/debug`) if
+  fleet evidence demands it.
+- Keep segment-exact matching (`InVendoredDir`); no substring matches.
+- Update AGENTS invariants list + `TestInVendoredDir` cases in the same
+  change.
+
+**Acceptance**
+
+- Paths under the new segments are skipped by the hook and by
+  `--check` collection/pruning.
+- HUMANS / AGENTS vendored list matches `vendoredDirs`.
+
+### Extensionless shebang scripts (optional, Ext-empty only)
+
+Agents often write `bin/do-thing` with a `#!/usr/bin/env bash` shebang and
+no extension. Today `filepath.Ext` is `""`, `KnownExtension` is false →
+instant no-op. A narrow peek when — and only when — `ext == ""` would
+keep the unsupported-extension fast path intact for every real
+extension.
+
+**Traps**
+
+- Read at most one small prefix (e.g. 256 bytes); never full-file parse
+  before the gate.
+- Only route clear shell shebangs (`bash`/`sh`/`dash`) to `shellFormatter`;
+  do not guess Python/Ruby from shebang into other formatters in v1.
+- `LangBash` parser already used for `.sh`/`.bash` — same variant.
+- `--check` and `KnownExtension` need a coherent story: either
+  `KnownExtension("")` stays false and only `run`/`wouldReformat` special-
+  case empty ext after a shebang sniff, or document that extensionless
+  files are never collected by `--check` directory walks unless named
+  explicitly.
+
+**Acceptance**
+
+- An executable without an extension whose first line is a shell shebang
+  formats via shfmt when invoked as a hook path.
+- A `.ts` / `.md` / unknown-ext write still does zero I/O before the map
+  lookup.
+- Explicit go/no-go after a short fleet count of extensionless shebang
+  writes; if rare, keep as documented won't-fix rather than code.
+
+---
+
+## Round 8 — Doc catch-up beyond Round 1
+
+### SECURITY.md command-injection list missing `buf`
+
+Scope bullet lists external formatters through `terraform` and omits
+`buf` (added with `.proto`). Same class of omission Round 1 already
+flags for AGENTS layout / CONTRIBUTING release matrix.
+
+**Traps**
+
+- List tools, not every flag — keep the bullet readable.
+- Do not claim formatters are sandboxed; the point is injection via
+  *our* argument construction.
+
+**Acceptance**
+
+- `buf` appears beside `terraform` / `rustfmt` in SECURITY.md Scope.
+
+### HUMANS "Other flags" omits `--check`
+
+`### Other flags` still only shows `--version` / `--help`, while a full
+`--check` section exists below. Operators scanning the flag list miss the
+CI gate.
+
+**Traps**
+
+- One-line pointer is enough; do not duplicate the whole `--check`
+  section under Other flags.
+
+**Acceptance**
+
+- Other flags names `--check PATH...` and points at the CI section.
+
+### Package comment drift in `cmd/format-dispatch`
+
+`main.go`'s file comment still says native formatters are "JSON, shell"
+only — Go (`golang.go`) has been native since 0.3.0. LLM-facing and
+human-facing skim both start there.
+
+**Traps**
+
+- Keep the comment short; full rationale stays in AGENTS Architecture.
+
+**Acceptance**
+
+- Comment lists JSON, shell, and Go as in-process.
+
+### README Highlights omit `--check`
+
+README sells install + silent hook behavior but never mentions
+`format-dispatch --check`, which is now the CI dogfood path
+(`.github/workflows/ci.yml`) and the main consumer-facing gate. Operators
+discovering the project via README alone will not know the non-mutating
+mode exists.
+
+**Traps**
+
+- One bullet; link or point to HUMANS — do not paste the exit-code matrix
+  into README.
+- Round 1 already covers the JSON-router caveat for Highlights; do not
+  thrash that bullet while adding this one.
+
+**Acceptance**
+
+- Highlights (or Quick start) names `--check` as the CI-oriented,
+  non-mutating gate.
 
 ---
 
