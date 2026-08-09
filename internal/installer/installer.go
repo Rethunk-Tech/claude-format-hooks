@@ -69,7 +69,7 @@ func DefaultOptions() (Options, error) {
 	binDir := cmp.Or(os.Getenv("CLAUDE_HOOKS_BIN_DIR"), filepath.Join(home, ".claude", "hooks"))
 	settingsPath := cmp.Or(os.Getenv("CLAUDE_SETTINGS_FILE"), filepath.Join(home, ".claude", "settings.json"))
 	return Options{
-		BinPath:      filepath.Join(binDir, "format-dispatch"),
+		BinPath:      HookBinaryPath(binDir),
 		SettingsPath: settingsPath,
 	}, nil
 }

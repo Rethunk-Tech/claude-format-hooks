@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"os"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"testing"
 
@@ -11,6 +12,29 @@ import (
 )
 
 const binPath = "/home/user/.claude/hooks/format-dispatch"
+
+func TestHookBinaryBaseName(t *testing.T) {
+	tests := []struct {
+		name string
+		goos string
+		want string
+	}{
+		{name: "windows", goos: "windows", want: "format-dispatch.exe"},
+		{name: "linux", goos: "linux", want: "format-dispatch"},
+		{name: "darwin", goos: "darwin", want: "format-dispatch"},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			qt.Check(t, qt.Equals(hookBinaryBaseName(tt.goos), tt.want))
+		})
+	}
+
+	want := "format-dispatch"
+	if runtime.GOOS == "windows" {
+		want = "format-dispatch.exe"
+	}
+	qt.Check(t, qt.Equals(HookBinaryBaseName(), want))
+}
 
 func TestDefaultOptionsUsesEnvOverrides(t *testing.T) {
 	// Built via filepath.Join, not a hardcoded POSIX literal, since
@@ -22,7 +46,7 @@ func TestDefaultOptionsUsesEnvOverrides(t *testing.T) {
 
 	opts, err := DefaultOptions()
 	qt.Assert(t, qt.IsNil(err))
-	qt.Check(t, qt.Equals(opts.BinPath, filepath.Join(binDir, "format-dispatch")))
+	qt.Check(t, qt.Equals(opts.BinPath, HookBinaryPath(binDir)))
 	qt.Check(t, qt.Equals(opts.SettingsPath, settingsFile))
 }
 
@@ -45,7 +69,7 @@ func TestDefaultOptionsFallsBackUnderHome(t *testing.T) {
 
 	opts, err := DefaultOptions()
 	qt.Assert(t, qt.IsNil(err))
-	qt.Check(t, qt.Equals(opts.BinPath, filepath.Join(home, ".claude", "hooks", "format-dispatch")))
+	qt.Check(t, qt.Equals(opts.BinPath, HookBinaryPath(filepath.Join(home, ".claude", "hooks"))))
 	qt.Check(t, qt.Equals(opts.SettingsPath, filepath.Join(home, ".claude", "settings.json")))
 }
 
