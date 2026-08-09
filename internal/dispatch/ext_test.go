@@ -15,6 +15,7 @@ func TestResolveExtensionFallsBackToPathExtension(t *testing.T) {
 		{"config.json", ".json"},
 		{"config.JSON", ".json"},
 		{"README", ""},
+		{"", ""},
 		{filepath.Join("nested.dir", "notes.UNKNOWN"), ".UNKNOWN"},
 	}
 	for _, tc := range cases {
