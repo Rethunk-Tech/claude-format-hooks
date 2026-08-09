@@ -31,6 +31,7 @@ func NewRegistry(cfg config.Config) *Registry {
 	prettier := formatters.NewPrettier()
 	sql := formatters.NewSQLFluff()
 	python := formatters.NewPython()
+	notebook := formatters.NewNotebook()
 	rust := formatters.NewRust()
 	terraform := formatters.NewTerraform()
 	proto := formatters.NewProto()
@@ -81,6 +82,7 @@ func NewRegistry(cfg config.Config) *Registry {
 
 		".py":     python,
 		".pyi":    python,
+		".ipynb":  notebook,
 		".rs":     rust,
 		".tf":     terraform,
 		".tfvars": terraform,

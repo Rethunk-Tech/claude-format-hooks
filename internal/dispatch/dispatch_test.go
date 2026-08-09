@@ -17,7 +17,7 @@ func TestSupported(t *testing.T) {
 		".json", ".sh", ".bash", ".go",
 		".ts", ".tsx", ".js", ".jsx", ".mjs", ".cjs", ".mts", ".cts", ".css", ".jsonc",
 		".md", ".mdx", ".markdown", ".toml", ".yaml", ".yml", ".html", ".scss", ".less",
-		".graphql", ".gql", ".sql", ".py", ".pyi", ".rs", ".tf", ".tfvars",
+		".graphql", ".gql", ".sql", ".py", ".pyi", ".ipynb", ".rs", ".tf", ".tfvars",
 	}
 	for _, ext := range supported {
 		qt.Check(t, qt.IsTrue(r.Supported(ext)), qt.Commentf("ext=%q", ext))
@@ -40,6 +40,7 @@ func TestSupportedRespectsDisabled(t *testing.T) {
 
 func TestKnownExtension(t *testing.T) {
 	qt.Check(t, qt.IsTrue(KnownExtension(".json")), qt.Commentf("registered by every Config, including empty"))
+	qt.Check(t, qt.IsTrue(KnownExtension(".ipynb")), qt.Commentf("notebook formatter is registered by every Config"))
 	qt.Check(t, qt.IsTrue(KnownExtension(".JSON")), qt.Commentf("case-insensitive"))
 	qt.Check(t, qt.IsFalse(KnownExtension(".rb")), qt.Commentf("no formatter registered"))
 	qt.Check(t, qt.IsFalse(KnownExtension("")))
@@ -57,6 +58,7 @@ func TestName(t *testing.T) {
 
 	qt.Check(t, qt.Equals(r.Name(".json"), "json"))
 	qt.Check(t, qt.Equals(r.Name(".sh"), "shfmt"))
+	qt.Check(t, qt.Equals(r.Name(".ipynb"), "ruff/black-notebook"))
 	qt.Check(t, qt.Equals(r.Name(".unknown"), ""))
 }
 
