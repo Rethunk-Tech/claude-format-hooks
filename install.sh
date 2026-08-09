@@ -16,12 +16,18 @@ DRY_RUN="${1:-}"
 
 REPO_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 BIN_DIR="${CLAUDE_HOOKS_BIN_DIR:-$HOME/.claude/hooks}"
-BIN_PATH="$BIN_DIR/format-dispatch"
 
 command -v go >/dev/null 2>&1 || {
   echo "error: go is required to build format-dispatch" >&2
   exit 1
 }
+
+GOOS="$(go env GOOS)"
+BIN_NAME="format-dispatch"
+if [ "$GOOS" = "windows" ]; then
+  BIN_NAME="${BIN_NAME}.exe"
+fi
+BIN_PATH="$BIN_DIR/$BIN_NAME"
 
 echo "==> Building format-dispatch..."
 mkdir -p "$BIN_DIR"
