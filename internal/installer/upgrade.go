@@ -16,8 +16,9 @@ import (
 )
 
 const (
-	releaseRepository = "Rethunk-Tech/claude-format-hooks"
-	releaseAPIBaseURL = "https://api.github.com"
+	releaseRepository       = "Rethunk-Tech/claude-format-hooks"
+	releaseAPIBaseURL       = "https://api.github.com"
+	maxUpgradeDownloadBytes = 64 << 20
 )
 
 type githubRelease struct {
@@ -42,9 +43,13 @@ type upgradeConfig struct {
 // Settings are intentionally not changed; the installed hook path remains
 // wired even while its binary is upgraded.
 func Upgrade(opts Options, dryRun bool, out io.Writer) error {
+	apiBaseURL := os.Getenv("CLAUDE_FORMAT_HOOKS_RELEASE_API")
+	if apiBaseURL == "" {
+		apiBaseURL = releaseAPIBaseURL
+	}
 	return upgradeWithConfig(opts, dryRun, out, upgradeConfig{
 		client:     &http.Client{Timeout: 30 * time.Second},
-		apiBaseURL: releaseAPIBaseURL,
+		apiBaseURL: apiBaseURL,
 		goos:       runtime.GOOS,
 		goarch:     runtime.GOARCH,
 	})
@@ -153,7 +158,13 @@ func fetchHTTP(client *http.Client, url string) ([]byte, error) {
 	}
 	defer func() { _ = resp.Body.Close() }()
 
-	body, readErr := io.ReadAll(resp.Body)
+	if resp.ContentLength > maxUpgradeDownloadBytes {
+		return nil, fmt.Errorf("response body exceeds maximum download size of %d bytes", maxUpgradeDownloadBytes)
+	}
+	body, readErr := io.ReadAll(io.LimitReader(resp.Body, maxUpgradeDownloadBytes+1))
+	if len(body) > maxUpgradeDownloadBytes {
+		return nil, fmt.Errorf("response body exceeds maximum download size of %d bytes", maxUpgradeDownloadBytes)
+	}
 	if resp.StatusCode < http.StatusOK || resp.StatusCode >= http.StatusMultipleChoices {
 		detail := strings.TrimSpace(string(body))
 		if detail == "" {

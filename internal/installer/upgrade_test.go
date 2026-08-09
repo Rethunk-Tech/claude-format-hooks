@@ -212,6 +212,68 @@ func TestUpgradeDryRunDoesNotWriteOrDownloadAssets(t *testing.T) {
 	}
 }
 
+func TestUpgradeUsesReleaseAPIEnvironmentOverride(t *testing.T) {
+	binary := []byte("environment release binary\n")
+	server, _, _, _ := upgradeTestServer(t, binary, binary)
+	defer server.Close()
+	t.Setenv("CLAUDE_FORMAT_HOOKS_RELEASE_API", server.URL)
+
+	target := HookBinaryPath(t.TempDir())
+	if err := Upgrade(Options{BinPath: target}, false, nil); err != nil {
+		t.Fatal(err)
+	}
+
+	got, err := os.ReadFile(target)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !bytes.Equal(got, binary) {
+		t.Fatalf("upgraded binary = %q, want %q", got, binary)
+	}
+}
+
+func TestFetchHTTPRejectsOversizedContentLength(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		w.Header().Set("Content-Length", fmt.Sprintf("%d", maxUpgradeDownloadBytes+1))
+		_, _ = w.Write([]byte("body is not read"))
+	}))
+	defer server.Close()
+
+	_, err := fetchHTTP(server.Client(), server.URL)
+	if err == nil || !strings.Contains(err.Error(), "exceeds maximum download size") {
+		t.Fatalf("fetchHTTP error = %v, want download size error", err)
+	}
+}
+
+func TestUpgradeOversizedBinaryLeavesInstalledBinaryUntouched(t *testing.T) {
+	oversized := bytes.Repeat([]byte("x"), maxUpgradeDownloadBytes+1)
+	server, _, _, _ := upgradeTestServer(t, oversized, nil)
+	defer server.Close()
+
+	target := HookBinaryPath(t.TempDir())
+	oldBinary := []byte("installed binary\n")
+	if err := os.WriteFile(target, oldBinary, 0o751); err != nil {
+		t.Fatal(err)
+	}
+
+	err := upgradeWithConfig(Options{BinPath: target}, false, nil, upgradeConfig{
+		client:     server.Client(),
+		apiBaseURL: server.URL,
+		goos:       runtime.GOOS,
+		goarch:     runtime.GOARCH,
+	})
+	if err == nil || !strings.Contains(err.Error(), "exceeds maximum download size") {
+		t.Fatalf("upgrade error = %v, want download size error", err)
+	}
+	got, err := os.ReadFile(target)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !bytes.Equal(got, oldBinary) {
+		t.Fatalf("binary changed after oversized download: %q", got)
+	}
+}
+
 func TestUpgradeFreshInstallUsesExecutableMode(t *testing.T) {
 	binary := []byte("fresh release binary\n")
 	server, _, _, _ := upgradeTestServer(t, binary, binary)
