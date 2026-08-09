@@ -39,6 +39,23 @@ func TestSupportedRespectsDisabled(t *testing.T) {
 	qt.Check(t, qt.IsTrue(r.Supported(".json")), qt.Commentf("unrelated ext stays enabled"))
 }
 
+func TestSupportedRespectsDisabledFormatters(t *testing.T) {
+	cfg := config.Default()
+	cfg.DisabledFormatters = []string{"BIOME"}
+	r := NewRegistry(cfg)
+
+	for _, ext := range []string{".ts", ".tsx", ".js", ".jsx", ".jsonc"} {
+		qt.Check(t, qt.IsFalse(r.Supported(ext)), qt.Commentf("biome ext=%q", ext))
+	}
+	qt.Check(t, qt.IsTrue(r.Supported(".json")), qt.Commentf("json router falls back to native"))
+	qt.Check(t, qt.IsTrue(KnownExtension(".ts")), qt.Commentf("known extensions stay unfiltered"))
+
+	cfg.DisabledFormatters = []string{"JSON"}
+	r = NewRegistry(cfg)
+	qt.Check(t, qt.IsFalse(r.Supported(".json")))
+	qt.Check(t, qt.IsTrue(r.Supported(".ts")), qt.Commentf("unrelated formatter stays enabled"))
+}
+
 func TestKnownExtension(t *testing.T) {
 	qt.Check(t, qt.IsTrue(KnownExtension(".json")), qt.Commentf("registered by every Config, including empty"))
 	qt.Check(t, qt.IsTrue(KnownExtension(".ipynb")), qt.Commentf("notebook formatter is registered by every Config"))

@@ -46,12 +46,14 @@ type Shell struct {
 
 // Config is the installing user's own preference, loaded once from
 // ~/.claude/claude-format-hooks.json (or wherever CLAUDE_FORMAT_HOOKS_CONFIG
-// points). Disabled lists extensions (e.g. ".sql") to skip entirely, for
-// users who want fewer formatters running than the default set.
+// points). Disabled lists extensions (e.g. ".sql") to skip entirely, while
+// DisabledFormatters lists formatter names (e.g. "biome") for users who want
+// fewer formatters running than the default set.
 type Config struct {
-	JSON     JSON     `json:"json"`
-	Shell    Shell    `json:"shell"`
-	Disabled []string `json:"disabled"`
+	JSON               JSON     `json:"json"`
+	Shell              Shell    `json:"shell"`
+	Disabled           []string `json:"disabled"`
+	DisabledFormatters []string `json:"disabledFormatters"`
 }
 
 // Default returns the built-in indent defaults (2-space, no tabs).
@@ -87,6 +89,14 @@ func Load(path string) (Config, error) {
 // everywhere else (filepath.Ext preserves the source file's casing).
 func (c Config) IsDisabled(ext string) bool {
 	return slices.ContainsFunc(c.Disabled, func(d string) bool { return strings.EqualFold(d, ext) })
+}
+
+// IsFormatterDisabled reports whether name is in the user's disabled
+// formatter list. Formatter names are matched case-insensitively.
+func (c Config) IsFormatterDisabled(name string) bool {
+	return slices.ContainsFunc(c.DisabledFormatters, func(d string) bool {
+		return strings.EqualFold(d, name)
+	})
 }
 
 // IndentSpec is a resolved indent width/style for one file.

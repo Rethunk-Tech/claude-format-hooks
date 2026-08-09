@@ -30,7 +30,7 @@ func TestLoad(t *testing.T) {
 
 	t.Run("valid file overrides only the fields it sets", func(t *testing.T) {
 		path := filepath.Join(t.TempDir(), "cfg.json")
-		qt.Assert(t, qt.IsNil(os.WriteFile(path, []byte(`{"json":{"indentSize":4,"useTabs":true},"disabled":[".sql"]}`), 0o600)))
+		qt.Assert(t, qt.IsNil(os.WriteFile(path, []byte(`{"json":{"indentSize":4,"useTabs":true},"disabled":[".sql"],"disabledFormatters":["biome"]}`), 0o600)))
 
 		cfg, err := Load(path)
 		qt.Assert(t, qt.IsNil(err))
@@ -38,6 +38,7 @@ func TestLoad(t *testing.T) {
 		qt.Check(t, qt.IsTrue(cfg.JSON.UseTabs))
 		qt.Check(t, qt.DeepEquals(cfg.Shell, Default().Shell), qt.Commentf("unset section keeps built-in default"))
 		qt.Check(t, qt.DeepEquals(cfg.Disabled, []string{".sql"}))
+		qt.Check(t, qt.DeepEquals(cfg.DisabledFormatters, []string{"biome"}))
 	})
 
 	t.Run("path exists but is unreadable returns defaults and an error", func(t *testing.T) {
@@ -67,6 +68,15 @@ func TestIsDisabled(t *testing.T) {
 	qt.Check(t, qt.IsTrue(cfg.IsDisabled(".SQL")), qt.Commentf("case-insensitive"))
 	qt.Check(t, qt.IsTrue(cfg.IsDisabled(".toml")), qt.Commentf("case-insensitive against a mixed-case entry"))
 	qt.Check(t, qt.IsFalse(cfg.IsDisabled(".json")))
+}
+
+func TestIsFormatterDisabled(t *testing.T) {
+	cfg := Config{DisabledFormatters: []string{"biome", "Ruff/Black"}}
+
+	qt.Check(t, qt.IsTrue(cfg.IsFormatterDisabled("biome")))
+	qt.Check(t, qt.IsTrue(cfg.IsFormatterDisabled("BIOME")), qt.Commentf("case-insensitive"))
+	qt.Check(t, qt.IsTrue(cfg.IsFormatterDisabled("ruff/black")), qt.Commentf("case-insensitive against a mixed-case entry"))
+	qt.Check(t, qt.IsFalse(cfg.IsFormatterDisabled("json")))
 }
 
 func TestResolveIndentEditorConfigLayering(t *testing.T) {

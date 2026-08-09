@@ -15,13 +15,14 @@ import (
 )
 
 // Registry holds one Formatter per supported extension, built once from
-// the resolved Config so per-user Disabled entries only cost a map lookup,
+// the resolved Config so per-user disabled entries only cost a map lookup,
 // not a slice scan, on the hot path.
 type Registry struct {
 	byExt map[string]formatters.Formatter
 }
 
-// NewRegistry builds the extension -> Formatter map, honoring cfg.Disabled.
+// NewRegistry builds the extension -> Formatter map, honoring cfg.Disabled
+// and cfg.DisabledFormatters.
 func NewRegistry(cfg config.Config) *Registry {
 	json := formatters.NewJSONRouter(cfg)
 	shell := formatters.NewShell(cfg)
@@ -92,7 +93,9 @@ func NewRegistry(cfg config.Config) *Registry {
 		".tfquery.hcl": terraform,
 		".proto":       proto,
 	}
-	maps.DeleteFunc(all, func(ext string, _ formatters.Formatter) bool { return cfg.IsDisabled(ext) })
+	maps.DeleteFunc(all, func(ext string, f formatters.Formatter) bool {
+		return cfg.IsDisabled(ext) || cfg.IsFormatterDisabled(f.Name())
+	})
 	return &Registry{byExt: all}
 }
 

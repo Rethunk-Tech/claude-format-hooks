@@ -25,8 +25,8 @@ type jsonFormatter struct{ cfg config.Config }
 // NewJSON returns the native jsonFormatter for .json.
 func NewJSON(cfg config.Config) Formatter { return jsonFormatter{cfg: cfg} }
 
-// jsonRouter sends .json to biome where the project has a biome config and to
-// the native formatter everywhere else.
+// jsonRouter sends .json to biome where the project has a biome config unless
+// biome is disabled, and to the native formatter everywhere else.
 //
 // Biome's config governs .json as much as it governs .ts — indent, line width
 // and `expand`, which decides whether an object collapses onto one line. The
@@ -36,14 +36,20 @@ func NewJSON(cfg config.Config) Formatter { return jsonFormatter{cfg: cfg} }
 // config that gets violated. Projects without biome keep the native formatter,
 // which needs no bunx and no config of its own.
 type jsonRouter struct {
-	biome  Formatter
-	native Formatter
+	biome         Formatter
+	native        Formatter
+	biomeDisabled bool
 }
 
 // NewJSONRouter returns the .json formatter: biome when the project has a
-// biome config, the dependency-free native formatter otherwise.
+// biome config and biome is enabled, the dependency-free native formatter
+// otherwise.
 func NewJSONRouter(cfg config.Config) Formatter {
-	return jsonRouter{biome: NewBiome(), native: NewJSON(cfg)}
+	return jsonRouter{
+		biome:         NewBiome(),
+		native:        NewJSON(cfg),
+		biomeDisabled: cfg.IsFormatterDisabled("biome"),
+	}
 }
 
 func (jsonRouter) Name() string { return "json" }
@@ -51,7 +57,7 @@ func (jsonRouter) Name() string { return "json" }
 func (r jsonRouter) Format(ctx context.Context, projectRoot, abs string) Result {
 	// Without a usable Biome launcher the native formatter is still better than
 	// leaving the file untouched, even though it ignores `expand`.
-	if cachedFindUpward(filepath.Dir(abs), projectRoot, "biome.json", "biome.jsonc") != "" {
+	if !r.biomeDisabled && cachedFindUpward(filepath.Dir(abs), projectRoot, "biome.json", "biome.jsonc") != "" {
 		if _, err := lookPath("biome"); err == nil {
 			return r.biome.Format(ctx, projectRoot, abs)
 		}
