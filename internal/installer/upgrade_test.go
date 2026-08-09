@@ -262,6 +262,40 @@ func TestFetchHTTPReportsOversizedNon2xx(t *testing.T) {
 	}
 }
 
+func TestFetchHTTPCapsOversizedNon2xxBody(t *testing.T) {
+	const sentinel = "oversized-error-body-sentinel"
+	status := http.StatusBadGateway
+	body := append(bytes.Repeat([]byte("e"), maxUpgradeErrorBodyBytes), []byte(sentinel)...)
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		w.WriteHeader(status)
+		_, _ = w.Write(body)
+	}))
+	defer server.Close()
+
+	_, err := fetchHTTP(server.Client(), server.URL)
+	if err == nil {
+		t.Fatal("fetchHTTP error = nil, want HTTP error")
+	}
+	errText := err.Error()
+	if !strings.Contains(errText, fmt.Sprintf("HTTP %d", status)) {
+		t.Fatalf("fetchHTTP error = %v, want HTTP %d", err, status)
+	}
+	if strings.Contains(errText, "exceeds maximum download size") {
+		t.Fatalf("fetchHTTP error = %v, want status error before size error", err)
+	}
+	if strings.Contains(errText, sentinel) {
+		t.Fatalf("fetchHTTP error = %v, want body capped before sentinel", err)
+	}
+	prefix := fmt.Sprintf("HTTP %d %s: ", status, http.StatusText(status))
+	detail := strings.TrimPrefix(errText, prefix)
+	if detail == errText {
+		t.Fatalf("fetchHTTP error = %v, want status-shaped error", err)
+	}
+	if len(detail) > maxUpgradeErrorBodyBytes {
+		t.Fatalf("error detail length = %d, want <= %d", len(detail), maxUpgradeErrorBodyBytes)
+	}
+}
+
 func TestFetchHTTPReportsNon2xx(t *testing.T) {
 	for _, tt := range []struct {
 		name   string
