@@ -31,44 +31,23 @@ ModuleNotFoundError-shaped skip; precomputed `registeredSuffixes`;
 `install.sh --upgrade` (+ dry-run) with unrecognized-arg reject; HUMANS
 env docs. Fixup: document release API override trust.
 
+Wave 5 (2026-08-09) landed: `fetchHTTP` prefers HTTP status on oversized
+error bodies + non-2xx unit coverage; CLI `--upgrade --dry-run` happy
+path; black notebook dotted-module reject + ModuleNotFoundError
+fixtures; `ResolveExtension("")` row; `--check` user-disable before
+registry build. Fixup: single config load for `--check` + mixed
+disabled/enabled order coverage.
+
 ---
 
-## Residual — Wave-4 audit carry-forwards (optional)
+## Residual — Wave-5 audit carry-forwards (optional)
 
-### Prefer HTTP status over size-limit on oversized error bodies
+### Oversized non-2xx error-body cap coverage
 
-`fetchHTTP` can return a size-limit error for a non-2xx body larger than
-the cap before surfacing `HTTP 403`/`404`. Reorder or separately cap
-error-body reads.
-
-### Tighten black skip around dotted module names
-
-`no module named nbformat.core` can still classify as missing notebook
-extras (prefix match before `.`). Prefer end-of-token only for the exact
-module names.
-
-### CLI `--upgrade --dry-run` success path
-
-Happy-path covers live upgrade via `dispatchArgs`; add a parallel
-`--upgrade --dry-run` CLI test (library dry-run already covered).
-
-### fetchHTTP non-2xx unit coverage
-
-Oversized bodies are tested; small 403/404 bodies are not.
-
-### Notebook ModuleNotFoundError fixture lines
-
-Runtime lowercasing matches `ModuleNotFoundError: No module named …`;
-committed tests do not include that prefix.
-
-### ResolveExtension empty-path case
-
-`""` falls through to `filepath.Ext`; add an explicit unit row.
-
-### `--check` skip config for disabled-but-known extensions
-
-`KnownExtension` still loads the registry before `Supported` returns
-false for user-disabled extensions. CI cost only; matches the hook.
+`TestFetchHTTPReportsOversizedNon2xx` proves status wins over the binary
+size guard, but sends a short body. Add a body larger than
+`maxUpgradeErrorBodyBytes` (chunked / no helpful Content-Length) and
+assert returned detail length is capped.
 
 ---
 
@@ -76,14 +55,16 @@ false for user-disabled extensions. CI cost only; matches the hook.
 
 ### Diagnose and clear red CI on `origin/main`
 
-MCP `repo_status` previously reported CI failure on `main` at `2fd5ab2`.
-Local gates are green on commits ahead of `origin/main` — verify against
-the failing run before any history rewrite (none authorized). Push still
-requires an explicit operator go.
+Remote tip `2fd5ab2` still shows failed CI workflow run
+`30131468133` (test×3 + lint). Job logs are **expired / unavailable**.
+Local `main` is ahead with green `go build`/`go vet`/scoped race tests;
+clearing the badge needs an explicit operator push (not authorized). A
+later Dependabot `go_modules` run on the same SHA succeeded and does not
+clear the CI workflow failure.
 
 **Acceptance**
 
-+ Identified failing check and root cause recorded.
++ Identified failing check and root cause recorded (logs gone — stale tip).
 + A subsequent `main` push is green on ubuntu/macOS/Windows test + lint.
 
 ### Retire `js-yaml` global override when upstream is fixed
