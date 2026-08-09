@@ -87,6 +87,15 @@ func TestCheckAcceptsIndividualFiles(t *testing.T) {
 	qt.Check(t, qt.Equals(runCheck([]string{bad}, &out, &errOut), 1))
 }
 
+func TestCheckResolvesExtensionlessShellShebang(t *testing.T) {
+	dir := t.TempDir()
+	path := writeCheckFile(t, dir, "script", "#!/bin/sh\nif true;then echo hi;fi\n")
+
+	var out, errOut bytes.Buffer
+	qt.Check(t, qt.Equals(runCheck([]string{path}, &out, &errOut), 1))
+	qt.Check(t, qt.StringContains(out.String(), path))
+}
+
 func TestCheckHonorsProjectConfigDisablesFormatter(t *testing.T) {
 	projectRoot := t.TempDir()
 	path := writeCheckFile(t, projectRoot, "bad.json", unformattedJSON)

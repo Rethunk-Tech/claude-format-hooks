@@ -53,7 +53,12 @@ func runCheck(args []string, out, errOut io.Writer) int {
 	}
 	var wouldChange []string
 	for _, abs := range files {
-		ext := filepath.Ext(abs)
+		ext := dispatch.ResolveExtension(abs)
+		if ext == "" {
+			if shebangExt, ok := shellShebangExt(abs); ok {
+				ext = shebangExt
+			}
+		}
 		if !registry.Supported(ext) {
 			continue
 		}

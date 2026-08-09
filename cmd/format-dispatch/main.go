@@ -218,7 +218,7 @@ func run(stdin io.Reader) int {
 	// Instant no-op path for an extension no formatter ever handles: no
 	// filesystem access at all, not even a config load — KnownExtension
 	// needs no Registry to answer.
-	ext := filepath.Ext(path)
+	ext := dispatch.ResolveExtension(path)
 	if ext == "" {
 		if shebangExt, ok := shellShebangExt(path); ok {
 			ext = shebangExt
