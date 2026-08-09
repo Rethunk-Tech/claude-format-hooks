@@ -162,9 +162,11 @@ Unchanged from the hand-written per-project hooks this replaces:
   config-presence gate on any formatter (biome had one; it was removed —
   see `CHANGELOG.md`).
 - Files under `node_modules/`, `.next/`, `.yarn/`, `.git/`, `.agents/`,
-  `dist/`, `build/`, `coverage/`, `test-results/`, `vendor/`, or `.venv/`
-  (anywhere in the path), or outside `$CLAUDE_PROJECT_DIR`, are always
-  skipped (`dispatch.InVendoredDir`, `main.within`).
+  `dist/`, `build/`, `coverage/`, `test-results/`, `vendor/`, `.venv/`,
+  `.terraform/`, `__pycache__/`, `.ruff_cache/`, `.mypy_cache/`,
+  `.pytest_cache/`, or `.tox/` (anywhere in the path), or outside
+  `$CLAUDE_PROJECT_DIR`, are always skipped (`dispatch.InVendoredDir`,
+  `main.within`).
 
 ## Conventions
 

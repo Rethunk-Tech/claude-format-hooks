@@ -118,9 +118,9 @@ hanging on stdin — safe to run by hand while debugging.
 | `.toml` | `taplo format` | no (bunx) |
 | `.yaml`, `.yml`, `.html`, `.scss`, `.less`, `.graphql`, `.gql` | `prettier --write` | no (bunx) |
 | `.sql` | `sqlfluff fix` | no (system binary) |
-| `.py` | `ruff format` (preferred) or `black` | no (system binary) |
+| `.py`, `.pyi` | `ruff format` (preferred) or `black` | no (system binary) |
 | `.rs` | `rustfmt` | no (system binary) |
-| `.tf` | `terraform fmt` | no (system binary) |
+| `.tf`, `.tfvars` | `terraform fmt` | no (system binary) |
 | `.proto` | `buf format -w` | no (system binary) |
 
 Any other extension is an instant no-op. Vendored/build directories and
