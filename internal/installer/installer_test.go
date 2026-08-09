@@ -160,6 +160,47 @@ func TestWireIdempotentReinstall(t *testing.T) {
 	qt.Check(t, qt.Equals(entries[0].Hooks[0].Command, binPath))
 }
 
+func TestWireReplacesLegacyBareBasename(t *testing.T) {
+	dir := t.TempDir()
+	settingsPath := filepath.Join(dir, "settings.json")
+	exeBinPath := filepath.Join(t.TempDir(), "format-dispatch.exe")
+	existing := `{
+		"hooks": {
+			"PostToolUse": [
+				{"matcher": "Write|Edit|NotebookEdit", "hooks": [{"type": "command", "command": "` + binPath + `"}]}
+			]
+		}
+	}`
+	qt.Assert(t, qt.IsNil(os.WriteFile(settingsPath, []byte(existing), 0o600)))
+
+	_, after, err := Wire(settingsPath, exeBinPath)
+	qt.Assert(t, qt.IsNil(err))
+
+	entries := settingsPostToolUse(t, after)
+	qt.Assert(t, qt.HasLen(entries, 1))
+	qt.Check(t, qt.Equals(entries[0].Hooks[0].Command, exeBinPath))
+}
+
+func TestUnwireExeRemovesLegacyBareBasename(t *testing.T) {
+	dir := t.TempDir()
+	settingsPath := filepath.Join(dir, "settings.json")
+	exeBinPath := filepath.Join(t.TempDir(), "format-dispatch.exe")
+	existing := `{
+		"hooks": {
+			"PostToolUse": [
+				{"matcher": "Write|Edit|NotebookEdit", "hooks": [{"type": "command", "command": "` + binPath + `"}]}
+			]
+		}
+	}`
+	qt.Assert(t, qt.IsNil(os.WriteFile(settingsPath, []byte(existing), 0o600)))
+
+	_, after, err := Unwire(settingsPath, exeBinPath)
+	qt.Assert(t, qt.IsNil(err))
+
+	entries := settingsPostToolUse(t, after)
+	qt.Check(t, qt.HasLen(entries, 0))
+}
+
 func TestWireReplacesOldBiomeOnlyHook(t *testing.T) {
 	dir := t.TempDir()
 	settingsPath := filepath.Join(dir, "settings.json")

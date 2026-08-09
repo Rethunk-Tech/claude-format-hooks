@@ -184,7 +184,18 @@ func Unwire(settingsPath, binPath string) (before, after []byte, err error) {
 
 // hasBin reports whether e has a hook command pointing at binPath.
 func hasBin(e PostToolUseEntry, binPath string) bool {
-	return slices.ContainsFunc(e.Hooks, func(h HookCommand) bool { return h.Command == binPath })
+	return slices.ContainsFunc(e.Hooks, func(h HookCommand) bool {
+		return h.Command == binPath || isHookBinaryCommand(h.Command)
+	})
+}
+
+func isHookBinaryCommand(command string) bool {
+	switch filepath.Base(command) {
+	case "format-dispatch", "format-dispatch.exe":
+		return true
+	default:
+		return false
+	}
 }
 
 // keepEntry reports whether an existing PostToolUse entry should survive
