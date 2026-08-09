@@ -26,6 +26,7 @@ from `PATH` first, then via `bunx`; `sqlfluff`, `ruff`/`black`, `rustfmt`,
 git clone git@github.com:Rethunk-Tech/claude-format-hooks.git
 cd claude-format-hooks
 ./install.sh
+./install.sh --upgrade
 ```
 
 Full install steps, prerequisites, and configuration: [HUMANS.md](HUMANS.md).

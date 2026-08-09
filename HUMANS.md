@@ -40,6 +40,8 @@ git clone git@github.com:Rethunk-Tech/claude-format-hooks.git
 cd claude-format-hooks
 ./install.sh              # builds the binary, wires ~/.claude/settings.json
 ./install.sh --dry-run    # preview the settings.json diff, write nothing
+./install.sh --upgrade    # rebuild, then upgrade to the latest release
+./install.sh --upgrade --dry-run # rebuild, then preview the release upgrade
 ```
 
 The installer builds `format-dispatch` to `~/.claude/hooks/format-dispatch`

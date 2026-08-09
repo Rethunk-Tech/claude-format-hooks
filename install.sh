@@ -6,13 +6,16 @@
 # Usage:
 #   ./install.sh              # build + install
 #   ./install.sh --dry-run    # print the settings.json diff, write nothing
+#   ./install.sh --upgrade    # build + upgrade to the latest release
+#   ./install.sh --upgrade --dry-run # build + preview the latest release upgrade
 #
 # Env overrides (mainly for testing):
 #   CLAUDE_HOOKS_BIN_DIR   default: ~/.claude/hooks
 #   CLAUDE_SETTINGS_FILE   default: ~/.claude/settings.json
 set -euo pipefail
 
-DRY_RUN="${1:-}"
+ACTION="${1:-}"
+DRY_RUN="${2:-}"
 
 REPO_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 BIN_DIR="${CLAUDE_HOOKS_BIN_DIR:-$HOME/.claude/hooks}"
@@ -40,7 +43,20 @@ echo "==> Built: $BIN_PATH"
 # internal/installer/tools.go. It replaces the cache pre-warm that used to
 # live here, which left the tools resolvable but not on PATH.
 
-if [ "$DRY_RUN" = "--dry-run" ]; then
+if [ "$ACTION" = "--upgrade" ]; then
+  case "$DRY_RUN" in
+    "")
+      "$BIN_PATH" --upgrade
+      ;;
+    "--dry-run")
+      "$BIN_PATH" --upgrade --dry-run
+      ;;
+    *)
+      echo "error: --upgrade accepts only an optional --dry-run" >&2
+      exit 2
+      ;;
+  esac
+elif [ "$ACTION" = "--dry-run" ]; then
   "$BIN_PATH" --install --dry-run
 else
   "$BIN_PATH" --install
