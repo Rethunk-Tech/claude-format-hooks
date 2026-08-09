@@ -510,6 +510,18 @@ func TestRunProjectConfigDisablesBiomeForJSONRouter(t *testing.T) {
 		qt.Commentf("project-disabled biome must leave the native JSON router enabled"))
 }
 
+func TestRunProjectConfigDisablesBiomeForJSONC(t *testing.T) {
+	projectRoot := t.TempDir()
+	abs := filepath.Join(projectRoot, "f.jsonc")
+	src := `{"a":1}`
+	writeFile(t, abs, src)
+	writeFile(t, filepath.Join(projectRoot, projectConfigFile), `{"disabledFormatters":["biome"]}`)
+
+	t.Setenv("CLAUDE_PROJECT_DIR", projectRoot)
+	qt.Check(t, qt.Equals(run(strings.NewReader(payload(abs))), 0))
+	qt.Check(t, qt.Equals(readFile(t, abs), src), qt.Commentf("project-disabled biome must not format JSONC"))
+}
+
 func TestRunUserConfigDisablesFormatter(t *testing.T) {
 	projectRoot := t.TempDir()
 	abs := filepath.Join(projectRoot, "f.json")
@@ -540,6 +552,20 @@ func TestRunUserConfigDisablesFormatterByName(t *testing.T) {
 	t.Setenv("CLAUDE_FORMAT_HOOKS_CONFIG", configPath)
 	qt.Check(t, qt.Equals(run(strings.NewReader(payload(abs))), 0))
 	qt.Check(t, qt.Equals(readFile(t, abs), src), qt.Commentf("user-disabled formatter must not be formatted"))
+}
+
+func TestRunUserConfigDisablesJSONFormatterByName(t *testing.T) {
+	projectRoot := t.TempDir()
+	abs := filepath.Join(projectRoot, "f.json")
+	src := `{"b":1,"a":2}`
+	writeFile(t, abs, src)
+	configPath := filepath.Join(t.TempDir(), "claude-format-hooks.json")
+	writeFile(t, configPath, `{"disabledFormatters":["json"]}`)
+
+	t.Setenv("CLAUDE_PROJECT_DIR", projectRoot)
+	t.Setenv("CLAUDE_FORMAT_HOOKS_CONFIG", configPath)
+	qt.Check(t, qt.Equals(run(strings.NewReader(payload(abs))), 0))
+	qt.Check(t, qt.Equals(readFile(t, abs), src), qt.Commentf("user-disabled json formatter must not be formatted"))
 }
 
 func TestRunUserConfigMalformedFallsBackAndWarns(t *testing.T) {
