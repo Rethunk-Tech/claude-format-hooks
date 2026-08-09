@@ -69,7 +69,8 @@ instead of building from source. Place it at
 `~/.claude/hooks/format-dispatch` on POSIX, or
 `~/.claude/hooks/format-dispatch.exe` on Windows; `chmod +x` the POSIX
 binary, then run
-`~/.claude/hooks/format-dispatch --install` yourself. The binary's
+`~/.claude/hooks/format-dispatch --install` yourself. On Windows, run
+`~/.claude/hooks/format-dispatch.exe --install` instead. The binary's
 `ProvisionTools` step still runs when `bun` is available; only `install.sh`'s
 Go build wrapper is skipped.
 
@@ -90,15 +91,19 @@ Env overrides (mainly for testing): `CLAUDE_HOOKS_BIN_DIR` (default
 ### Uninstall
 
 ```bash
-~/.claude/hooks/format-dispatch --uninstall              # remove the PostToolUse entry
-~/.claude/hooks/format-dispatch --uninstall --dry-run    # preview the diff, write nothing
-rm ~/.claude/hooks/format-dispatch                        # then delete the binary
+~/.claude/hooks/format-dispatch --uninstall              # POSIX
+~/.claude/hooks/format-dispatch.exe --uninstall         # Windows
+~/.claude/hooks/format-dispatch --uninstall --dry-run    # POSIX preview
+~/.claude/hooks/format-dispatch.exe --uninstall --dry-run # Windows preview
+rm ~/.claude/hooks/format-dispatch                      # POSIX
+rm ~/.claude/hooks/format-dispatch.exe                  # Windows
 ```
 
 `--uninstall` removes only the `PostToolUse` entry whose `command` points
-at `~/.claude/hooks/format-dispatch` (or `$CLAUDE_HOOKS_BIN_DIR`'s
-binary); every other key and hook entry is left exactly as it was. A
-settings.json with no such entry is a no-op.
+at `~/.claude/hooks/format-dispatch` on POSIX or
+`~/.claude/hooks/format-dispatch.exe` on Windows (or
+`$CLAUDE_HOOKS_BIN_DIR`'s binary); every other key and hook entry is left
+exactly as it was. A settings.json with no such entry is a no-op.
 
 ### Other flags
 
@@ -129,6 +134,9 @@ hanging on stdin — safe to run by hand while debugging.
 | `.rs` | `rustfmt` | no (system binary) |
 | `.tf`, `.tfvars` | `terraform fmt` | no (system binary) |
 | `.proto` | `buf format -w` | no (system binary) |
+
+Extensionless paths beginning with a `bash`, `sh`, `zsh`, or `dash` shebang
+use the same native shell formatter as `.sh`.
 
 Any other extension is an instant no-op. Vendored/build directories and
 anything outside `$CLAUDE_PROJECT_DIR` are always skipped — see

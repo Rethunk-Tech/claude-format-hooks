@@ -15,6 +15,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Jupyter Notebook (`.ipynb`) formatting via `ruff format` (preferred) or
   `black` when its notebook support is installed; both tools remain optional
   and the extension is skipped silently when neither is available.
+- Extensionless shell-shebang scripts are formatted by the native shell
+  formatter when their shebang names `bash`, `sh`, `zsh`, or `dash`.
 - `format-dispatch --check PATH...`, a non-mutating CI gate that reports
   which files a formatter would change and exits 1 if any would. It answers
   the same question every local write answers, so a repo can enforce
