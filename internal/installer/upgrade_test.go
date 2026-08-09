@@ -16,7 +16,7 @@ import (
 
 func TestUpgradeHappyPathPreservesModeAndSettings(t *testing.T) {
 	binary := []byte("new release binary\n")
-	server, binaryRequests, checksumRequests := upgradeTestServer(t, binary, binary)
+	server, _, binaryRequests, checksumRequests := upgradeTestServer(t, binary, binary)
 	defer server.Close()
 
 	dir := t.TempDir()
@@ -82,7 +82,7 @@ func TestUpgradeHappyPathPreservesModeAndSettings(t *testing.T) {
 
 func TestUpgradeChecksumMismatchLeavesBinaryUntouched(t *testing.T) {
 	binary := []byte("new release binary\n")
-	server, _, _ := upgradeTestServer(t, binary, []byte("different binary\n"))
+	server, _, _, _ := upgradeTestServer(t, binary, []byte("different binary\n"))
 	defer server.Close()
 
 	dir := t.TempDir()
@@ -123,7 +123,7 @@ func TestUpgradeChecksumMismatchLeavesBinaryUntouched(t *testing.T) {
 
 func TestUpgradeDryRunDoesNotWriteOrDownloadAssets(t *testing.T) {
 	binary := []byte("new release binary\n")
-	server, binaryRequests, checksumRequests := upgradeTestServer(t, binary, binary)
+	server, releaseRequests, binaryRequests, checksumRequests := upgradeTestServer(t, binary, binary)
 	defer server.Close()
 
 	dir := t.TempDir()
@@ -150,6 +150,9 @@ func TestUpgradeDryRunDoesNotWriteOrDownloadAssets(t *testing.T) {
 	if !bytes.Equal(got, oldBinary) {
 		t.Fatalf("dry-run changed binary: %q", got)
 	}
+	if got := releaseRequests.Load(); got != 0 {
+		t.Fatalf("dry-run release requests = %d, want 0", got)
+	}
 	if got := binaryRequests.Load(); got != 0 {
 		t.Fatalf("dry-run binary requests = %d, want 0", got)
 	}
@@ -161,23 +164,116 @@ func TestUpgradeDryRunDoesNotWriteOrDownloadAssets(t *testing.T) {
 	}
 }
 
-func upgradeTestServer(t *testing.T, binary, checksumBinary []byte) (*httptest.Server, *atomic.Int32, *atomic.Int32) {
+func TestUpgradeFreshInstallUsesExecutableMode(t *testing.T) {
+	binary := []byte("fresh release binary\n")
+	server, _, _, _ := upgradeTestServer(t, binary, binary)
+	defer server.Close()
+
+	target := HookBinaryPath(t.TempDir())
+	err := upgradeWithConfig(Options{BinPath: target}, false, nil, upgradeConfig{
+		client:     server.Client(),
+		apiBaseURL: server.URL,
+		goos:       runtime.GOOS,
+		goarch:     runtime.GOARCH,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	info, err := os.Stat(target)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got, want := info.Mode().Perm(), os.FileMode(0o755); got != want {
+		t.Fatalf("fresh binary mode = %o, want %o", got, want)
+	}
+}
+
+func TestUpgradeMissingBinaryAsset(t *testing.T) {
+	server, _, _, _ := upgradeTestServerForTarget(t, []byte("binary\n"), []byte("binary\n"),
+		runtime.GOOS, runtime.GOARCH, false, true)
+	defer server.Close()
+
+	err := upgradeWithConfig(Options{BinPath: HookBinaryPath(t.TempDir())}, false, nil, upgradeConfig{
+		client:     server.Client(),
+		apiBaseURL: server.URL,
+		goos:       runtime.GOOS,
+		goarch:     runtime.GOARCH,
+	})
+	if err == nil || !strings.Contains(err.Error(), "has no asset") {
+		t.Fatalf("upgrade error = %v, want missing binary asset error", err)
+	}
+}
+
+func TestUpgradeMissingChecksumAsset(t *testing.T) {
+	server, _, _, _ := upgradeTestServerForTarget(t, []byte("binary\n"), []byte("binary\n"),
+		runtime.GOOS, runtime.GOARCH, true, false)
+	defer server.Close()
+
+	err := upgradeWithConfig(Options{BinPath: HookBinaryPath(t.TempDir())}, false, nil, upgradeConfig{
+		client:     server.Client(),
+		apiBaseURL: server.URL,
+		goos:       runtime.GOOS,
+		goarch:     runtime.GOARCH,
+	})
+	if err == nil || !strings.Contains(err.Error(), "has no asset") {
+		t.Fatalf("upgrade error = %v, want missing checksum asset error", err)
+	}
+}
+
+func TestUpgradeWindowsAssetPairOnLinux(t *testing.T) {
+	binary := []byte("windows release binary\n")
+	server, _, _, _ := upgradeTestServerForTarget(t, binary, binary, "windows", "amd64", true, true)
+	defer server.Close()
+
+	target := HookBinaryPath(t.TempDir())
+	err := upgradeWithConfig(Options{BinPath: target}, false, nil, upgradeConfig{
+		client:     server.Client(),
+		apiBaseURL: server.URL,
+		goos:       "windows",
+		goarch:     "amd64",
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	got, err := os.ReadFile(target)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !bytes.Equal(got, binary) {
+		t.Fatalf("windows asset result = %q, want %q", got, binary)
+	}
+}
+
+func upgradeTestServer(t *testing.T, binary, checksumBinary []byte) (*httptest.Server, *atomic.Int32, *atomic.Int32, *atomic.Int32) {
+	return upgradeTestServerForTarget(t, binary, checksumBinary, runtime.GOOS, runtime.GOARCH, true, true)
+}
+
+func upgradeTestServerForTarget(t *testing.T, binary, checksumBinary []byte, goos, goarch string, includeBinary, includeChecksum bool) (*httptest.Server, *atomic.Int32, *atomic.Int32, *atomic.Int32) {
 	t.Helper()
-	assetName := fmt.Sprintf("format-dispatch-%s-%s", runtime.GOOS, runtime.GOARCH)
-	if runtime.GOOS == "windows" {
+	assetName := fmt.Sprintf("format-dispatch-%s-%s", goos, goarch)
+	if goos == "windows" {
 		assetName += ".exe"
 	}
 	checksum := sha256.Sum256(checksumBinary)
 	checksumFile := []byte(fmt.Sprintf("%x  %s\n", checksum, assetName))
+	var releaseRequests atomic.Int32
 	var binaryRequests atomic.Int32
 	var checksumRequests atomic.Int32
+	assetJSON := make([]string, 0, 2)
+	if includeBinary {
+		assetJSON = append(assetJSON, fmt.Sprintf(`{"name":%q,"browser_download_url":%q}`, assetName, "__SERVER__/binary"))
+	}
+	if includeChecksum {
+		assetJSON = append(assetJSON, fmt.Sprintf(`{"name":%q,"browser_download_url":%q}`, assetName+".sha256", "__SERVER__/checksum"))
+	}
 
 	var server *httptest.Server
 	server = httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		switch r.URL.Path {
 		case "/repos/" + releaseRepository + "/releases/latest":
-			_, _ = fmt.Fprintf(w, `{"tag_name":"v9.9.9","assets":[{"name":%q,"browser_download_url":%q},{"name":%q,"browser_download_url":%q}]}`,
-				assetName, server.URL+"/binary", assetName+".sha256", server.URL+"/checksum")
+			releaseRequests.Add(1)
+			assets := strings.ReplaceAll(strings.Join(assetJSON, ","), "__SERVER__", server.URL)
+			_, _ = fmt.Fprintf(w, `{"tag_name":"v9.9.9","assets":[%s]}`, assets)
 		case "/binary":
 			binaryRequests.Add(1)
 			_, _ = w.Write(binary)
@@ -188,5 +284,5 @@ func upgradeTestServer(t *testing.T, binary, checksumBinary []byte) (*httptest.S
 			http.NotFound(w, r)
 		}
 	}))
-	return server, &binaryRequests, &checksumRequests
+	return server, &releaseRequests, &binaryRequests, &checksumRequests
 }

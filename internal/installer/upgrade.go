@@ -74,6 +74,12 @@ func upgradeWithConfig(opts Options, dryRun bool, out io.Writer, cfg upgradeConf
 	}
 	checksumName := assetName + ".sha256"
 
+	if dryRun {
+		_, _ = fmt.Fprintf(out, "==> --dry-run: would download %s and replace %s (not written)\n",
+			assetName, target)
+		return nil
+	}
+
 	release, err := fetchLatestRelease(cfg.client, cfg.apiBaseURL)
 	if err != nil {
 		return err
@@ -88,12 +94,6 @@ func upgradeWithConfig(opts Options, dryRun bool, out io.Writer, cfg upgradeConf
 	}
 	if binaryAsset.BrowserDownloadURL == "" || checksumAsset.BrowserDownloadURL == "" {
 		return fmt.Errorf("latest release %q has an asset without a download URL", release.TagName)
-	}
-
-	if dryRun {
-		_, _ = fmt.Fprintf(out, "==> --dry-run: would download %s from release %s and replace %s (not written)\n",
-			assetName, release.TagName, target)
-		return nil
 	}
 
 	binary, err := fetchAsset(cfg.client, binaryAsset.BrowserDownloadURL)

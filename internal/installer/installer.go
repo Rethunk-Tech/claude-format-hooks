@@ -281,17 +281,37 @@ func applyChange(opts Options, before, after []byte, dryRun bool, out io.Writer,
 	return nil
 }
 
-// writeAtomic writes data to path via a temp file in the same directory
-// followed by a rename, so a process killed mid-write (or a crash) can
-// never leave path holding a truncated settings.json — the file the
-// installing user's entire Claude Code hook configuration lives in, not
-// just this one hook's entry. The temp file is written in path's own
-// directory rather than the OS temp dir so the rename is guaranteed to
-// stay on one filesystem.
+// writeAtomic writes data to a unique temp file in path's directory, then
+// renames it into place so concurrent writers cannot share a temp pathname
+// and a process killed mid-write cannot leave path truncated.
 func writeAtomic(path string, data []byte, perm os.FileMode) error {
-	tmp := path + ".tmp"
-	if err := os.WriteFile(tmp, data, perm); err != nil { //nolint:gosec // path is caller-controlled (settings location or its .bak sibling), by design
+	dir := filepath.Dir(path)
+	tmp, err := os.CreateTemp(dir, filepath.Base(path)+".*.tmp")
+	if err != nil {
 		return err
 	}
-	return os.Rename(tmp, path)
+	tmpPath := tmp.Name()
+	removeTemp := true
+	defer func() {
+		if removeTemp {
+			_ = os.Remove(tmpPath)
+		}
+	}()
+
+	if _, err := tmp.Write(data); err != nil {
+		_ = tmp.Close()
+		return err
+	}
+	if err := tmp.Chmod(perm); err != nil {
+		_ = tmp.Close()
+		return err
+	}
+	if err := tmp.Close(); err != nil {
+		return err
+	}
+	if err := os.Rename(tmpPath, path); err != nil {
+		return err
+	}
+	removeTemp = false
+	return nil
 }
