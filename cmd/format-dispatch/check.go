@@ -63,7 +63,7 @@ func runCheck(args []string, out, errOut io.Writer) int {
 		} else if disabled {
 			continue
 		}
-		changed, err := wouldReformat(ctx, registry, abs)
+		changed, err := wouldReformat(ctx, registry, projectRoot, abs)
 		if err != nil {
 			_, _ = fmt.Fprintf(errOut, "format-dispatch --check: %s: %v\n", abs, err)
 			return 2
@@ -115,7 +115,7 @@ func checkProjectRoot(paths []string) string {
 // resolves its config by walking up from the file (biome.json, .sqlfluff, a
 // project .markdownlint-cli2.jsonc), so formatting a copy in a temp
 // directory elsewhere would silently apply the wrong rules.
-func wouldReformat(ctx context.Context, registry *dispatch.Registry, abs string) (bool, error) {
+func wouldReformat(ctx context.Context, registry *dispatch.Registry, projectRoot, abs string) (bool, error) {
 	original, err := os.ReadFile(abs) //nolint:gosec // abs is a path the caller asked to check, by design
 	if err != nil {
 		return false, err
@@ -130,7 +130,9 @@ func wouldReformat(ctx context.Context, registry *dispatch.Registry, abs string)
 	// A formatter that skips (tool not installed) or fails leaves the copy
 	// untouched, which compares equal -- an absent tool must not fail a
 	// build for files it could never have formatted.
-	registry.Dispatch(ctx, filepath.Dir(abs), scratch)
+	// Dispatch from the check's project root so config discovery matches the
+	// hook, even when the file being checked is nested below that root.
+	registry.Dispatch(ctx, projectRoot, scratch)
 
 	formatted, err := os.ReadFile(scratch) //nolint:gosec // scratch is the temp copy this function just created
 	if err != nil {

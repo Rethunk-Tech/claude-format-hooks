@@ -119,6 +119,36 @@ func TestCheckProjectConfigMalformedWarnsAndContinues(t *testing.T) {
 	qt.Check(t, qt.Equals(readFile(t, path), unformattedJSON))
 }
 
+func TestCheckDispatchesNestedBiomeFromProjectRoot(t *testing.T) {
+	if filepath.Separator == '\\' {
+		t.Skip("fake formatter script is POSIX-shell only")
+	}
+	projectRoot := t.TempDir()
+	path := writeCheckFile(t, filepath.Join(projectRoot, "nested"), "bad.ts", "const value={answer:42}\n")
+	writeCheckFile(t, projectRoot, "biome.json", `{}`)
+	configPath := filepath.Join(t.TempDir(), "claude-format-hooks.json")
+	writeFile(t, configPath, `{}`)
+
+	toolDir := t.TempDir()
+	marker := filepath.Join(t.TempDir(), "formatter-cwd")
+	script := "#!/bin/sh\nprintf '%s' \"$PWD\" > \"$FMTCHECK_MARKER\"\nfor arg in \"$@\"; do\n  case \"$arg\" in\n    *.ts) printf 'const value = { answer: 42 };\\n' > \"$arg\"; exit 0 ;;\n  esac\ndone\nexit 1\n"
+	for _, name := range []string{"biome", "bunx"} {
+		tool := filepath.Join(toolDir, name)
+		qt.Assert(t, qt.IsNil(os.WriteFile(tool, []byte(script), 0o755))) //nolint:gosec // test fixture
+	}
+
+	t.Setenv("CLAUDE_PROJECT_DIR", projectRoot)
+	t.Setenv("CLAUDE_FORMAT_HOOKS_CONFIG", configPath)
+	t.Setenv("FMTCHECK_MARKER", marker)
+	t.Setenv("PATH", toolDir)
+
+	var out, errOut bytes.Buffer
+	qt.Check(t, qt.Equals(runCheck([]string{projectRoot}, &out, &errOut), 1))
+	qt.Check(t, qt.Equals(readFile(t, marker), projectRoot),
+		qt.Commentf("nested checks must dispatch from the project root"))
+	qt.Check(t, qt.StringContains(out.String(), path))
+}
+
 func TestCheckIgnoresUnsupportedExtensions(t *testing.T) {
 	dir := t.TempDir()
 	writeCheckFile(t, dir, "notes.xyz", "whatever   \n")
