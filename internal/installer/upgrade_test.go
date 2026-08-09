@@ -262,6 +262,36 @@ func TestFetchHTTPReportsOversizedNon2xx(t *testing.T) {
 	}
 }
 
+func TestFetchHTTPReportsNon2xx(t *testing.T) {
+	for _, tt := range []struct {
+		name   string
+		status int
+		body   string
+	}{
+		{name: "forbidden", status: http.StatusForbidden, body: "access denied"},
+		{name: "not found", status: http.StatusNotFound, body: "missing release"},
+	} {
+		t.Run(tt.name, func(t *testing.T) {
+			server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+				w.WriteHeader(tt.status)
+				_, _ = w.Write([]byte(tt.body))
+			}))
+			defer server.Close()
+
+			_, err := fetchHTTP(server.Client(), server.URL)
+			if err == nil {
+				t.Fatal("fetchHTTP error = nil, want HTTP error")
+			}
+			if !strings.Contains(err.Error(), fmt.Sprintf("HTTP %d", tt.status)) {
+				t.Fatalf("fetchHTTP error = %v, want HTTP %d", err, tt.status)
+			}
+			if !strings.Contains(err.Error(), tt.body) {
+				t.Fatalf("fetchHTTP error = %v, want response body %q", err, tt.body)
+			}
+		})
+	}
+}
+
 func TestUpgradeOversizedBinaryLeavesInstalledBinaryUntouched(t *testing.T) {
 	oversized := bytes.Repeat([]byte("x"), maxUpgradeDownloadBytes+1)
 	server, _, _, _ := upgradeTestServer(t, oversized, nil)
