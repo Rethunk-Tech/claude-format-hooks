@@ -50,10 +50,17 @@ func runCheck(args []string, out, errOut io.Writer) int {
 		_, _ = fmt.Fprintf(errOut, "format-dispatch --check: %v\n", err)
 		return 2
 	}
+	projectRoot := checkProjectRoot(args)
 
 	var wouldChange []string
 	for _, abs := range files {
-		if !registry.Supported(filepath.Ext(abs)) {
+		ext := filepath.Ext(abs)
+		if !registry.Supported(ext) {
+			continue
+		}
+		if disabled, err := projectDisables(projectRoot, ext); err != nil {
+			_, _ = fmt.Fprintf(errOut, "format-dispatch --check: project config: %v (ignoring)\n", err)
+		} else if disabled {
 			continue
 		}
 		changed, err := wouldReformat(ctx, registry, abs)
@@ -75,6 +82,26 @@ func runCheck(args []string, out, errOut io.Writer) int {
 	}
 	_, _ = fmt.Fprintf(out, "format-dispatch --check: %d file(s) need formatting\n", len(wouldChange))
 	return 1
+}
+
+// checkProjectRoot preserves the hook's project-root choice when --check is
+// run without CLAUDE_PROJECT_DIR: the path argument, rather than each nested
+// file discovered beneath it, defines the config and dispatch boundary.
+func checkProjectRoot(paths []string) string {
+	root := os.Getenv("CLAUDE_PROJECT_DIR")
+	if root == "" {
+		root = "."
+		if len(paths) > 0 {
+			root = paths[0]
+			if info, err := os.Stat(root); err == nil && !info.IsDir() {
+				root = filepath.Dir(root)
+			}
+		}
+	}
+	if abs, err := filepath.Abs(root); err == nil {
+		return abs
+	}
+	return root
 }
 
 // wouldReformat answers the question by actually formatting a copy and

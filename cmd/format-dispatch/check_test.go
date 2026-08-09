@@ -86,6 +86,39 @@ func TestCheckAcceptsIndividualFiles(t *testing.T) {
 	qt.Check(t, qt.Equals(runCheck([]string{bad}, &out, &errOut), 1))
 }
 
+func TestCheckHonorsProjectConfigDisablesFormatter(t *testing.T) {
+	projectRoot := t.TempDir()
+	path := writeCheckFile(t, projectRoot, "bad.json", unformattedJSON)
+	writeCheckFile(t, projectRoot, projectConfigFile, `{"disabled": [".json"]}`)
+	configPath := filepath.Join(t.TempDir(), "claude-format-hooks.json")
+	writeFile(t, configPath, `{}`)
+
+	t.Setenv("CLAUDE_PROJECT_DIR", projectRoot)
+	t.Setenv("CLAUDE_FORMAT_HOOKS_CONFIG", configPath)
+
+	var out, errOut bytes.Buffer
+	qt.Check(t, qt.Equals(runCheck([]string{projectRoot}, &out, &errOut), 0))
+	qt.Check(t, qt.Equals(readFile(t, path), unformattedJSON),
+		qt.Commentf("project-disabled extension must not be reported for formatting"))
+}
+
+func TestCheckProjectConfigMalformedWarnsAndContinues(t *testing.T) {
+	projectRoot := t.TempDir()
+	path := writeCheckFile(t, projectRoot, "bad.json", unformattedJSON)
+	writeCheckFile(t, projectRoot, projectConfigFile, "not valid json")
+	configPath := filepath.Join(t.TempDir(), "claude-format-hooks.json")
+	writeFile(t, configPath, `{}`)
+
+	t.Setenv("CLAUDE_PROJECT_DIR", projectRoot)
+	t.Setenv("CLAUDE_FORMAT_HOOKS_CONFIG", configPath)
+
+	var out, errOut bytes.Buffer
+	qt.Check(t, qt.Equals(runCheck([]string{projectRoot}, &out, &errOut), 1))
+	qt.Check(t, qt.StringContains(errOut.String(), "project config:"))
+	qt.Check(t, qt.StringContains(out.String(), path))
+	qt.Check(t, qt.Equals(readFile(t, path), unformattedJSON))
+}
+
 func TestCheckIgnoresUnsupportedExtensions(t *testing.T) {
 	dir := t.TempDir()
 	writeCheckFile(t, dir, "notes.xyz", "whatever   \n")
