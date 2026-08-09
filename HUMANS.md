@@ -113,10 +113,10 @@ hanging on stdin — safe to run by hand while debugging.
 | `.json` | `biome check --write` when an upward `biome.json`/`biome.jsonc` is found and `biome` is available through `bunx`/`PATH`; otherwise `encoding/json.Indent` | conditional |
 | `.sh`, `.bash` | `mvdan.cc/sh/v3` | yes |
 | `.go` | `go/format.Source` | yes |
-| `.ts`, `.tsx`, `.js`, `.jsx`, `.mjs`, `.cjs`, `.mts`, `.cts`, `.css`, `.jsonc` | `biome check --write` | no (bunx) |
-| `.md`, `.mdx`, `.markdown` | `markdownlint-cli2 --fix` | no (bunx) |
-| `.toml` | `taplo format` | no (bunx) |
-| `.yaml`, `.yml`, `.html`, `.scss`, `.less`, `.graphql`, `.gql` | `prettier --write` | no (bunx) |
+| `.ts`, `.tsx`, `.js`, `.jsx`, `.mjs`, `.cjs`, `.mts`, `.cts`, `.css`, `.jsonc` | `biome check --write` | no (PATH, else bunx) |
+| `.md`, `.mdx`, `.markdown` | `markdownlint-cli2 --fix` | no (PATH, else bunx) |
+| `.toml` | `taplo format` | no (PATH, else bunx) |
+| `.yaml`, `.yml`, `.html`, `.scss`, `.less`, `.graphql`, `.gql` | `prettier --write` | no (PATH, else bunx) |
 | `.sql` | `sqlfluff fix` | no (system binary) |
 | `.py`, `.pyi` | `ruff format` (preferred) or `black` | no (system binary) |
 | `.rs` | `rustfmt` | no (system binary) |
@@ -200,11 +200,12 @@ not need to carry its own just to avoid noise:
   `.markdownlint-cli2.` means "options object". Renaming the file to the
   wrong shape makes it silently ignored, with no error.
 
-- **SQL** — `sqlfluff` reads `~/.sqlfluff` natively, before any project
-  config, so no hook support is needed. Create one to set at minimum a
-  `dialect`; without any reachable config `sqlfluff` hard-errors with "No
-  dialect was specified" and every `.sql` write reports that instead of
-  formatting.
+- **SQL** — on first `.sql` write, format-dispatch creates `~/.sqlfluff`
+  with an ANSI default dialect if the file does not already exist.
+  Existing user configuration is never overwritten, and a project's own
+  `.sqlfluff` still wins through sqlfluff's native merge order. Edit the
+  dialect to match your fleet; deleting the file restores the ANSI
+  bootstrap on the next `.sql` write.
 
 ### Project-level formatter opt-out
 
