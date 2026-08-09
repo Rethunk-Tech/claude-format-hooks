@@ -13,9 +13,9 @@ func TestResolveExtensionFallsBackToPathExtension(t *testing.T) {
 		want string
 	}{
 		{"config.json", ".json"},
-		{"config.JSON", ".JSON"},
+		{"config.JSON", ".json"},
 		{"README", ""},
-		{filepath.Join("nested.dir", "notes.unknown"), ".unknown"},
+		{filepath.Join("nested.dir", "notes.UNKNOWN"), ".UNKNOWN"},
 	}
 	for _, tc := range cases {
 		qt.Check(t, qt.Equals(ResolveExtension(tc.path), tc.want), qt.Commentf("path=%q", tc.path))
