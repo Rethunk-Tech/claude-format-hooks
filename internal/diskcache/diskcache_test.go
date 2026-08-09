@@ -107,6 +107,26 @@ func TestGetPrunesExpiredEntriesInTheSameNamespace(t *testing.T) {
 	qt.Check(t, qt.IsNil(err), qt.Commentf("pruning must not cross namespace boundaries"))
 }
 
+func TestGetPrunesHyphenatedBinaryNamesAsOneNamespace(t *testing.T) {
+	dir := t.TempDir()
+	freshKey := "missing-current-binary"
+	staleKey := "missing-old-binary"
+	otherKey := "other-old-binary"
+	stale := strconv.FormatInt(time.Now().Add(-time.Hour).Unix(), 10) + "\nvalue"
+
+	Set(dir, freshKey, "fresh")
+	qt.Assert(t, qt.IsNil(os.WriteFile(filepath.Join(dir, staleKey), []byte(stale), 0o600))) //nolint:gosec // test fixture
+	qt.Assert(t, qt.IsNil(os.WriteFile(filepath.Join(dir, otherKey), []byte(stale), 0o600))) //nolint:gosec // test fixture
+
+	_, ok := Get(dir, freshKey, time.Minute)
+	qt.Assert(t, qt.IsTrue(ok))
+
+	_, err := os.Stat(filepath.Join(dir, staleKey))
+	qt.Check(t, qt.IsTrue(os.IsNotExist(err)), qt.Commentf("binary names after the missing- namespace must share pruning"))
+	_, err = os.Stat(filepath.Join(dir, otherKey))
+	qt.Check(t, qt.IsNil(err), qt.Commentf("pruning must not cross namespace boundaries"))
+}
+
 func TestGetTreatsEntryWithNoNewlineAsAMiss(t *testing.T) {
 	dir := t.TempDir()
 	path := filepath.Join(dir, "k")

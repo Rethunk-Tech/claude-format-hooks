@@ -75,7 +75,7 @@ func Get(dir, key string, maxAge time.Duration) (value string, ok bool) {
 }
 
 func cacheNamespacePrefix(key string) string {
-	i := strings.LastIndexByte(key, '-')
+	i := strings.IndexByte(key, '-')
 	if i <= 0 {
 		return ""
 	}
@@ -99,20 +99,29 @@ func prune(dir, namespacePrefix string, maxAge time.Duration) {
 		}
 
 		path := filepath.Join(dir, entry.Name())
-		raw, err := os.ReadFile(path) //nolint:gosec // dir/path are our own fixed cache location, never user input
-		if err != nil {
+		if !cacheEntryExpired(path, maxAge) {
 			continue
 		}
-		i := strings.IndexByte(string(raw), '\n')
-		if i < 0 {
-			continue
-		}
-		ts, err := strconv.ParseInt(string(raw[:i]), 10, 64)
-		if err != nil || time.Since(time.Unix(ts, 0)) < maxAge {
+		// Set can refresh the path after the first read. Recheck immediately
+		// before Remove so a fresh cache value is not swept away.
+		if !cacheEntryExpired(path, maxAge) {
 			continue
 		}
 		_ = os.Remove(path)
 	}
+}
+
+func cacheEntryExpired(path string, maxAge time.Duration) bool {
+	raw, err := os.ReadFile(path) //nolint:gosec // path is our own fixed cache location, never user input
+	if err != nil {
+		return false
+	}
+	i := strings.IndexByte(string(raw), '\n')
+	if i < 0 {
+		return false
+	}
+	ts, err := strconv.ParseInt(string(raw[:i]), 10, 64)
+	return err == nil && time.Since(time.Unix(ts, 0)) >= maxAge
 }
 
 // Set records value under key within dir, timestamped now. A failure to
