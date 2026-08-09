@@ -42,7 +42,6 @@ func runCheck(args []string, out, errOut io.Writer) int {
 		return 2
 	}
 
-	registry := buildRegistry()
 	ctx, cancel := context.WithTimeout(context.Background(), checkTimeout)
 	defer cancel()
 
@@ -52,12 +51,19 @@ func runCheck(args []string, out, errOut io.Writer) int {
 		return 2
 	}
 	var wouldChange []string
+	var registry *dispatch.Registry
 	for _, abs := range files {
 		ext := dispatch.ResolveExtension(abs)
 		if ext == "" {
 			if shebangExt, ok := shellShebangExt(abs); ok {
 				ext = shebangExt
 			}
+		}
+		if !dispatch.KnownExtension(ext) {
+			continue
+		}
+		if registry == nil {
+			registry = buildRegistry()
 		}
 		if !registry.Supported(ext) {
 			continue

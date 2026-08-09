@@ -239,9 +239,13 @@ func TestCollectCheckTargetsSkipsScratchFiles(t *testing.T) {
 func TestCheckIgnoresUnsupportedExtensions(t *testing.T) {
 	dir := t.TempDir()
 	writeCheckFile(t, dir, "notes.xyz", "whatever   \n")
+	configPath := filepath.Join(t.TempDir(), "claude-format-hooks.json")
+	writeFile(t, configPath, "not valid json")
+	t.Setenv("CLAUDE_FORMAT_HOOKS_CONFIG", configPath)
 
 	var out, errOut bytes.Buffer
 	qt.Check(t, qt.Equals(runCheck([]string{dir}, &out, &errOut), 0))
+	qt.Check(t, qt.Equals(errOut.String(), ""))
 }
 
 func TestCheckSkipsVendoredDirectories(t *testing.T) {
