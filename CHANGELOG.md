@@ -14,7 +14,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   Terraform extensions.
 - `--upgrade` downloads and verifies the latest platform release binary, then
   atomically replaces the installed hook without rewriting `settings.json`;
-  `--upgrade --dry-run` previews the replacement without writing.
+  `--upgrade --dry-run` previews the planned asset and path offline without
+  writing.
 - `.proto` formatting via `buf format -w`, following the same
   system-binary pattern as `terraform fmt` and `rustfmt` (skipped silently
   when `buf` is not on `PATH`).

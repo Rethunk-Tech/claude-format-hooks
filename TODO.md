@@ -20,7 +20,46 @@ Wave 3 (2026-08-09) landed: longest-suffix `ResolveExtension`; Terraform
 `.tftest.hcl`/`.tfmock.hcl`/`.tfquery.hcl`; `--check` shebang parity;
 nil-safe `Dispatch`; black notebook-missing heuristic tighten;
 `TestExternalFormatterNames` notebook row; `installer.Upgrade` +
-`--upgrade` CLI glue; HUMANS/CHANGELOG.
+`--upgrade` CLI glue; HUMANS/CHANGELOG. Fixup: unique `writeAtomic`
+temps, offline `--upgrade --dry-run`, Windows in-use note, coverage for
+multi-dot `--check` / nil Dispatch / upgrade asset errors.
+
+---
+
+## Residual — Wave-3 audit carry-forwards (optional)
+
+### Reject anonymous one-field checksum lines in Upgrade
+
+`parseReleaseChecksum` currently accepts a digest-only line. Prefer
+requiring the filename field to match the expected asset (release.yml
+already emits two-field `sha256sum` lines).
+
+### Cap Upgrade download size
+
+`fetchHTTP` reads the full asset into memory with no Content-Length /
+max-bytes guard.
+
+### Tighten `no module named jupyter` black skip further
+
+Still a substring match; prose mentioning jupyter could over-skip.
+
+### Precompute longest-suffix list for ResolveExtension
+
+Hot path iterates every `knownExtensions` key per invocation.
+
+### CLI-level `--upgrade` happy-path test
+
+Library covered via httptest; `runUpgrade` success path through
+`dispatchArgs` is not.
+
+### `install.sh --upgrade` convenience
+
+Operators using only the shell wrapper must discover the binary flag.
+
+### `--check` KnownExtension before config load
+
+`runCheck` always `buildRegistry` first; hook can bail earlier on unknown
+exts. Behavioral parity holds; CI cost only.
 
 ---
 

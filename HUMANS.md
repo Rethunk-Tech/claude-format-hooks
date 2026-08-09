@@ -117,7 +117,8 @@ exactly as it was. A settings.json with no such entry is a no-op.
 `--upgrade` downloads the latest release binary for the current platform,
 verifies its published SHA-256 checksum, and atomically replaces the
 installed binary. It leaves `settings.json` unchanged. `--dry-run` prints
-the planned release and replacement path without writing anything.
+the planned asset name and replacement path without contacting the network
+or writing anything.
 
 On Windows, replacement may fail while `format-dispatch.exe` is in use. Quit
 Claude Code, close the process holding the binary, and retry.
