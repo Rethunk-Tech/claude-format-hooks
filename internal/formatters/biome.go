@@ -28,20 +28,18 @@ func NewBiome() Formatter { return biomeFormatter{} }
 func (biomeFormatter) Name() string { return "biome" }
 
 func (biomeFormatter) Format(ctx context.Context, projectRoot, abs string) Result {
-	if _, err := lookPath("bunx"); err != nil {
-		return Result{Skipped: true}
-	}
-
 	cfgDir := cachedFindUpward(filepath.Dir(abs), projectRoot, "biome.json", "biome.jsonc")
 	if cfgDir == "" {
 		cfgDir = projectRoot
 	}
 
-	ok, diag := runExternal(ctx, cfgDir, "bunx", []string{"@biomejs/biome", "check", "--write", "--no-errors-on-unmatched", "--", abs})
-	if !ok {
-		return Result{Diagnostic: diag}
-	}
-	return Result{}
+	return runPathOrBunx(
+		ctx,
+		cfgDir,
+		"biome",
+		[]string{"check", "--write", "--no-errors-on-unmatched", "--", abs},
+		[]string{"@biomejs/biome", "check", "--write", "--no-errors-on-unmatched", "--", abs},
+	)
 }
 
 // findUpwardCacheTTL is how long a resolved (or unresolved) config
