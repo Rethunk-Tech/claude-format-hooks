@@ -12,6 +12,10 @@
 # Env overrides (mainly for testing):
 #   CLAUDE_HOOKS_BIN_DIR   default: ~/.claude/hooks
 #   CLAUDE_SETTINGS_FILE   default: ~/.claude/settings.json
+#   CLAUDE_FORMAT_HOOKS_RELEASE_API
+#       override GitHub Releases API base URL for --upgrade (default:
+#       https://api.github.com); intended for tests/mirrors. The configured
+#       host is fully trusted for release metadata and asset URLs.
 set -euo pipefail
 
 ACTION="${1:-}"

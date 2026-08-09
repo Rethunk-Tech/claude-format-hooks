@@ -88,7 +88,10 @@ settings file when the session started.
 
 Env overrides (mainly for testing): `CLAUDE_HOOKS_BIN_DIR` (default
 `~/.claude/hooks`), `CLAUDE_SETTINGS_FILE` (default
-`~/.claude/settings.json`).
+`~/.claude/settings.json`), and `CLAUDE_FORMAT_HOOKS_RELEASE_API` (default
+`https://api.github.com`) to override the GitHub Releases API base URL for
+`--upgrade`. This is intended for tests and mirrors; the configured host is
+fully trusted for release metadata and asset URLs.
 
 ### Uninstall
 
