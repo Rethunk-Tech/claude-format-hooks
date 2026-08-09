@@ -22,8 +22,9 @@ required.
 - Optional: [`sqlfluff`](https://sqlfluff.com/) (system binary, e.g. via
   `pipx install sqlfluff`) for `.sql` formatting.
 - Optional: [`ruff`](https://docs.astral.sh/ruff/) or
-  [`black`](https://black.readthedocs.io/) (system binary) for `.py`
-  formatting — ruff is tried first if both are installed.
+  [`black`](https://black.readthedocs.io/) (system binary) for `.py` and
+  `.ipynb` formatting — ruff is tried first if both are installed; black
+  needs its notebook support installed for `.ipynb`.
 - Optional: [`rustfmt`](https://github.com/rust-lang/rustfmt) (installed
   with the Rust toolchain via `rustup component add rustfmt`) for `.rs`
   formatting.
@@ -42,9 +43,11 @@ cd claude-format-hooks
 ```
 
 The installer builds `format-dispatch` to `~/.claude/hooks/format-dispatch`
-and adds (or replaces an existing narrower biome-only hook with) a
-`PostToolUse` entry for `Write|Edit|NotebookEdit`, invoked via the hook
-schema's exec form (`command` + `args: []`) — no shell spawned to launch
+on POSIX systems, or `format-dispatch.exe` to
+`~/.claude/hooks/format-dispatch.exe` on Windows, and adds (or replaces an
+existing narrower biome-only hook with) a `PostToolUse` entry for
+`Write|Edit|NotebookEdit`, invoked via the hook schema's exec form
+(`command` + `args: []`) — no shell spawned to launch
 it, just the binary directly.
 
 If `bun` is on `PATH`, `--install` also installs biome, prettier, taplo, and
@@ -59,10 +62,13 @@ is left alone.
 This is best-effort: a failed install never fails the install as a whole,
 since `bunx` still falls back to fetching on demand.
 
-**No Go toolchain?** Download the `linux`/`darwin`/`windows` (amd64 or
-arm64) binary from the [latest release](https://github.com/Rethunk-Tech/claude-format-hooks/releases/latest)
-instead of building from source, place it at
-`~/.claude/hooks/format-dispatch`, `chmod +x` it, then run
+**No Go toolchain?** Download the `linux`/`darwin` (amd64 or arm64)
+binary, or the Windows `format-dispatch-windows-*.exe` asset, from the
+[latest release](https://github.com/Rethunk-Tech/claude-format-hooks/releases/latest)
+instead of building from source. Place it at
+`~/.claude/hooks/format-dispatch` on POSIX, or
+`~/.claude/hooks/format-dispatch.exe` on Windows; `chmod +x` the POSIX
+binary, then run
 `~/.claude/hooks/format-dispatch --install` yourself. The binary's
 `ProvisionTools` step still runs when `bun` is available; only `install.sh`'s
 Go build wrapper is skipped.
@@ -119,6 +125,7 @@ hanging on stdin — safe to run by hand while debugging.
 | `.yaml`, `.yml`, `.html`, `.scss`, `.less`, `.graphql`, `.gql` | `prettier --write` | no (PATH, else bunx) |
 | `.sql` | `sqlfluff fix` | no (system binary) |
 | `.py`, `.pyi` | `ruff format` (preferred) or `black` | no (system binary) |
+| `.ipynb` | `ruff format` (preferred) or `black` with notebook support | no (system binary) |
 | `.rs` | `rustfmt` | no (system binary) |
 | `.tf`, `.tfvars` | `terraform fmt` | no (system binary) |
 | `.proto` | `buf format -w` | no (system binary) |
