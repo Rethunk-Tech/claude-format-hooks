@@ -156,6 +156,11 @@ toolchain:
   formatter that deliberately leaves violations it will not auto-fix does
   not fail the build over them — otherwise CI would gate on something no
   local write could ever repair.
+- **Project opt-out applies.** A `.claude-format-hooks.json` `disabled`
+  list at `$CLAUDE_PROJECT_DIR` (or the check path root) skips those
+  extensions the same way the live hook does, so CI does not fail files
+  the hook would leave alone. Config discovery for tools like biome also
+  uses that project root, not each file's parent directory.
 
 ## Configuration
 
