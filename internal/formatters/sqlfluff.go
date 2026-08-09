@@ -2,6 +2,8 @@ package formatters
 
 import (
 	"context"
+	"fmt"
+	"path/filepath"
 	"strings"
 )
 
@@ -42,12 +44,19 @@ func (sqlfluffFormatter) Format(ctx context.Context, projectRoot, abs string) Re
 	if _, err := lookPath("sqlfluff"); err != nil {
 		return Result{Skipped: true}
 	}
+	userSQLFluffConfig()
 
 	// No --force: it is the default as of sqlfluff 4, and passing it prints
 	// a deprecation warning that would itself become diagnostic noise.
 	ok, diag, raw := runExternalOutput(ctx, projectRoot, "sqlfluff", []string{"fix", "--", abs})
 	if ok {
 		return Result{}
+	}
+	if sqlfluffNoDialect(raw) {
+		return Result{Diagnostic: fmt.Sprintf(
+			"sqlfluff has no dialect; set [sqlfluff] dialect in %s",
+			filepath.Join(projectRoot, ".sqlfluff"),
+		)}
 	}
 	// No output at all is not classifiable, and sqlfluff always says
 	// something when it actually runs -- so an empty non-zero exit means it
@@ -57,6 +66,10 @@ func (sqlfluffFormatter) Format(ctx context.Context, projectRoot, abs string) Re
 	}
 	// Ran, rewrote what it could, left some violations behind: success.
 	return Result{}
+}
+
+func sqlfluffNoDialect(output string) bool {
+	return strings.Contains(strings.ToLower(output), "no dialect")
 }
 
 func sqlfluffFailedToParse(output string) bool {
