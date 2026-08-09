@@ -21,6 +21,15 @@ set -euo pipefail
 ACTION="${1:-}"
 DRY_RUN="${2:-}"
 
+case "$ACTION" in
+  "" | --dry-run | --upgrade)
+    ;;
+  *)
+    echo "usage: $0 [--dry-run | --upgrade [--dry-run]]" >&2
+    exit 2
+    ;;
+esac
+
 REPO_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 BIN_DIR="${CLAUDE_HOOKS_BIN_DIR:-$HOME/.claude/hooks}"
 
