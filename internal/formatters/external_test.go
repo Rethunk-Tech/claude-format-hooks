@@ -58,6 +58,7 @@ func TestExternalFormatterNames(t *testing.T) {
 		{NewPrettier(), "prettier"},
 		{NewSQLFluff(), "sqlfluff"},
 		{NewPython(), "ruff/black"},
+		{NewNotebook(), "ruff/black-notebook"},
 		{NewRust(), "rustfmt"},
 		{NewTerraform(), "terraform"},
 	}
