@@ -38,20 +38,72 @@ fixtures; `ResolveExtension("")` row; `--check` user-disable before
 registry build. Fixup: single config load for `--check` + mixed
 disabled/enabled order coverage.
 
----
-
-## Residual — Wave-5 audit carry-forwards (optional)
-
-### Oversized non-2xx error-body cap coverage
-
-`TestFetchHTTPReportsOversizedNon2xx` proves status wins over the binary
-size guard, but sends a short body. Add a body larger than
-`maxUpgradeErrorBodyBytes` (chunked / no helpful Content-Length) and
-assert returned detail length is capped.
+Wave 6 (2026-08-09) landed: capped oversized non-2xx error-body test;
+`disabledFormatters` name-based opt-out (registry + jsonRouter biome
+skip + hook/`--check` + HUMANS/CHANGELOG); drop empty `js-yaml`
+`bunGlobalOverrides` after markdownlint-cli2 0.23.2 → js-yaml 5.2.2;
+fleet survey all no-go (`.vue`/`.svelte`/`.astro`/`.nix`/`.zig` = 0).
+Fixup: canonical Name() list + notebook distinction; json/jsonc
+disabledFormatters tests; EditorConfig numbering glue.
 
 ---
 
-## Residual — Ops / next-fleet survey
+## Residual — Wave-6 audit carry-forwards (optional)
+
+### Trim whitespace in `disabledFormatters` entries
+
+`IsFormatterDisabled` uses `EqualFold` without `TrimSpace`, so a value
+like `"biome "` silently fails to match.
+
+**Acceptance**
+
++ Leading/trailing whitespace on list entries is ignored (or rejected
+  loudly at Load with a clear diagnostic).
+
+### CHANGELOG Documentation bullet for `disabledFormatters`
+
+Unreleased Documentation section still omits the new opt-out; Added
+already covers the feature.
+
+**Acceptance**
+
++ Documentation bullet mentions `disabledFormatters` / HUMANS config.
+
+### Clarify `IsFormatterDisabled` comment (user vs project)
+
+Helper is reused for project configs via `projectDisables`; comment still
+says "user".
+
+**Acceptance**
+
++ Comment names both callers (or is caller-agnostic).
+
+### Cache project-biome-disabled registry in `--check`
+
+`registryWithProjectConfig` rebuilds `NewRegistry` per `.json` when the
+project disables biome. Fine for small trees; optional memoization if
+`--check` on large monorepos shows cost.
+
+**Acceptance**
+
++ Same merged registry reused across files that share the same user+project
+  disable set, or measured no-op leave-as-is note.
+
+### Router-style formatters need explicit project-disable wiring
+
+`jsonRouter.Name()` is `"json"` while biome may run underneath, so
+project-level `"biome"` disable needs `registryWithProjectConfig`. Any
+future router that delegates to another `Name()` must get the same hook/
+`--check` treatment — do not assume registry name-filter alone is enough.
+
+**Acceptance**
+
++ Documented invariant near `jsonRouter` / `registryWithProjectConfig`, or
+  a shared helper that future routers must call.
+
+---
+
+## Residual — Ops
 
 ### Diagnose and clear red CI on `origin/main`
 
@@ -67,49 +119,13 @@ clear the CI workflow failure.
 + Identified failing check and root cause recorded (logs gone — stale tip).
 + A subsequent `main` push is green on ubuntu/macOS/Windows test + lint.
 
-### Retire `js-yaml` global override when upstream is fixed
+### Fleet re-survey (periodic)
 
-`bunGlobalOverrides` in `internal/installer/tools.go` pins `js-yaml` to
-`^5.2.2` because markdownlint-cli2 0.23.1 pins vulnerable `5.2.1`
-(GHSA-pm4m-ph32-ghv5). Drop once markdownlint-cli2 ships against the patch.
-
-**Acceptance**
-
-+ Override map empty (or without `js-yaml`) only after confirming the
-  published dependency tree; CHANGELOG notes the pin removal.
-
-### Fleet re-survey for the next zero-cost extensions
-
-Measure real fleet file counts before registering:
-
-| Candidate | Likely tool | Notes |
-| --- | --- | --- |
-| `.vue` / `.svelte` / `.astro` | prettier | Confirm biome does not own these in fleet |
-| `.nix` | `nixfmt` / `alejandra` | Only if one canonical binary dominates |
-| `.zig` | `zig fmt` | Same pattern as rustfmt/gofmt |
-
-Re-reject Kotlin/XML/Lua/Gradle unless fleet evidence changed.
-
-**Acceptance**
-
-+ Short survey note with counts and go/no-go per candidate.
-+ Any "go" lands with dispatch registration + HUMANS row together.
-
-### Config: disable by formatter name
-
-Today `disabled` is extension-only. A parallel `disabledFormatters:
-["biome"]` (or bare names in `disabled`) would match operator mental models.
-
-**Traps**
-
-+ `jsonRouter.Name()` returns `"json"` while biome may run underneath —
-  disabling `"biome"` must still skip the biome branch for `.json`, or
-  document extension-only opt-out for `.json`.
-
-**Acceptance**
-
-+ One config key disables all extensions registered to that formatter.
-+ HUMANS example shows disabling biome without enumerating eight extensions.
+Wave-6 survey across `/usr/local/src/com.github/Rethunk-Tech/` found
+**zero** hand-authored `.vue`/`.svelte`/`.astro`/`.nix`/`.zig` under
+vendored-dir exclusions — all **no-go**. Re-run when the fleet gains
+candidate sources; any go still needs dispatch registration + HUMANS row
+together. For `.nix`, pick one of `nixfmt`/`alejandra` by PATH dominance.
 
 ---
 
@@ -124,3 +140,5 @@ Today `disabled` is extension-only. A parallel `disabledFormatters:
   do not reintroduce.
 + Shared `internal/atomicfile` extract for installer + formatters — both
   paths are atomic independently; extract only if a third caller appears.
++ Overloading bare formatter names into `disabled` (wave 6 chose separate
+  `disabledFormatters` key).
