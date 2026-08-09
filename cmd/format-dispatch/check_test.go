@@ -141,6 +141,21 @@ func TestCheckHonorsProjectConfigDisablesFormatter(t *testing.T) {
 		qt.Commentf("project-disabled extension must not be reported for formatting"))
 }
 
+func TestCheckHonorsUserConfigDisablesFormatter(t *testing.T) {
+	projectRoot := t.TempDir()
+	path := writeCheckFile(t, projectRoot, "bad.json", unformattedJSON)
+	configPath := filepath.Join(t.TempDir(), "claude-format-hooks.json")
+	writeFile(t, configPath, `{"disabled": [".json"]}`)
+
+	t.Setenv("CLAUDE_PROJECT_DIR", projectRoot)
+	t.Setenv("CLAUDE_FORMAT_HOOKS_CONFIG", configPath)
+
+	var out, errOut bytes.Buffer
+	qt.Check(t, qt.Equals(runCheck([]string{projectRoot}, &out, &errOut), 0))
+	qt.Check(t, qt.Equals(readFile(t, path), unformattedJSON),
+		qt.Commentf("user-disabled extension must not be reported for formatting"))
+}
+
 func TestCheckResolvesProjectRootPerPathArgument(t *testing.T) {
 	firstRoot := t.TempDir()
 	secondRoot := t.TempDir()

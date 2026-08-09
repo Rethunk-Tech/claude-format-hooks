@@ -14,6 +14,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/Rethunk-Tech/claude-format-hooks/internal/config"
 	"github.com/Rethunk-Tech/claude-format-hooks/internal/dispatch"
 )
 
@@ -63,6 +64,14 @@ func runCheck(args []string, out, errOut io.Writer) int {
 			continue
 		}
 		if registry == nil {
+			cfg, err := config.Load(configPath())
+			if err != nil {
+				_, _ = fmt.Fprintf(errOut, "format-dispatch: config: %v (using defaults)\n", err)
+				cfg = config.Default()
+			}
+			if cfg.IsDisabled(ext) {
+				continue
+			}
 			registry = buildRegistry()
 		}
 		if !registry.Supported(ext) {
