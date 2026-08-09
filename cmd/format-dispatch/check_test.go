@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 	"time"
 
@@ -154,6 +155,38 @@ func TestCheckHonorsUserConfigDisablesFormatter(t *testing.T) {
 	qt.Check(t, qt.Equals(runCheck([]string{projectRoot}, &out, &errOut), 0))
 	qt.Check(t, qt.Equals(readFile(t, path), unformattedJSON),
 		qt.Commentf("user-disabled extension must not be reported for formatting"))
+}
+
+func TestCheckUserDisableMixedWithEnabledExtension(t *testing.T) {
+	// Both traversal orders must keep the disabled file silent while still
+	// reporting the enabled native shell target — covers the nil-registry
+	// to built-registry transition after the early IsDisabled skip.
+	const unformattedShell = "#!/bin/sh\nif true;then echo hi;fi\n"
+
+	for _, order := range []string{"disabled-first", "enabled-first"} {
+		t.Run(order, func(t *testing.T) {
+			projectRoot := t.TempDir()
+			jsonPath := writeCheckFile(t, projectRoot, "bad.json", unformattedJSON)
+			shellPath := writeCheckFile(t, projectRoot, "script.sh", unformattedShell)
+			configPath := filepath.Join(t.TempDir(), "claude-format-hooks.json")
+			writeFile(t, configPath, `{"disabled": [".json"]}`)
+
+			t.Setenv("CLAUDE_PROJECT_DIR", projectRoot)
+			t.Setenv("CLAUDE_FORMAT_HOOKS_CONFIG", configPath)
+
+			paths := []string{jsonPath, shellPath}
+			if order == "enabled-first" {
+				paths = []string{shellPath, jsonPath}
+			}
+
+			var out, errOut bytes.Buffer
+			qt.Check(t, qt.Equals(runCheck(paths, &out, &errOut), 1))
+			qt.Check(t, qt.StringContains(out.String(), shellPath))
+			qt.Check(t, qt.Equals(strings.Contains(out.String(), jsonPath), false),
+				qt.Commentf("disabled json must not appear in --check output"))
+			qt.Check(t, qt.Equals(readFile(t, jsonPath), unformattedJSON))
+		})
+	}
 }
 
 func TestCheckResolvesProjectRootPerPathArgument(t *testing.T) {
