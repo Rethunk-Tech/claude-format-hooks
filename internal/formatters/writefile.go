@@ -1,6 +1,7 @@
 package formatters
 
 import (
+	"bytes"
 	"os"
 	"path/filepath"
 )
@@ -9,13 +10,24 @@ import (
 // (e.g. an executable bit on a shell script) rather than resetting it —
 // falling back to defaultMode only when abs can't be stat'd (the file
 // somehow vanished between the read and the write).
-func writeFormatted(abs string, out []byte, defaultMode os.FileMode) error {
+func writeFormatted(abs string, source, out []byte, defaultMode os.FileMode) error {
+	target, err := filepath.EvalSymlinks(abs)
+	if err != nil {
+		if info, lstatErr := os.Lstat(abs); lstatErr == nil && info.Mode()&os.ModeSymlink != 0 {
+			return nil
+		}
+		if !os.IsNotExist(err) {
+			return err
+		}
+		target = abs
+	}
+
 	mode := defaultMode
-	if info, err := os.Stat(abs); err == nil {
+	if info, err := os.Stat(target); err == nil {
 		mode = info.Mode()
 	}
 
-	tmp, err := os.CreateTemp(filepath.Dir(abs), "."+filepath.Base(abs)+"-format-*")
+	tmp, err := os.CreateTemp(filepath.Dir(target), "."+filepath.Base(target)+"-format-*")
 	if err != nil {
 		return err
 	}
@@ -37,6 +49,18 @@ func writeFormatted(abs string, out []byte, defaultMode os.FileMode) error {
 	}
 
 	// The temporary file lives beside the destination, so rename is atomic
-	// on the same filesystem and a partial write never reaches abs.
-	return os.Rename(tmpName, abs) //nolint:gosec // abs is the file this formatter was invoked to format, by design
+	// on the same filesystem and a partial write never reaches target.
+	if source != nil {
+		current, err := os.ReadFile(target)
+		if err != nil {
+			if os.IsNotExist(err) {
+				return nil
+			}
+			return err
+		}
+		if !bytes.Equal(current, source) {
+			return nil
+		}
+	}
+	return os.Rename(tmpName, target) //nolint:gosec // target resolves the formatter's input path, by design
 }
