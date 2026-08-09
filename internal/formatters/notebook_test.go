@@ -58,3 +58,29 @@ func TestNotebookFormatterSkipsWhenBlackNotebookSupportIsMissing(t *testing.T) {
 	qt.Check(t, qt.IsTrue(res.Skipped))
 	qt.Check(t, qt.Equals(res.Diagnostic, ""))
 }
+
+func TestBlackNotebookSupportMissingRecognizesMissingExtras(t *testing.T) {
+	for _, diagnostic := range []string{
+		"No module named 'nbformat'",
+		`No module named "nbformat"`,
+		"No module named nbformat",
+		"No module named 'jupyter'",
+		`No module named "jupyter"`,
+		"No module named jupyter",
+		"black[jupyter] is not installed",
+	} {
+		qt.Check(t, qt.IsTrue(blackNotebookSupportMissing(diagnostic, "")),
+			qt.Commentf("diagnostic=%q", diagnostic))
+	}
+}
+
+func TestNotebookFormatterReportsUnrelatedNotebookDiagnostic(t *testing.T) {
+	isolateDiskCache(t)
+	writeFakeTool(t, "black", "echo 'notebook formatting failed'; exit 1")
+	dir := t.TempDir()
+
+	res := NewNotebook().Format(t.Context(), dir, filepath.Join(dir, "f.ipynb"))
+
+	qt.Check(t, qt.IsFalse(res.Skipped))
+	qt.Check(t, qt.Not(qt.Equals(res.Diagnostic, "")))
+}

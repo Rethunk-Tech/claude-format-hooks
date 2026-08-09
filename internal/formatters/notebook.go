@@ -42,5 +42,18 @@ func runNotebookTool(ctx context.Context, dir, name string, args []string) Resul
 
 func blackNotebookSupportMissing(diagnostic, raw string) bool {
 	text := strings.ToLower(diagnostic + "\n" + raw)
-	return strings.Contains(text, "jupyter") || strings.Contains(text, "notebook")
+	for _, pattern := range []string{
+		"no module named 'nbformat'",
+		`no module named "nbformat"`,
+		"no module named nbformat",
+		"no module named 'jupyter'",
+		`no module named "jupyter"`,
+		"no module named jupyter",
+		"black[jupyter]",
+	} {
+		if strings.Contains(text, pattern) {
+			return true
+		}
+	}
+	return false
 }
