@@ -14,6 +14,7 @@ import (
 	"runtime"
 	"runtime/debug"
 	"strings"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -305,6 +306,40 @@ func TestDispatchArgsUpgradeHappyPathViaReleaseAPI(t *testing.T) {
 	qt.Check(t, qt.StringContains(stdout, "upgraded"))
 	qt.Check(t, qt.StringContains(stdout, target))
 	qt.Check(t, qt.Equals(readFile(t, target), string(binary)))
+}
+
+func TestDispatchArgsUpgradeDryRunViaReleaseAPI(t *testing.T) {
+	dir := t.TempDir()
+	binDir := filepath.Join(dir, "bin")
+	target := installer.HookBinaryPath(binDir)
+	oldBinary := []byte("old release binary\n")
+	qt.Assert(t, qt.IsNil(os.MkdirAll(binDir, 0o700)))
+	qt.Assert(t, qt.IsNil(os.WriteFile(target, oldBinary, 0o751))) //nolint:gosec // test fixture
+
+	var binaryRequests atomic.Int32
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path == "/binary" {
+			binaryRequests.Add(1)
+		}
+		http.NotFound(w, r)
+	}))
+	defer server.Close()
+
+	t.Setenv("CLAUDE_FORMAT_HOOKS_RELEASE_API", server.URL)
+	t.Setenv("CLAUDE_HOOKS_BIN_DIR", binDir)
+	t.Setenv("CLAUDE_SETTINGS_FILE", filepath.Join(dir, "settings.json"))
+
+	var code int
+	stdout := captureStdout(t, func() {
+		code = dispatchArgs([]string{"--upgrade", "--dry-run"})
+	})
+	qt.Check(t, qt.Equals(code, 0))
+	qt.Check(t, qt.StringContains(stdout, "--dry-run"))
+	qt.Check(t, qt.StringContains(stdout, "would download"))
+	qt.Check(t, qt.StringContains(stdout, target))
+	qt.Check(t, qt.StringContains(stdout, "not written"))
+	qt.Check(t, qt.Equals(readFile(t, target), string(oldBinary)))
+	qt.Check(t, qt.Equals(binaryRequests.Load(), int32(0)))
 }
 
 func TestRunInstallReportsActionError(t *testing.T) {
