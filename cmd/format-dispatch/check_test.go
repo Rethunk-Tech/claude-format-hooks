@@ -149,6 +149,16 @@ func TestCheckDispatchesNestedBiomeFromProjectRoot(t *testing.T) {
 	qt.Check(t, qt.StringContains(out.String(), path))
 }
 
+func TestCollectCheckTargetsSkipsScratchFiles(t *testing.T) {
+	dir := t.TempDir()
+	keep := writeCheckFile(t, dir, "keep.json", formattedJSON)
+	writeCheckFile(t, dir, ".fmtcheck-leftover-keep.json", formattedJSON)
+
+	targets, err := collectCheckTargets([]string{dir})
+	qt.Assert(t, qt.IsNil(err))
+	qt.Check(t, qt.DeepEquals(targets, []string{keep}))
+}
+
 func TestCheckIgnoresUnsupportedExtensions(t *testing.T) {
 	dir := t.TempDir()
 	writeCheckFile(t, dir, "notes.xyz", "whatever   \n")

@@ -11,6 +11,7 @@ import (
 	"os"
 	"path/filepath"
 	"sort"
+	"strings"
 	"time"
 
 	"github.com/Rethunk-Tech/claude-format-hooks/internal/dispatch"
@@ -171,6 +172,11 @@ func collectCheckTargets(paths []string) ([]string, error) {
 	// would let an unrelated ancestor directory named "build" or "vendor"
 	// silently exclude the whole run.
 	add := func(root, p string) {
+		// copyBeside uses this prefix; ignoring it here keeps leftovers from
+		// an interrupted check out of the next target set.
+		if strings.HasPrefix(filepath.Base(p), ".fmtcheck-") {
+			return
+		}
 		rel, err := filepath.Rel(root, p)
 		if err != nil {
 			rel = filepath.Base(p)
