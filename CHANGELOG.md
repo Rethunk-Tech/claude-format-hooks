@@ -9,6 +9,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- Route `.tftest.hcl`, `.tfmock.hcl`, and `.tfquery.hcl` through Terraform
+  formatting; bare `.hcl`, `.tf.json`, and `.tfvars.json` are not registered
+  Terraform extensions.
+- `--upgrade` downloads and verifies the latest platform release binary, then
+  atomically replaces the installed hook without rewriting `settings.json`;
+  `--upgrade --dry-run` previews the replacement without writing.
 - `.proto` formatting via `buf format -w`, following the same
   system-binary pattern as `terraform fmt` and `rustfmt` (skipped silently
   when `buf` is not on `PATH`).
@@ -36,6 +42,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- `--check` now resolves multi-dot registered suffixes and extensionless
+  shell shebangs the same way the live hook does, so CI no longer skips
+  those targets.
+- Black's notebook fallback only treats missing-jupyter-extra diagnostics
+  as a silent skip; unrelated failures that merely mention "notebook" still
+  surface as diagnostics.
+- `Registry.Dispatch` returns `Skipped` instead of panicking when called
+  with an unregistered extension.
 - `--install` no longer rewrites an existing `"args": []` as `"args": null`
   in `settings.json`. The key is now omitted entirely, which is what the
   schema expects for a hook that takes no arguments and the only form that

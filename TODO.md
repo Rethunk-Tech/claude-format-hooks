@@ -14,44 +14,13 @@ Wave 2 (2026-08-09) landed: Windows `format-dispatch.exe` basename +
 legacy Wire/Unwire dedupe; extensionless shell-shebang peek (incl. CRLF)
 
 + `Dispatch(ext)` glue; `.ipynb` via ruff/black-notebook; docs/tests
-aligned. Deferred: multi-dot Terraform, `disabledFormatters`, `--check`
-shebang parity (below).
+aligned.
 
----
-
-## Residual — Formatter coverage
-
-### Multi-dot Terraform suffixes (deferred from `.tfvars` wave)
-
-`filepath.Ext("x.tftest.hcl")` is `.hcl`, not `.tftest.hcl`. Upstream
-`terraform fmt` also formats `.tftest.hcl`, `.tfmock.hcl`, and
-`.tfquery.hcl`. A naive `".hcl"` registration would hit Packer/Nomad HCL.
-
-Absorb extension resolution into a shared `dispatch` helper (longest
-suffix + shebang already peeks in `main`) so `main.go` / `check.go` stop
-re-deriving `filepath.Ext` independently.
-
-**Traps**
-
-+ Longest-suffix match; keep `disabled: [".hcl"]` vs
-  `disabled: [".tftest.hcl"]` coherent with `KnownExtension`.
-+ Do not format `.tf.json` / `.tfvars.json`.
-
-**Acceptance**
-
-+ Multi-dot Terraform suffixes format via `terraform fmt`, or stay an
-  explicit won't-fix with the `filepath.Ext` trap recorded in HUMANS.
-
-### Retire `js-yaml` global override when upstream is fixed
-
-`bunGlobalOverrides` in `internal/installer/tools.go` pins `js-yaml` to
-`^5.2.2` because markdownlint-cli2 0.23.1 pins vulnerable `5.2.1`
-(GHSA-pm4m-ph32-ghv5). Drop once markdownlint-cli2 ships against the patch.
-
-**Acceptance**
-
-+ Override map empty (or without `js-yaml`) only after confirming the
-  published dependency tree; CHANGELOG notes the pin removal.
+Wave 3 (2026-08-09) landed: longest-suffix `ResolveExtension`; Terraform
+`.tftest.hcl`/`.tfmock.hcl`/`.tfquery.hcl`; `--check` shebang parity;
+nil-safe `Dispatch`; black notebook-missing heuristic tighten;
+`TestExternalFormatterNames` notebook row; `installer.Upgrade` +
+`--upgrade` CLI glue; HUMANS/CHANGELOG.
 
 ---
 
@@ -69,20 +38,16 @@ requires an explicit operator go.
 + Identified failing check and root cause recorded.
 + A subsequent `main` push is green on ubuntu/macOS/Windows test + lint.
 
-### Release-binary upgrade path
+### Retire `js-yaml` global override when upstream is fixed
 
-No `format-dispatch --upgrade` / install.sh path that fetches the latest
-release artifact, verifies sha256, and replaces the installed hook binary.
-
-**Traps**
-
-+ Must verify sha256; reuse `installer.HookBinaryBaseName` /
-  `HookBinaryPath` for Windows `.exe` vs POSIX naming.
-+ Do not rewrite `settings.json` if already wired to the same path.
+`bunGlobalOverrides` in `internal/installer/tools.go` pins `js-yaml` to
+`^5.2.2` because markdownlint-cli2 0.23.1 pins vulnerable `5.2.1`
+(GHSA-pm4m-ph32-ghv5). Drop once markdownlint-cli2 ships against the patch.
 
 **Acceptance**
 
-+ Documented, tested download + hash verify + install; HUMANS no-Go links it.
++ Override map empty (or without `js-yaml`) only after confirming the
+  published dependency tree; CHANGELOG notes the pin removal.
 
 ### Fleet re-survey for the next zero-cost extensions
 
@@ -116,41 +81,6 @@ Today `disabled` is extension-only. A parallel `disabledFormatters:
 
 + One config key disables all extensions registered to that formatter.
 + HUMANS example shows disabling biome without enumerating eight extensions.
-
----
-
-## Residual — Hook / check parity
-
-### `--check` extensionless shebang parity
-
-Hook formats extensionless shell-shebang paths; `runCheck` still uses
-`filepath.Ext` only, so CI skips those files. Wave-2 contract deferred
-this to the same extension-resolution pass as multi-dot Terraform.
-
-**Acceptance**
-
-+ `--check` and the hook agree on extensionless shell-shebang targets.
-
----
-
-## Residual — Hardening (wave-2 audit carry-forwards)
-
-### Defensive nil skip in `Registry.Dispatch`
-
-`Dispatch` indexes `byExt[ext]` with no nil guard; a caller that skips
-`Supported` panics the process. Prefer `Result{Skipped: true}` (or a
-clear Err) over nil deref.
-
-### Tighten black notebook-missing heuristic
-
-`blackNotebookSupportMissing` substring-matches `jupyter`/`notebook` in
-any diagnostic, which can silence unrelated black failures. Prefer
-exit-code/message patterns that only mean the jupyter extra is absent.
-
-### Include notebook in `TestExternalFormatterNames`
-
-`external_test.go` lists external formatter names but omits
-`NewNotebook` / `ruff/black-notebook`.
 
 ---
 

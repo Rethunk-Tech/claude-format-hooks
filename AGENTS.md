@@ -141,11 +141,12 @@ Unchanged from the hand-written per-project hooks this replaces:
   NotebookEdit call reports failure. `--check` is the one deliberate
   exception: it is not a hook invocation, and exists precisely to fail a
   build. It must never share the hook's exit path.
-- **An unsupported real extension is an instant no-op** — one `filepath.Ext`
-  call and one map lookup, nothing else — no `stat`, no `exec.LookPath`,
-  no subprocess, no config read. An extensionless path is the only
-  exception: the hook may read at most 256 bytes to detect a supported shell
-  shebang before deciding whether to route it as `.sh`.
+- **An unsupported real extension is an instant no-op** — one
+  `dispatch.ResolveExtension` call (longest registered suffix, else
+  `filepath.Ext`) and one map lookup, nothing else — no `stat`, no
+  `exec.LookPath`, no subprocess, no config read. An extensionless path is
+  the only exception: the hook may read at most 256 bytes to detect a
+  supported shell shebang before deciding whether to route it as `.sh`.
 - **Anything expensive that rarely changes mid-session is cached for a
   short TTL via `internal/diskcache`**, not recomputed on every
   invocation: a missing external tool binary (`binPathCacheTTL`,

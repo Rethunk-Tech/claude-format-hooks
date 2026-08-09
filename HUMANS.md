@@ -105,6 +105,20 @@ at `~/.claude/hooks/format-dispatch` on POSIX or
 `$CLAUDE_HOOKS_BIN_DIR`'s binary); every other key and hook entry is left
 exactly as it was. A settings.json with no such entry is a no-op.
 
+### Upgrade
+
+```bash
+~/.claude/hooks/format-dispatch --upgrade
+~/.claude/hooks/format-dispatch --upgrade --dry-run
+~/.claude/hooks/format-dispatch.exe --upgrade
+~/.claude/hooks/format-dispatch.exe --upgrade --dry-run
+```
+
+`--upgrade` downloads the latest release binary for the current platform,
+verifies its published SHA-256 checksum, and atomically replaces the
+installed binary. It leaves `settings.json` unchanged. `--dry-run` prints
+the planned release and replacement path without writing anything.
+
 ### Other flags
 
 ```bash
@@ -132,11 +146,13 @@ hanging on stdin — safe to run by hand while debugging.
 | `.py`, `.pyi` | `ruff format` (preferred) or `black` | no (system binary) |
 | `.ipynb` | `ruff format` (preferred) or `black` with notebook support | no (system binary) |
 | `.rs` | `rustfmt` | no (system binary) |
-| `.tf`, `.tfvars` | `terraform fmt` | no (system binary) |
+| `.tf`, `.tfvars`, `.tftest.hcl`, `.tfmock.hcl`, `.tfquery.hcl` | `terraform fmt` | no (system binary) |
 | `.proto` | `buf format -w` | no (system binary) |
 
 Extensionless paths beginning with a `bash`, `sh`, `zsh`, or `dash` shebang
-use the same native shell formatter as `.sh`.
+use the same native shell formatter as `.sh`. Multi-dot Terraform suffixes
+(`.tftest.hcl`, `.tfmock.hcl`, `.tfquery.hcl`) are registered explicitly;
+bare `.hcl`, `.tf.json`, and `.tfvars.json` are not.
 
 Any other extension is an instant no-op. Vendored/build directories and
 anything outside `$CLAUDE_PROJECT_DIR` are always skipped — see
