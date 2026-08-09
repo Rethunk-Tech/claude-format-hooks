@@ -53,6 +53,8 @@ func runCheck(args []string, out, errOut io.Writer) int {
 	}
 	var wouldChange []string
 	var registry *dispatch.Registry
+	var cfg config.Config
+	var cfgLoaded bool
 	for _, abs := range files {
 		ext := dispatch.ResolveExtension(abs)
 		if ext == "" {
@@ -63,16 +65,20 @@ func runCheck(args []string, out, errOut io.Writer) int {
 		if !dispatch.KnownExtension(ext) {
 			continue
 		}
-		if registry == nil {
-			cfg, err := config.Load(configPath())
-			if err != nil {
-				_, _ = fmt.Fprintf(errOut, "format-dispatch: config: %v (using defaults)\n", err)
+		if !cfgLoaded {
+			var loadErr error
+			cfg, loadErr = config.Load(configPath())
+			if loadErr != nil {
+				_, _ = fmt.Fprintf(errOut, "format-dispatch: config: %v (using defaults)\n", loadErr)
 				cfg = config.Default()
 			}
-			if cfg.IsDisabled(ext) {
-				continue
-			}
-			registry = buildRegistry()
+			cfgLoaded = true
+		}
+		if cfg.IsDisabled(ext) {
+			continue
+		}
+		if registry == nil {
+			registry = dispatch.NewRegistry(cfg)
 		}
 		if !registry.Supported(ext) {
 			continue
