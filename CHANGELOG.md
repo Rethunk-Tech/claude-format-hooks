@@ -53,6 +53,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   purely to silence defaults. `sqlfluff` needed no equivalent — it reads
   `~/.sqlfluff` natively, ahead of any project config.
 
+### Documentation
+
+- Documents conditional Biome routing for `.json`, native Go and protobuf
+  support, Windows release targets, installer `ProvisionTools`, and the
+  `--check` CI gate.
+
 ## [0.3.0] - 2026-07-19
 
 ### Added

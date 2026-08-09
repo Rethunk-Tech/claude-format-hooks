@@ -1,8 +1,9 @@
 // Command format-dispatch is a Claude Code PostToolUse hook for
 // Write/Edit/NotebookEdit. It formats/lints the file that was just written,
 // natively in-process where a formatting-fidelity-safe Go implementation
-// exists (JSON, shell), and via each ecosystem's own tool otherwise
-// (biome, markdownlint-cli2, taplo, prettier, sqlfluff).
+// exists (JSON, shell, Go), and via each ecosystem's own tool otherwise
+// (biome, markdownlint-cli2, taplo, prettier, sqlfluff, ruff/black,
+// rustfmt, terraform, buf).
 //
 // Design contract, unchanged from the hand-written hooks this replaces:
 //   - Silent on success — nothing to show, saves tokens in the transcript.

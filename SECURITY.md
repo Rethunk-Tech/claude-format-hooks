@@ -51,7 +51,7 @@ in place — either in-process or by shelling out to a project-local or
   was invoked on or the formatter it dispatches to.
 - Command injection via the arguments passed to external formatters
   (`biome`, `prettier`, `taplo`, `markdownlint-cli2`, `sqlfluff`, `ruff`,
-  `black`, `rustfmt`, `terraform`).
+  `black`, `rustfmt`, `terraform`, `buf`).
 - Path traversal past the `$CLAUDE_PROJECT_DIR` boundary check in
   `cmd/format-dispatch/main.go`.
 

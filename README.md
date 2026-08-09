@@ -36,6 +36,9 @@ Full install steps, prerequisites, and configuration: [HUMANS.md](HUMANS.md).
 - **Native, in-process formatting for JSON, shell, and Go** — no
   subprocess, and (for JSON) source key order is preserved exactly instead
   of alphabetized by a naive Unmarshal+Marshal round-trip.
+- **CI formatting checks with `--check`** — reports files a formatter would
+  change without mutating them, with distinct exit codes for clean, changed,
+  and invalid invocations.
 - **Everything else routed to the real tool** — biome, markdownlint-cli2,
   taplo, and prettier via `bunx`; `sqlfluff`, `ruff`/`black`, `rustfmt`,
   `terraform fmt`, and `buf format` as system binaries — so project config
