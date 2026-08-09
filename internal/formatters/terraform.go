@@ -3,13 +3,13 @@ package formatters
 import "context"
 
 // terraformFormatter shells out to the system terraform binary's `fmt`
-// subcommand for .tf — Terraform/HCL has no Go equivalent invokable
+// subcommand for .tf and .tfvars — Terraform/HCL has no Go equivalent invokable
 // in-process without vendoring HashiCorp's own hclwrite package, and
 // `terraform fmt` is the single canonical formatter for the language:
 // unlike e.g. Kotlin, there's no competing tool to weigh.
 type terraformFormatter struct{}
 
-// NewTerraform returns the terraformFormatter for .tf.
+// NewTerraform returns the terraformFormatter for .tf and .tfvars.
 func NewTerraform() Formatter { return terraformFormatter{} }
 
 func (terraformFormatter) Name() string { return "terraform" }

@@ -79,10 +79,12 @@ func NewRegistry(cfg config.Config) *Registry {
 
 		".sql": sql,
 
-		".py":    python,
-		".rs":    rust,
-		".tf":    terraform,
-		".proto": proto,
+		".py":     python,
+		".pyi":    python,
+		".rs":     rust,
+		".tf":     terraform,
+		".tfvars": terraform,
+		".proto":  proto,
 	}
 	maps.DeleteFunc(all, func(ext string, _ formatters.Formatter) bool { return cfg.IsDisabled(ext) })
 	return &Registry{byExt: all}

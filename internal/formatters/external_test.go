@@ -247,19 +247,26 @@ func TestTerraformFormatterSkipsWhenMissing(t *testing.T) {
 func TestTerraformFormatterSuccessAndFailure(t *testing.T) {
 	isolateDiskCache(t)
 	dir := t.TempDir()
-	abs := filepath.Join(dir, "f.tf")
+	paths := []string{
+		filepath.Join(dir, "f.tf"),
+		filepath.Join(dir, "f.tfvars"),
+	}
 
 	t.Run("success", func(t *testing.T) {
 		writeFakeTool(t, "terraform", "exit 0")
-		res := NewTerraform().Format(t.Context(), dir, abs)
-		qt.Check(t, qt.IsNil(res.Err))
-		qt.Check(t, qt.Equals(res.Diagnostic, ""))
+		for _, abs := range paths {
+			res := NewTerraform().Format(t.Context(), dir, abs)
+			qt.Check(t, qt.IsNil(res.Err), qt.Commentf("path=%q", abs))
+			qt.Check(t, qt.Equals(res.Diagnostic, ""), qt.Commentf("path=%q", abs))
+		}
 	})
 
 	t.Run("failure with no output falls back to the process error", func(t *testing.T) {
 		writeFakeTool(t, "terraform", "exit 1")
-		res := NewTerraform().Format(t.Context(), dir, abs)
-		qt.Check(t, qt.Not(qt.Equals(res.Diagnostic, "")))
+		for _, abs := range paths {
+			res := NewTerraform().Format(t.Context(), dir, abs)
+			qt.Check(t, qt.Not(qt.Equals(res.Diagnostic, "")), qt.Commentf("path=%q", abs))
+		}
 	})
 }
 
