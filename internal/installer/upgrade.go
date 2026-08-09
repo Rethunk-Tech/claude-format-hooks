@@ -194,10 +194,10 @@ func parseReleaseChecksum(checksumFile []byte, assetName string) ([]byte, error)
 		if len(fields) == 0 {
 			continue
 		}
-		if len(fields) > 2 {
+		if len(fields) != 2 {
 			return nil, fmt.Errorf("invalid checksum file")
 		}
-		if len(fields) == 2 && strings.TrimPrefix(fields[1], "*") != assetName {
+		if strings.TrimPrefix(fields[1], "*") != assetName {
 			return nil, fmt.Errorf("checksum file names %q, not %q", strings.TrimPrefix(fields[1], "*"), assetName)
 		}
 		digest, err := hex.DecodeString(fields[0])

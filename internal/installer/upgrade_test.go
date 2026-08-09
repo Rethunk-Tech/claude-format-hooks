@@ -80,6 +80,54 @@ func TestUpgradeHappyPathPreservesModeAndSettings(t *testing.T) {
 	}
 }
 
+func TestParseReleaseChecksumRequiresNamedAsset(t *testing.T) {
+	assetName := "format-dispatch-linux-amd64"
+	digest := sha256.Sum256([]byte("release binary"))
+
+	tests := []struct {
+		name         string
+		checksumFile string
+		wantErr      bool
+	}{
+		{
+			name:         "digest only",
+			checksumFile: fmt.Sprintf("%x\n", digest),
+			wantErr:      true,
+		},
+		{
+			name:         "wrong asset name",
+			checksumFile: fmt.Sprintf("%x  other-binary\n", digest),
+			wantErr:      true,
+		},
+		{
+			name:         "named asset",
+			checksumFile: fmt.Sprintf("%x  %s\n", digest, assetName),
+		},
+		{
+			name:         "starred asset name",
+			checksumFile: fmt.Sprintf("%x  *%s\n", digest, assetName),
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got, err := parseReleaseChecksum([]byte(tt.checksumFile), assetName)
+			if tt.wantErr {
+				if err == nil {
+					t.Fatal("parseReleaseChecksum error = nil, want error")
+				}
+				return
+			}
+			if err != nil {
+				t.Fatal(err)
+			}
+			if !bytes.Equal(got, digest[:]) {
+				t.Fatalf("parsed digest = %x, want %x", got, digest)
+			}
+		})
+	}
+}
+
 func TestUpgradeChecksumMismatchLeavesBinaryUntouched(t *testing.T) {
 	binary := []byte("new release binary\n")
 	server, _, _, _ := upgradeTestServer(t, binary, []byte("different binary\n"))
