@@ -2,7 +2,7 @@ package formatters
 
 import "context"
 
-// pythonFormatter shells out to ruff or black for .py — Python has no Go
+// pythonFormatter shells out to ruff or black for .py and .pyi — Python has no Go
 // equivalent, so this stays external. ruff format is preferred: it's a
 // much faster, actively-developed drop-in for black's own formatting
 // mode and has become the de facto standard; black is tried as a
@@ -10,7 +10,7 @@ import "context"
 // PATH runs; if both are, ruff wins.
 type pythonFormatter struct{}
 
-// NewPython returns the pythonFormatter for .py.
+// NewPython returns the pythonFormatter for .py and .pyi.
 func NewPython() Formatter { return pythonFormatter{} }
 
 func (pythonFormatter) Name() string { return "ruff/black" }

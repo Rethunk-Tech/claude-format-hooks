@@ -186,27 +186,36 @@ func TestPythonFormatterPrefersRuffOverBlack(t *testing.T) {
 	qt.Assert(t, qt.IsNil(os.WriteFile(blackPath, []byte("#!/bin/sh\nexit 1\n"), 0o755))) //nolint:gosec // test fixture
 	t.Setenv("PATH", dir)
 
-	abs := filepath.Join(t.TempDir(), "f.py")
-	res := NewPython().Format(t.Context(), t.TempDir(), abs)
-	qt.Check(t, qt.IsNil(res.Err))
-	qt.Check(t, qt.Equals(res.Diagnostic, ""), qt.Commentf("black would have failed; ruff must have run instead"))
+	fileDir := t.TempDir()
+	for _, name := range []string{"f.py", "f.pyi"} {
+		abs := filepath.Join(fileDir, name)
+		res := NewPython().Format(t.Context(), fileDir, abs)
+		qt.Check(t, qt.IsNil(res.Err), qt.Commentf("path=%q", abs))
+		qt.Check(t, qt.Equals(res.Diagnostic, ""), qt.Commentf("black would have failed; ruff must have run instead for %q", abs))
+	}
 }
 
 func TestPythonFormatterFallsBackToBlack(t *testing.T) {
 	isolateDiskCache(t)
 	writeFakeTool(t, "black", "exit 0")
-	abs := filepath.Join(t.TempDir(), "f.py")
-	res := NewPython().Format(t.Context(), t.TempDir(), abs)
-	qt.Check(t, qt.IsNil(res.Err))
-	qt.Check(t, qt.Equals(res.Diagnostic, ""))
+	dir := t.TempDir()
+	for _, name := range []string{"f.py", "f.pyi"} {
+		abs := filepath.Join(dir, name)
+		res := NewPython().Format(t.Context(), dir, abs)
+		qt.Check(t, qt.IsNil(res.Err), qt.Commentf("path=%q", abs))
+		qt.Check(t, qt.Equals(res.Diagnostic, ""), qt.Commentf("path=%q", abs))
+	}
 }
 
 func TestPythonFormatterFailure(t *testing.T) {
 	isolateDiskCache(t)
 	writeFakeTool(t, "ruff", "exit 1")
-	abs := filepath.Join(t.TempDir(), "f.py")
-	res := NewPython().Format(t.Context(), t.TempDir(), abs)
-	qt.Check(t, qt.Not(qt.Equals(res.Diagnostic, "")))
+	dir := t.TempDir()
+	for _, name := range []string{"f.py", "f.pyi"} {
+		abs := filepath.Join(dir, name)
+		res := NewPython().Format(t.Context(), dir, abs)
+		qt.Check(t, qt.Not(qt.Equals(res.Diagnostic, "")), qt.Commentf("path=%q", abs))
+	}
 }
 
 func TestRustFormatterSkipsWhenMissing(t *testing.T) {
