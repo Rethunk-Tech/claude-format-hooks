@@ -3,7 +3,9 @@ package formatters
 import (
 	"os"
 	"path/filepath"
+	"runtime"
 	"strings"
+	"sync"
 	"testing"
 
 	"github.com/go-quicktest/qt"
@@ -47,4 +49,58 @@ func TestResolveSQLFluffConfigIsIdempotent(t *testing.T) {
 func TestSQLFluffNoDialectDiagnostic(t *testing.T) {
 	qt.Check(t, qt.IsTrue(sqlfluffNoDialect("User Error: No dialect was specified")))
 	qt.Check(t, qt.IsFalse(sqlfluffNoDialect("All Finished!")))
+}
+
+func TestSQLFluffFormatMaterializesUserConfig(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("fake shell-script tools are POSIX-shell only")
+	}
+	resetSQLFluffConfigForTest()
+	isolateDiskCache(t)
+	home := t.TempDir()
+	t.Setenv("HOME", home)
+	writeFakeTool(t, "sqlfluff", "exit 0")
+	dir := t.TempDir()
+	abs := filepath.Join(dir, "f.sql")
+	qt.Assert(t, qt.IsNil(os.WriteFile(abs, []byte("select 1;\n"), 0o644))) //nolint:gosec // test fixture
+
+	res := NewSQLFluff().Format(t.Context(), dir, abs)
+
+	qt.Check(t, qt.IsFalse(res.Skipped))
+	qt.Check(t, qt.IsNil(res.Err))
+	qt.Check(t, qt.Equals(res.Diagnostic, ""))
+	written, err := os.ReadFile(filepath.Join(home, userSQLFluffConfigFile)) //nolint:gosec // path is the temp home this test just configured
+	qt.Assert(t, qt.IsNil(err))
+	qt.Check(t, qt.DeepEquals(written, sqlfluffDefaults))
+}
+
+func TestSQLFluffFormatPreservesExistingUserConfig(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("fake shell-script tools are POSIX-shell only")
+	}
+	resetSQLFluffConfigForTest()
+	isolateDiskCache(t)
+	home := t.TempDir()
+	t.Setenv("HOME", home)
+	existing := []byte("[sqlfluff]\ndialect = postgres\n")
+	configPath := filepath.Join(home, userSQLFluffConfigFile)
+	qt.Assert(t, qt.IsNil(os.WriteFile(configPath, existing, 0o600))) //nolint:gosec // test fixture
+	writeFakeTool(t, "sqlfluff", "exit 0")
+	dir := t.TempDir()
+	abs := filepath.Join(dir, "f.sql")
+	qt.Assert(t, qt.IsNil(os.WriteFile(abs, []byte("select 1;\n"), 0o644))) //nolint:gosec // test fixture
+
+	res := NewSQLFluff().Format(t.Context(), dir, abs)
+
+	qt.Check(t, qt.IsFalse(res.Skipped))
+	qt.Check(t, qt.IsNil(res.Err))
+	qt.Check(t, qt.Equals(res.Diagnostic, ""))
+	written, err := os.ReadFile(configPath) //nolint:gosec // path is the temp home this test just configured
+	qt.Assert(t, qt.IsNil(err))
+	qt.Check(t, qt.DeepEquals(written, existing))
+}
+
+func resetSQLFluffConfigForTest() {
+	sqlfluffConfigOnce = sync.Once{}
+	sqlfluffConfigPath = ""
 }

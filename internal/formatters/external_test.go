@@ -163,6 +163,7 @@ func TestBiomeFormatFailureTruncatesDiagnostic(t *testing.T) {
 
 func TestSQLFluffFormatSuccessAndFailure(t *testing.T) {
 	isolateDiskCache(t)
+	t.Setenv("HOME", t.TempDir())
 	dir := t.TempDir()
 	abs := filepath.Join(dir, "f.sql")
 
