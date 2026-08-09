@@ -18,6 +18,7 @@ func TestSupported(t *testing.T) {
 		".ts", ".tsx", ".js", ".jsx", ".mjs", ".cjs", ".mts", ".cts", ".css", ".jsonc",
 		".md", ".mdx", ".markdown", ".toml", ".yaml", ".yml", ".html", ".scss", ".less",
 		".graphql", ".gql", ".sql", ".py", ".pyi", ".ipynb", ".rs", ".tf", ".tfvars",
+		".tftest.hcl", ".tfmock.hcl", ".tfquery.hcl",
 	}
 	for _, ext := range supported {
 		qt.Check(t, qt.IsTrue(r.Supported(ext)), qt.Commentf("ext=%q", ext))
@@ -53,6 +54,22 @@ func TestKnownExtensionIgnoresDisabled(t *testing.T) {
 	qt.Check(t, qt.IsTrue(KnownExtension(".sql")))
 }
 
+func TestTerraformMultiDotExtensionsRespectExactDisables(t *testing.T) {
+	cfg := config.Default()
+	cfg.Disabled = []string{".hcl"}
+	r := NewRegistry(cfg)
+
+	for _, ext := range []string{".tftest.hcl", ".tfmock.hcl", ".tfquery.hcl"} {
+		qt.Check(t, qt.IsTrue(r.Supported(ext)), qt.Commentf("ext=%q", ext))
+	}
+	qt.Check(t, qt.IsFalse(r.Supported(".hcl")))
+
+	cfg.Disabled = []string{".tftest.hcl"}
+	r = NewRegistry(cfg)
+	qt.Check(t, qt.IsFalse(r.Supported(".tftest.hcl")))
+	qt.Check(t, qt.IsTrue(r.Supported(".tfmock.hcl")))
+}
+
 func TestName(t *testing.T) {
 	r := NewRegistry(config.Default())
 
@@ -86,6 +103,15 @@ func TestDispatchUsesCallerResolvedExtensionForExtensionlessPath(t *testing.T) {
 
 	qt.Assert(t, qt.IsNil(result.Err))
 	qt.Check(t, qt.Equals(result.Diagnostic, ""))
+}
+
+func TestDispatchSkipsMissingFormatter(t *testing.T) {
+	r := NewRegistry(config.Default())
+
+	result := r.Dispatch(t.Context(), "", "", ".unknown")
+
+	qt.Check(t, qt.IsTrue(result.Skipped))
+	qt.Check(t, qt.IsNil(result.Err))
 }
 
 func TestInVendoredDir(t *testing.T) {

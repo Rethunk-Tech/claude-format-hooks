@@ -80,13 +80,16 @@ func NewRegistry(cfg config.Config) *Registry {
 
 		".sql": sql,
 
-		".py":     python,
-		".pyi":    python,
-		".ipynb":  notebook,
-		".rs":     rust,
-		".tf":     terraform,
-		".tfvars": terraform,
-		".proto":  proto,
+		".py":          python,
+		".pyi":         python,
+		".ipynb":       notebook,
+		".rs":          rust,
+		".tf":          terraform,
+		".tfvars":      terraform,
+		".tftest.hcl":  terraform,
+		".tfmock.hcl":  terraform,
+		".tfquery.hcl": terraform,
+		".proto":       proto,
 	}
 	maps.DeleteFunc(all, func(ext string, _ formatters.Formatter) bool { return cfg.IsDisabled(ext) })
 	return &Registry{byExt: all}
@@ -161,7 +164,13 @@ func InVendoredDir(relPath string) bool {
 // already have confirmed Supported(ext) and !InVendoredDir(...);
 // Dispatch does not re-check either.
 func (r *Registry) Dispatch(ctx context.Context, projectRoot, abs, ext string) formatters.Result {
+	if r == nil {
+		return formatters.Result{Skipped: true}
+	}
 	f := r.byExt[strings.ToLower(ext)]
+	if f == nil {
+		return formatters.Result{Skipped: true}
+	}
 	return f.Format(ctx, projectRoot, abs)
 }
 
