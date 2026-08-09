@@ -76,6 +76,32 @@ func TestBunxFormattersSkipWhenBunxMissing(t *testing.T) {
 	}
 }
 
+func TestPathFormattersRunWithoutBunx(t *testing.T) {
+	isolateDiskCache(t)
+	dir := t.TempDir()
+	cases := []struct {
+		name string
+		new  func() Formatter
+		file string
+	}{
+		{"biome", NewBiome, "f.ts"},
+		{"markdownlint-cli2", NewMarkdown, "f.md"},
+		{"taplo", NewTOML, "f.toml"},
+		{"prettier", NewPrettier, "f.yaml"},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			writeFakeTool(t, tc.name, "exit 0")
+			abs := filepath.Join(dir, tc.file)
+			res := tc.new().Format(t.Context(), dir, abs)
+			qt.Check(t, qt.IsFalse(res.Skipped))
+			qt.Check(t, qt.IsNil(res.Err))
+			qt.Check(t, qt.Equals(res.Diagnostic, ""))
+		})
+	}
+}
+
 func TestBunxFormatterSuccessAndFailure(t *testing.T) {
 	isolateDiskCache(t)
 	dir := t.TempDir()

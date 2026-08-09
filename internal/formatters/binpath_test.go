@@ -48,6 +48,18 @@ func TestLookPathFreshMissMasksASubsequentInstall(t *testing.T) {
 	qt.Check(t, qt.IsNotNil(err), qt.Commentf("fresh negative cache entry should short-circuit the recheck"))
 }
 
+func TestLookPathMissesAreIndependentByBinaryName(t *testing.T) {
+	isolateDiskCache(t)
+	clearPath(t)
+
+	_, err := lookPath("missing-first-binary")
+	qt.Assert(t, qt.IsNotNil(err))
+
+	writeFakeTool(t, "available-second-binary", "exit 0")
+	_, err = lookPath("available-second-binary")
+	qt.Check(t, qt.IsNil(err), qt.Commentf("a miss for one binary must not mask another binary"))
+}
+
 func TestLookPathRechecksAfterTTLExpires(t *testing.T) {
 	isolateDiskCache(t)
 	writeFakeTool(t, "was-missing-now-stale", "exit 0")
