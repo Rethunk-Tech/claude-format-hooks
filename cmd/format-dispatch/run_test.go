@@ -257,6 +257,55 @@ func TestRunUnsupportedExtensionIsNoop(t *testing.T) {
 	qt.Check(t, qt.Equals(readFile(t, abs), "irrelevant"))
 }
 
+func TestRunDispatchesExtensionlessShellShebang(t *testing.T) {
+	projectRoot := t.TempDir()
+	abs := filepath.Join(projectRoot, "script")
+	src := "#!/usr/bin/env bash\necho    hello\n"
+	writeFile(t, abs, src)
+
+	t.Setenv("CLAUDE_PROJECT_DIR", projectRoot)
+	qt.Check(t, qt.Equals(run(strings.NewReader(payload(abs))), 0))
+	got := readFile(t, abs)
+	qt.Check(t, qt.StringContains(got, "#!/usr/bin/env bash"))
+	qt.Check(t, qt.IsFalse(got == src), qt.Commentf("shell shebang file should be formatted"))
+}
+
+func TestRunExtensionlessNonShellFilesAreNoop(t *testing.T) {
+	cases := []struct {
+		name string
+		src  string
+	}{
+		{"non-shell shebang", "#!/usr/bin/env python\nprint('hello')\n"},
+		{"no shebang", "plain text\n"},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			projectRoot := t.TempDir()
+			abs := filepath.Join(projectRoot, "script")
+			writeFile(t, abs, tc.src)
+
+			t.Setenv("CLAUDE_PROJECT_DIR", projectRoot)
+			qt.Check(t, qt.Equals(run(strings.NewReader(payload(abs))), 0))
+			qt.Check(t, qt.Equals(readFile(t, abs), tc.src))
+		})
+	}
+}
+
+func TestRunRealExtensionsSkipWithoutShebangPeek(t *testing.T) {
+	for _, ext := range []string{".ts", ".md"} {
+		t.Run(ext, func(t *testing.T) {
+			projectRoot := t.TempDir()
+			abs := filepath.Join(projectRoot, "missing"+ext)
+			logPath := filepath.Join(t.TempDir(), "format-dispatch.log")
+
+			t.Setenv("CLAUDE_PROJECT_DIR", projectRoot)
+			t.Setenv("CLAUDE_FORMAT_HOOKS_LOG", logPath)
+			qt.Check(t, qt.Equals(run(strings.NewReader(payload(abs))), 0))
+			qt.Check(t, qt.StringContains(readFile(t, logPath), "skip: stat failed or is a directory"))
+		})
+	}
+}
+
 func TestRunOutsideProjectRootIsSkipped(t *testing.T) {
 	projectRoot := t.TempDir()
 	outside := t.TempDir()
