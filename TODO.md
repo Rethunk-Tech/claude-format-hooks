@@ -24,42 +24,51 @@ nil-safe `Dispatch`; black notebook-missing heuristic tighten;
 temps, offline `--upgrade --dry-run`, Windows in-use note, coverage for
 multi-dot `--check` / nil Dispatch / upgrade asset errors.
 
+Wave 4 (2026-08-09) landed: named checksum lines + 64 MiB upgrade
+download cap + `CLAUDE_FORMAT_HOOKS_RELEASE_API`; black notebook
+ModuleNotFoundError-shaped skip; precomputed `registeredSuffixes`;
+`--check` lazy registry; CLI `--upgrade` happy-path test;
+`install.sh --upgrade` (+ dry-run) with unrecognized-arg reject; HUMANS
+env docs. Fixup: document release API override trust.
+
 ---
 
-## Residual — Wave-3 audit carry-forwards (optional)
+## Residual — Wave-4 audit carry-forwards (optional)
 
-### Reject anonymous one-field checksum lines in Upgrade
+### Prefer HTTP status over size-limit on oversized error bodies
 
-`parseReleaseChecksum` currently accepts a digest-only line. Prefer
-requiring the filename field to match the expected asset (release.yml
-already emits two-field `sha256sum` lines).
+`fetchHTTP` can return a size-limit error for a non-2xx body larger than
+the cap before surfacing `HTTP 403`/`404`. Reorder or separately cap
+error-body reads.
 
-### Cap Upgrade download size
+### Tighten black skip around dotted module names
 
-`fetchHTTP` reads the full asset into memory with no Content-Length /
-max-bytes guard.
+`no module named nbformat.core` can still classify as missing notebook
+extras (prefix match before `.`). Prefer end-of-token only for the exact
+module names.
 
-### Tighten `no module named jupyter` black skip further
+### CLI `--upgrade --dry-run` success path
 
-Still a substring match; prose mentioning jupyter could over-skip.
+Happy-path covers live upgrade via `dispatchArgs`; add a parallel
+`--upgrade --dry-run` CLI test (library dry-run already covered).
 
-### Precompute longest-suffix list for ResolveExtension
+### fetchHTTP non-2xx unit coverage
 
-Hot path iterates every `knownExtensions` key per invocation.
+Oversized bodies are tested; small 403/404 bodies are not.
 
-### CLI-level `--upgrade` happy-path test
+### Notebook ModuleNotFoundError fixture lines
 
-Library covered via httptest; `runUpgrade` success path through
-`dispatchArgs` is not.
+Runtime lowercasing matches `ModuleNotFoundError: No module named …`;
+committed tests do not include that prefix.
 
-### `install.sh --upgrade` convenience
+### ResolveExtension empty-path case
 
-Operators using only the shell wrapper must discover the binary flag.
+`""` falls through to `filepath.Ext`; add an explicit unit row.
 
-### `--check` KnownExtension before config load
+### `--check` skip config for disabled-but-known extensions
 
-`runCheck` always `buildRegistry` first; hook can bail earlier on unknown
-exts. Behavioral parity holds; CI cost only.
+`KnownExtension` still loads the registry before `Supported` returns
+false for user-disabled extensions. CI cost only; matches the hook.
 
 ---
 
