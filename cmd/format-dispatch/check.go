@@ -184,26 +184,45 @@ func copyBeside(abs string, content []byte) (path string, cleanup func(), err er
 // runs is meaningful.
 func collectCheckTargets(paths []string) ([]string, error) {
 	seen := map[string]bool{}
+	projectRoot := os.Getenv("CLAUDE_PROJECT_DIR")
+	if projectRoot != "" {
+		if abs, err := filepath.Abs(projectRoot); err == nil {
+			projectRoot = abs
+		}
+	}
+	vendorRoot, err := os.Getwd()
+	if err != nil {
+		vendorRoot = ""
+	}
 
 	// InVendoredDir matches path SEGMENTS, so it must be given a path
-	// relative to what the caller asked about -- handing it an absolute path
-	// would let an unrelated ancestor directory named "build" or "vendor"
-	// silently exclude the whole run.
+	// relative to the project or working directory -- handing it an absolute
+	// path would let an unrelated ancestor directory named "build" or
+	// "vendor" silently exclude the whole run.
 	add := func(root, p string) {
 		// copyBeside uses this prefix; ignoring it here keeps leftovers from
 		// an interrupted check out of the next target set.
 		if strings.HasPrefix(filepath.Base(p), ".fmtcheck-") {
 			return
 		}
-		rel, err := filepath.Rel(root, p)
-		if err != nil {
-			rel = filepath.Base(p)
-		}
-		if dispatch.InVendoredDir(rel) {
-			return
-		}
 		abs, err := filepath.Abs(p)
 		if err != nil {
+			return
+		}
+		if projectRoot != "" && !within(abs, projectRoot) {
+			return
+		}
+		relRoot := vendorRoot
+		if projectRoot != "" {
+			relRoot = projectRoot
+		} else if relRoot == "" {
+			relRoot = root
+		}
+		rel, err := filepath.Rel(relRoot, abs)
+		if err != nil {
+			rel = filepath.Base(abs)
+		}
+		if dispatch.InVendoredDir(rel) {
 			return
 		}
 		seen[abs] = true
@@ -216,6 +235,21 @@ func collectCheckTargets(paths []string) ([]string, error) {
 		}
 		if !info.IsDir() {
 			add(filepath.Dir(p), p)
+			continue
+		}
+		absDir, err := filepath.Abs(p)
+		if err != nil {
+			continue
+		}
+		if projectRoot != "" && !within(absDir, projectRoot) {
+			continue
+		}
+		relRoot := vendorRoot
+		if projectRoot != "" {
+			relRoot = projectRoot
+		}
+		rel, relErr := filepath.Rel(relRoot, absDir)
+		if relErr == nil && dispatch.InVendoredDir(rel) {
 			continue
 		}
 		err = filepath.WalkDir(p, func(path string, d fs.DirEntry, err error) error { //nolint:gosec // walking an operator-supplied directory is the entire contract

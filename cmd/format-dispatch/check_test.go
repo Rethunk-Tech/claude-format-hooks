@@ -218,6 +218,18 @@ func TestCheckSkipsVendoredDirectories(t *testing.T) {
 	qt.Check(t, qt.Equals(runCheck([]string{dir}, &out, &errOut), 0))
 }
 
+func TestCollectCheckTargetsSkipsDirectOutsideAndVendoredFiles(t *testing.T) {
+	projectRoot := t.TempDir()
+	outsideRoot := t.TempDir()
+	vendored := writeCheckFile(t, filepath.Join(projectRoot, "node_modules", "pkg"), "dep.json", unformattedJSON)
+	outside := writeCheckFile(t, outsideRoot, "outside.json", unformattedJSON)
+	t.Setenv("CLAUDE_PROJECT_DIR", projectRoot)
+
+	targets, err := collectCheckTargets([]string{vendored, outside})
+	qt.Assert(t, qt.IsNil(err))
+	qt.Check(t, qt.DeepEquals(targets, []string{}))
+}
+
 func TestCheckRejectsNoPaths(t *testing.T) {
 	var out, errOut bytes.Buffer
 	// 2, not 1: "you invoked me wrong" must be distinguishable from
