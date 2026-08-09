@@ -10,8 +10,9 @@ import (
 	"github.com/Rethunk-Tech/claude-format-hooks/internal/diskcache"
 )
 
-// biomeFormatter shells out to `bunx @biomejs/biome check --write` for JS/TS/JSX/
-// TSX/CSS/JSONC. Biome (Rust) has no Go bindings, so this stays external.
+// biomeFormatter shells out to Biome's CLI for JS/TS/JSX/TSX/CSS/JSONC,
+// preferring a provisioned `biome` binary and falling back to bunx. Biome
+// (Rust) has no Go bindings, so this stays external.
 //
 // It walks up from the file to the nearest biome.json/biome.jsonc and runs
 // from that directory, so monorepos with a nested config (e.g. a package

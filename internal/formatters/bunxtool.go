@@ -2,12 +2,13 @@ package formatters
 
 import "context"
 
-// bunxFormatter runs a bunx-published CLI formatter against a single file
-// from the project root, for tools with no practical native Go equivalent
-// that preserves formatting fidelity (markdownlint-cli2's fix rules,
-// taplo's TOML formatting, prettier's YAML/HTML formatting). Run from
-// projectRoot so bunx resolves the repo's local devDependency version
-// instead of fetching a fresh one from the registry each time.
+// bunxFormatter runs a bunx-published CLI formatter against a single file,
+// preferring a provisioned CLI binary and falling back to bunx, for tools with
+// no practical native Go equivalent that preserves formatting fidelity
+// (markdownlint-cli2's fix rules, taplo's TOML formatting, prettier's YAML/HTML
+// formatting). Run from projectRoot so bunx resolves the repo's local
+// devDependency version instead of fetching a fresh one from the registry each
+// time.
 type bunxFormatter struct {
 	name     string
 	pathArgs func(abs string) []string
