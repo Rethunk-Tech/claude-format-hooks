@@ -38,7 +38,7 @@ Update `CHANGELOG.md` (move `[Unreleased]` into a new dated version
 section, add the compare links at the bottom) and push a matching
 annotated `vX.Y.Z` tag. The tag push triggers
 [`.github/workflows/release.yml`](.github/workflows/release.yml), which
-cross-compiles `format-dispatch` for linux/darwin (amd64+arm64) and
+cross-compiles `format-dispatch` for linux/darwin/windows (amd64+arm64) and
 publishes a GitHub Release with the binaries and their sha256sums — no
 manual build/upload step.
 

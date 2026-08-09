@@ -63,8 +63,9 @@ since `bunx` still falls back to fetching on demand.
 arm64) binary from the [latest release](https://github.com/Rethunk-Tech/claude-format-hooks/releases/latest)
 instead of building from source, place it at
 `~/.claude/hooks/format-dispatch`, `chmod +x` it, then run
-`~/.claude/hooks/format-dispatch --install` yourself — `install.sh`'s
-extra steps (the build, and `bunx` cache pre-warming) are just skipped.
+`~/.claude/hooks/format-dispatch --install` yourself. The binary's
+`ProvisionTools` step still runs when `bun` is available; only `install.sh`'s
+Go build wrapper is skipped.
 
 Every real write to `settings.json` (install or uninstall) first backs up
 its current content to a sibling `settings.json.bak` — a single rolling
@@ -100,6 +101,8 @@ format-dispatch --version    # print version and build info (for bug reports)
 format-dispatch --help       # usage
 ```
 
+For CI formatting checks, see [`--check PATH...`](#checking-formatting-in-ci).
+
 An unrecognized flag prints usage to stderr and exits 1, rather than
 hanging on stdin — safe to run by hand while debugging.
 
@@ -107,7 +110,7 @@ hanging on stdin — safe to run by hand while debugging.
 
 | Extension | Formatter | Native? |
 | --- | --- | --- |
-| `.json` | `encoding/json.Indent` | yes |
+| `.json` | `biome check --write` when an upward `biome.json`/`biome.jsonc` is found and `biome` is available through `bunx`/`PATH`; otherwise `encoding/json.Indent` | conditional |
 | `.sh`, `.bash` | `mvdan.cc/sh/v3` | yes |
 | `.go` | `go/format.Source` | yes |
 | `.ts`, `.tsx`, `.js`, `.jsx`, `.mjs`, `.cjs`, `.mts`, `.cts`, `.css`, `.jsonc` | `biome check --write` | no (bunx) |
@@ -228,6 +231,12 @@ success — check the extension is in the [supported table](#supported-extension
 above and not in your `disabled` list or the project's own
 `.claude-format-hooks.json`. If the file lives under a vendored
 directory, it's skipped on purpose.
+
+**A `.json` file used the native formatter.** JSON uses `biome check --write`
+when an upward `biome.json` or `biome.jsonc` is found and `biome` is
+available through `bunx` or `PATH`. Otherwise it uses native
+`encoding/json.Indent`, which preserves source key order and applies the
+configured indentation.
 
 **A diagnostic showed up on stderr.** The formatter ran and failed (e.g.
 malformed syntax it couldn't safely fix). The message is truncated to 10

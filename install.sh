@@ -1,8 +1,7 @@
 #!/usr/bin/env bash
-# Installer for claude-format-hooks: builds the format-dispatch binary and
-# pre-warms bunx's package cache, then delegates the settings.json wiring
-# to the binary's own --install subcommand (native Go via encoding/json,
-# no jq dependency).
+# Installer for claude-format-hooks: builds the format-dispatch binary, then
+# delegates settings.json wiring and ProvisionTools to the binary's own
+# --install subcommand (native Go via encoding/json, no jq dependency).
 #
 # Usage:
 #   ./install.sh              # build + install
