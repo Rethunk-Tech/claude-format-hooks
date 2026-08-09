@@ -117,10 +117,10 @@ var vendoredDirs = map[string]bool{
 	".tox":          true,
 }
 
-// Supported reports whether ext (as returned by filepath.Ext, e.g. ".ts")
-// has a registered, enabled formatter. Callers should check this before
-// doing any other work — an unsupported extension must be an instant
-// no-op: this is a single map read, nothing else.
+// Supported reports whether ext (already resolved, e.g. ".ts" or
+// ".tftest.hcl") has a registered, enabled formatter. Callers should check
+// this before doing any other work — an unsupported extension must be an
+// instant no-op: this is a single map read, nothing else.
 func (r *Registry) Supported(ext string) bool {
 	_, ok := r.byExt[strings.ToLower(ext)]
 	return ok
