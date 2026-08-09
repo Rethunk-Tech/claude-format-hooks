@@ -2,10 +2,13 @@ package main
 
 import (
 	"bytes"
+	"crypto/sha256"
 	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
+	"net/http"
+	"net/http/httptest"
 	"os"
 	"path/filepath"
 	"runtime"
@@ -14,6 +17,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/Rethunk-Tech/claude-format-hooks/internal/installer"
 	"github.com/go-quicktest/qt"
 )
 
@@ -254,6 +258,53 @@ func TestDispatchArgsRoutesUpgrade(t *testing.T) {
 	stderr := captureStderr(t, func() { code = dispatchArgs([]string{"--upgrade", "--bogus"}) })
 	qt.Check(t, qt.Equals(code, 1))
 	qt.Check(t, qt.StringContains(stderr, "format-dispatch --upgrade:"))
+}
+
+func TestDispatchArgsUpgradeHappyPathViaReleaseAPI(t *testing.T) {
+	binary := []byte("new release binary\n")
+	digest := sha256.Sum256(binary)
+
+	dir := t.TempDir()
+	binDir := filepath.Join(dir, "bin")
+	target := installer.HookBinaryPath(binDir)
+	oldBinary := []byte("old release binary\n")
+	qt.Assert(t, qt.IsNil(os.MkdirAll(binDir, 0o700)))
+	qt.Assert(t, qt.IsNil(os.WriteFile(target, oldBinary, 0o751))) //nolint:gosec // test fixture
+
+	assetName := fmt.Sprintf("format-dispatch-%s-%s", runtime.GOOS, runtime.GOARCH)
+	if runtime.GOOS == "windows" {
+		assetName += ".exe"
+	}
+	checksumFile := []byte(fmt.Sprintf("%x  %s\n", digest, assetName))
+
+	var server *httptest.Server
+	server = httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		switch r.URL.Path {
+		case "/repos/Rethunk-Tech/claude-format-hooks/releases/latest":
+			_, _ = fmt.Fprintf(w, `{"tag_name":"v9.9.9","assets":[{"name":%q,"browser_download_url":%q},{"name":%q,"browser_download_url":%q}]}`,
+				assetName, server.URL+"/binary", assetName+".sha256", server.URL+"/checksum")
+		case "/binary":
+			_, _ = w.Write(binary)
+		case "/checksum":
+			_, _ = w.Write(checksumFile)
+		default:
+			http.NotFound(w, r)
+		}
+	}))
+	defer server.Close()
+
+	t.Setenv("CLAUDE_FORMAT_HOOKS_RELEASE_API", server.URL)
+	t.Setenv("CLAUDE_HOOKS_BIN_DIR", binDir)
+	t.Setenv("CLAUDE_SETTINGS_FILE", filepath.Join(dir, "settings.json"))
+
+	var code int
+	stdout := captureStdout(t, func() {
+		code = dispatchArgs([]string{"--upgrade"})
+	})
+	qt.Check(t, qt.Equals(code, 0))
+	qt.Check(t, qt.StringContains(stdout, "upgraded"))
+	qt.Check(t, qt.StringContains(stdout, target))
+	qt.Check(t, qt.Equals(readFile(t, target), string(binary)))
 }
 
 func TestRunInstallReportsActionError(t *testing.T) {
