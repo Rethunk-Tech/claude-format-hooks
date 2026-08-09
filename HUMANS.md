@@ -202,10 +202,11 @@ toolchain:
   not fail the build over them — otherwise CI would gate on something no
   local write could ever repair.
 - **Project opt-out applies.** A `.claude-format-hooks.json` `disabled`
-  list at `$CLAUDE_PROJECT_DIR` (or the check path root) skips those
-  extensions the same way the live hook does, so CI does not fail files
-  the hook would leave alone. Config discovery for tools like biome also
-  uses that project root, not each file's parent directory.
+  or `disabledFormatters` list at `$CLAUDE_PROJECT_DIR` (or the check path
+  root) skips those extensions or formatter names the same way the live hook
+  does, so CI does not fail files the hook would leave alone. Config
+  discovery for tools like biome also uses that project root, not each
+  file's parent directory.
 
 ## Configuration
 
@@ -217,16 +218,20 @@ Three layers, in increasing priority:
 
    ```json
    {
-     "json": { "indentSize": 2, "useTabs": false },
-     "shell": { "indentSize": 2, "useTabs": false, "switchCaseIndent": true },
-     "disabled": [".sql"]
+    "json": { "indentSize": 2, "useTabs": false },
+    "shell": { "indentSize": 2, "useTabs": false, "switchCaseIndent": true },
+    "disabled": [".sql"],
+    "disabledFormatters": ["biome"]
    }
    ```
 
-   `disabled` lists extensions to skip entirely, even if their formatter
-   is installed.
+  `disabled` lists extensions to skip entirely, even if their formatter
+  is installed. `disabledFormatters` lists formatter names to skip,
+  case-insensitively; for example, `"biome"` disables all Biome-owned
+  extensions without enumerating them. It leaves `.json` on the native JSON
+  fallback, while `"json"` disables `.json` entirely.
 
-3. **The target project's `.editorconfig`** — if a section covers the
+1. **The target project's `.editorconfig`** — if a section covers the
    file being formatted, its `indent_style`/`indent_size` win over your
    personal config, the same way every editor and formatter that honors
    EditorConfig behaves. A missing or malformed config file never blocks
@@ -263,25 +268,26 @@ A project can opt a specific formatter out for itself — e.g. it already
 runs its own pre-commit `prettier` with different rules and doesn't want
 this hook's `biome` double-running — without every operator changing
 their global config. Drop a `.claude-format-hooks.json` at the project
-root (same schema as your own config above; only `disabled` is
-consulted — `json`/`shell` indent settings there are ignored, since
-`.editorconfig` already owns that layer):
+root (same schema as your own config above; `disabled` and
+`disabledFormatters` are consulted — `json`/`shell` indent settings there
+are ignored, since `.editorconfig` already owns that layer):
 
 ```json
-{ "disabled": [".ts", ".tsx"] }
+{ "disabledFormatters": ["biome"] }
 ```
 
 A missing file is normal (no project-level opt-out). A malformed one is
 ignored — a diagnostic goes to stderr, and formatting proceeds as if it
-weren't there, same as a malformed user config.
+weren't there, same as a malformed user config. A project-level
+`disabledFormatters` entry uses the formatter's name, not its extensions.
 
 ## Troubleshooting
 
 **Nothing happened after I wrote a file.** That's the default, silent
 success — check the extension is in the [supported table](#supported-extensions)
-above and not in your `disabled` list or the project's own
-`.claude-format-hooks.json`. If the file lives under a vendored
-directory, it's skipped on purpose.
+above and not in your `disabled` or `disabledFormatters` list, or the
+project's own `.claude-format-hooks.json`. If the file lives under a
+vendored directory, it's skipped on purpose.
 
 **A `.json` file used the native formatter.** This is expected unless both an
 upward `biome.json` or `biome.jsonc` and a usable `biome` launcher (`biome` on

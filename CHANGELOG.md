@@ -39,6 +39,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `--install` now provisions the bunx-dispatched formatters globally
   (replacing `install.sh`'s cache pre-warm), so no registry fetch ever
   happens inside the per-file budget.
+- `disabledFormatters` provides case-insensitive formatter-name opt-outs in
+  user and project config. Disabling `biome` covers all Biome-owned
+  extensions while `.json` falls back to native formatting; `--check`
+  applies the same opt-outs as the live hook.
 
 ### Fixed
 
