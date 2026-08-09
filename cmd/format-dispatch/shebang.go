@@ -21,6 +21,7 @@ func shellShebangExt(path string) (string, bool) {
 		return "", false
 	}
 	line := strings.SplitN(string(buf[:n]), "\n", 2)[0]
+	line = strings.TrimRight(line, "\r")
 	if !strings.HasPrefix(line, "#!") {
 		return "", false
 	}
