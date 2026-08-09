@@ -238,11 +238,13 @@ above and not in your `disabled` list or the project's own
 `.claude-format-hooks.json`. If the file lives under a vendored
 directory, it's skipped on purpose.
 
-**A `.json` file used the native formatter.** JSON uses `biome check --write`
-when an upward `biome.json` or `biome.jsonc` is found and `biome` is
-available through `bunx` or `PATH`. Otherwise it uses native
-`encoding/json.Indent`, which preserves source key order and applies the
-configured indentation.
+**A `.json` file used the native formatter.** This is expected unless both an
+upward `biome.json` or `biome.jsonc` and a usable `biome` launcher (`biome` on
+`PATH` or `bunx`) are present. The native `encoding/json.Indent` path runs
+when the config is absent or no launcher is available; it preserves source
+key order and applies the configured indentation. Biome config discovery and
+missing-launcher checks are cached for up to 30 seconds, so allow that TTL
+after adding a config file or installing `biome`/`bun`.
 
 **A diagnostic showed up on stderr.** The formatter ran and failed (e.g.
 malformed syntax it couldn't safely fix). The message is truncated to 10

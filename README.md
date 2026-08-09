@@ -17,9 +17,8 @@ formats/lints a file right after Write/Edit/NotebookEdit writes it
 with no per-repo setup required. Three formatters (JSON, shell, Go) run
 natively in-process; everything else routes to the real,
 project-config-aware tool: biome, prettier, taplo, and markdownlint-cli2
-via `bunx`; `sqlfluff`, `ruff`/`black`, `rustfmt`, `terraform fmt`, and
-`buf format` as
-system binaries.
+from `PATH` first, then via `bunx`; `sqlfluff`, `ruff`/`black`, `rustfmt`,
+`terraform fmt`, and `buf format` as system binaries.
 
 ## Quick start
 
@@ -40,7 +39,8 @@ Full install steps, prerequisites, and configuration: [HUMANS.md](HUMANS.md).
   change without mutating them, with distinct exit codes for clean, changed,
   and invalid invocations.
 - **Everything else routed to the real tool** — biome, markdownlint-cli2,
-  taplo, and prettier via `bunx`; `sqlfluff`, `ruff`/`black`, `rustfmt`,
+  taplo, and prettier from `PATH` first, then via `bunx`; `sqlfluff`,
+  `ruff`/`black`, `rustfmt`,
   `terraform fmt`, and `buf format` as system binaries — so project config
   files are
   honored automatically, with no config-presence gate: every supported

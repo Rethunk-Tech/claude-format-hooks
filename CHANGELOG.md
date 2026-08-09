@@ -50,8 +50,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   layers on top and wins rule by rule.
 
   This closes the gap that made projects carry a `.markdownlint-cli2.jsonc`
-  purely to silence defaults. `sqlfluff` needed no equivalent — it reads
-  `~/.sqlfluff` natively, ahead of any project config.
+  purely to silence defaults.
+
+- SQL defaults. On the first `.sql` write, format-dispatch materializes
+  `~/.sqlfluff` with an ANSI dialect when it does not already exist. Existing
+  user configuration is preserved, and project configuration still wins.
 
 ### Documentation
 
