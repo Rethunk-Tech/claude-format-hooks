@@ -9,14 +9,10 @@ import (
 // suffix, or filepath.Ext when no registered suffix matches.
 func ResolveExtension(path string) string {
 	base := strings.ToLower(filepath.Base(path))
-	var match string
-	for ext := range knownExtensions {
-		if strings.HasSuffix(base, ext) && len(ext) > len(match) {
-			match = ext
+	for _, ext := range registeredSuffixes {
+		if strings.HasSuffix(base, ext) {
+			return ext
 		}
-	}
-	if match != "" {
-		return match
 	}
 	return filepath.Ext(path)
 }

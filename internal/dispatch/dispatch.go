@@ -7,6 +7,7 @@ import (
 	"maps"
 	"path/filepath"
 	"slices"
+	"sort"
 	"strings"
 
 	"github.com/Rethunk-Tech/claude-format-hooks/internal/config"
@@ -132,13 +133,21 @@ func (r *Registry) Supported(ext string) bool {
 // set. Built once from a Registry constructed with an empty Config (so
 // nothing is filtered out) — computing it this way, instead of duplicating
 // the extension list from NewRegistry, means the two can never drift.
-var knownExtensions = func() map[string]bool {
+var knownExtensions, registeredSuffixes = func() (map[string]bool, []string) {
 	r := NewRegistry(config.Config{})
 	exts := make(map[string]bool, len(r.byExt))
+	suffixes := make([]string, 0, len(r.byExt))
 	for ext := range r.byExt {
 		exts[ext] = true
+		suffixes = append(suffixes, ext)
 	}
-	return exts
+	sort.Slice(suffixes, func(i, j int) bool {
+		if len(suffixes[i]) != len(suffixes[j]) {
+			return len(suffixes[i]) > len(suffixes[j])
+		}
+		return suffixes[i] < suffixes[j]
+	})
+	return exts, suffixes
 }()
 
 // KnownExtension reports whether ext is ever handled by any formatter,
