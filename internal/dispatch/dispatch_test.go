@@ -114,6 +114,15 @@ func TestDispatchSkipsMissingFormatter(t *testing.T) {
 	qt.Check(t, qt.IsNil(result.Err))
 }
 
+func TestDispatchNilRegistry(t *testing.T) {
+	var r *Registry
+
+	result := r.Dispatch(t.Context(), "", "", ".json")
+
+	qt.Check(t, qt.IsTrue(result.Skipped))
+	qt.Check(t, qt.IsNil(result.Err))
+}
+
 func TestInVendoredDir(t *testing.T) {
 	cases := []struct {
 		path string

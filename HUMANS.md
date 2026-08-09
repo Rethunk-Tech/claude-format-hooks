@@ -119,6 +119,9 @@ verifies its published SHA-256 checksum, and atomically replaces the
 installed binary. It leaves `settings.json` unchanged. `--dry-run` prints
 the planned release and replacement path without writing anything.
 
+On Windows, replacement may fail while `format-dispatch.exe` is in use. Quit
+Claude Code, close the process holding the binary, and retry.
+
 ### Other flags
 
 ```bash
@@ -171,6 +174,11 @@ walked; vendored directories and unsupported extensions are skipped.
 format-dispatch --check .              # whole tree
 format-dispatch --check src docs/a.md  # specific paths
 ```
+
+Extensionless files with a `bash`, `sh`, `zsh`, or `dash` shebang are checked
+with the native shell formatter. Terraform test, mock, and query files
+(`.tftest.hcl`, `.tfmock.hcl`, and `.tfquery.hcl`) are checked through
+`terraform fmt` as well.
 
 Exit codes are `0` (all formatted), `1` (some files need formatting), and
 `2` (bad invocation, e.g. no paths or a path that does not exist) — so a

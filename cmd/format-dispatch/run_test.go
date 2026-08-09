@@ -281,6 +281,15 @@ func TestRunInstallReportsDefaultOptionsError(t *testing.T) {
 	qt.Check(t, qt.Equals(runInstall(nil, false), 1))
 }
 
+func TestRunUpgradeReportsDefaultOptionsError(t *testing.T) {
+	t.Setenv("HOME", "")
+	t.Setenv("USERPROFILE", "")
+	t.Setenv("CLAUDE_HOOKS_BIN_DIR", "")
+	t.Setenv("CLAUDE_SETTINGS_FILE", "")
+
+	qt.Check(t, qt.Equals(runUpgrade(nil), 1))
+}
+
 func TestRunReadStdinError(t *testing.T) {
 	qt.Check(t, qt.Equals(run(errReader{}), 1))
 }

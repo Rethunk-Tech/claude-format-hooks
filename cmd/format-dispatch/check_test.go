@@ -96,6 +96,35 @@ func TestCheckResolvesExtensionlessShellShebang(t *testing.T) {
 	qt.Check(t, qt.StringContains(out.String(), path))
 }
 
+func TestCheckResolvesTerraformMultiDotExtensions(t *testing.T) {
+	if filepath.Separator == '\\' {
+		t.Skip("fake terraform script is POSIX-shell only")
+	}
+	projectRoot := t.TempDir()
+	configPath := filepath.Join(t.TempDir(), "claude-format-hooks.json")
+	writeFile(t, configPath, `{}`)
+
+	toolDir := t.TempDir()
+	terraform := filepath.Join(toolDir, "terraform")
+	script := "#!/bin/sh\nfor arg in \"$@\"; do\n  case \"$arg\" in\n    *.tftest.hcl|*.tfmock.hcl|*.tfquery.hcl) printf 'formatted\\n' > \"$arg\"; exit 0 ;;\n  esac\ndone\nexit 1\n"
+	qt.Assert(t, qt.IsNil(os.WriteFile(terraform, []byte(script), 0o755))) //nolint:gosec // test fixture
+
+	t.Setenv("CLAUDE_PROJECT_DIR", projectRoot)
+	t.Setenv("CLAUDE_FORMAT_HOOKS_CONFIG", configPath)
+	t.Setenv("PATH", toolDir)
+
+	var paths []string
+	for _, suffix := range []string{".tftest.hcl", ".tfmock.hcl", ".tfquery.hcl"} {
+		paths = append(paths, writeCheckFile(t, projectRoot, "fixture"+suffix, "unformatted\n"))
+	}
+
+	var out, errOut bytes.Buffer
+	qt.Check(t, qt.Equals(runCheck(paths, &out, &errOut), 1))
+	for _, path := range paths {
+		qt.Check(t, qt.StringContains(out.String(), path), qt.Commentf("path=%q", path))
+	}
+}
+
 func TestCheckHonorsProjectConfigDisablesFormatter(t *testing.T) {
 	projectRoot := t.TempDir()
 	path := writeCheckFile(t, projectRoot, "bad.json", unformattedJSON)
