@@ -14,7 +14,7 @@
 //     call reports failure.
 //   - An unsupported extension is an instant no-op: one filepath.Ext call
 //     and one map lookup, nothing else — no stat, no exec.LookPath, no
-//     subprocess.
+//     subprocess. Extensionless files get one bounded shebang peek.
 package main
 
 import (
@@ -219,6 +219,11 @@ func run(stdin io.Reader) int {
 	// filesystem access at all, not even a config load — KnownExtension
 	// needs no Registry to answer.
 	ext := filepath.Ext(path)
+	if ext == "" {
+		if shebangExt, ok := shellShebangExt(path); ok {
+			ext = shebangExt
+		}
+	}
 	if !dispatch.KnownExtension(ext) {
 		logOutcome = "skip: unsupported extension"
 		return 0
