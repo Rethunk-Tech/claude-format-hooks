@@ -74,6 +74,18 @@ func TestBlackNotebookSupportMissingRecognizesMissingExtras(t *testing.T) {
 	}
 }
 
+func TestBlackNotebookSupportMissingRejectsUnrelatedJupyterText(t *testing.T) {
+	for _, diagnostic := range []string{
+		"see jupyter docs",
+		"install jupyter",
+		"No module named jupyterlab",
+		"No module named jupyter_extra",
+	} {
+		qt.Check(t, qt.IsFalse(blackNotebookSupportMissing(diagnostic, "")),
+			qt.Commentf("diagnostic=%q", diagnostic))
+	}
+}
+
 func TestNotebookFormatterReportsUnrelatedNotebookDiagnostic(t *testing.T) {
 	isolateDiskCache(t)
 	writeFakeTool(t, "black", "echo 'notebook formatting failed'; exit 1")
