@@ -231,6 +231,12 @@ Three layers, in increasing priority:
   extensions without enumerating them. It leaves `.json` on the native JSON
   fallback, while `"json"` disables `.json` entirely.
 
+  Canonical formatter names for `disabledFormatters` are:
+  `biome`, `json`, `shfmt`, `gofmt`, `markdownlint-cli2`, `taplo`, `prettier`,
+  `sqlfluff`, `ruff/black`, `ruff/black-notebook`, `rustfmt`, `terraform`,
+  and `buf`. `ruff/black` does not cover notebooks; use
+  `ruff/black-notebook` separately for `.ipynb`.
+
 1. **The target project's `.editorconfig`** — if a section covers the
    file being formatted, its `indent_style`/`indent_size` win over your
    personal config, the same way every editor and formatter that honors
