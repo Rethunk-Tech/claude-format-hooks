@@ -230,6 +230,25 @@ func TestCollectCheckTargetsSkipsDirectOutsideAndVendoredFiles(t *testing.T) {
 	qt.Check(t, qt.DeepEquals(targets, []string{}))
 }
 
+func TestCollectCheckTargetsSkipsNewVendoredCacheDirectories(t *testing.T) {
+	projectRoot := t.TempDir()
+	keep := writeCheckFile(t, projectRoot, "keep.json", formattedJSON)
+	for _, segment := range []string{
+		".terraform",
+		"__pycache__",
+		".ruff_cache",
+		".mypy_cache",
+		".pytest_cache",
+		".tox",
+	} {
+		writeCheckFile(t, filepath.Join(projectRoot, segment), "ignored.json", unformattedJSON)
+	}
+
+	targets, err := collectCheckTargets([]string{projectRoot})
+	qt.Assert(t, qt.IsNil(err))
+	qt.Check(t, qt.DeepEquals(targets, []string{keep}))
+}
+
 func TestCheckRejectsNoPaths(t *testing.T) {
 	var out, errOut bytes.Buffer
 	// 2, not 1: "you invoked me wrong" must be distinguishable from
