@@ -67,6 +67,8 @@ func TestBlackNotebookSupportMissingRecognizesMissingExtras(t *testing.T) {
 		"No module named 'jupyter'",
 		`No module named "jupyter"`,
 		"No module named jupyter",
+		"ModuleNotFoundError: No module named 'nbformat'",
+		"ModuleNotFoundError: no module named jupyter",
 		"black[jupyter] is not installed",
 	} {
 		qt.Check(t, qt.IsTrue(blackNotebookSupportMissing(diagnostic, "")),
