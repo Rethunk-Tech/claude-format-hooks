@@ -83,6 +83,28 @@ func TestGetExpiresAfterMaxAge(t *testing.T) {
 
 	_, ok := Get(dir, "k", time.Minute)
 	qt.Check(t, qt.IsFalse(ok), qt.Commentf("an hour-old entry must not survive a one-minute TTL"))
+	_, err := os.Stat(path)
+	qt.Check(t, qt.IsTrue(os.IsNotExist(err)), qt.Commentf("expired entries should be removed after they are observed"))
+}
+
+func TestGetPrunesExpiredEntriesInTheSameNamespace(t *testing.T) {
+	dir := t.TempDir()
+	freshKey := Key("ns", "fresh")
+	staleKey := Key("ns", "stale")
+	otherKey := Key("other", "stale")
+	stale := strconv.FormatInt(time.Now().Add(-time.Hour).Unix(), 10) + "\nvalue"
+
+	Set(dir, freshKey, "fresh")
+	qt.Assert(t, qt.IsNil(os.WriteFile(filepath.Join(dir, staleKey), []byte(stale), 0o600))) //nolint:gosec // test fixture
+	qt.Assert(t, qt.IsNil(os.WriteFile(filepath.Join(dir, otherKey), []byte(stale), 0o600))) //nolint:gosec // test fixture
+
+	_, ok := Get(dir, freshKey, time.Minute)
+	qt.Assert(t, qt.IsTrue(ok))
+
+	_, err := os.Stat(filepath.Join(dir, staleKey))
+	qt.Check(t, qt.IsTrue(os.IsNotExist(err)), qt.Commentf("expired entries in the requested namespace should be pruned"))
+	_, err = os.Stat(filepath.Join(dir, otherKey))
+	qt.Check(t, qt.IsNil(err), qt.Commentf("pruning must not cross namespace boundaries"))
 }
 
 func TestGetTreatsEntryWithNoNewlineAsAMiss(t *testing.T) {

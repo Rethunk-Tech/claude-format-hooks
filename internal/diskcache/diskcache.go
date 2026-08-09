@@ -53,6 +53,8 @@ func Key(namespace string, parts ...string) string {
 // Get reads the value cached under key within dir, if a cache entry
 // exists and is still within maxAge.
 func Get(dir, key string, maxAge time.Duration) (value string, ok bool) {
+	prune(dir, cacheNamespacePrefix(key), maxAge)
+
 	raw, err := os.ReadFile(filepath.Join(dir, key)) //nolint:gosec // dir/key are our own fixed cache location, never user input
 	if err != nil {
 		return "", false
@@ -66,9 +68,51 @@ func Get(dir, key string, maxAge time.Duration) (value string, ok bool) {
 		return "", false
 	}
 	if time.Since(time.Unix(ts, 0)) >= maxAge {
+		_ = os.Remove(filepath.Join(dir, key))
 		return "", false
 	}
 	return string(raw[i+1:]), true
+}
+
+func cacheNamespacePrefix(key string) string {
+	i := strings.LastIndexByte(key, '-')
+	if i <= 0 {
+		return ""
+	}
+	return key[:i+1]
+}
+
+// prune removes expired entries in key's namespace. Cache cleanup is best
+// effort: a failed read or remove must never block the uncached operation.
+func prune(dir, namespacePrefix string, maxAge time.Duration) {
+	if namespacePrefix == "" {
+		return
+	}
+
+	entries, err := os.ReadDir(dir)
+	if err != nil {
+		return
+	}
+	for _, entry := range entries {
+		if entry.IsDir() || !strings.HasPrefix(entry.Name(), namespacePrefix) {
+			continue
+		}
+
+		path := filepath.Join(dir, entry.Name())
+		raw, err := os.ReadFile(path) //nolint:gosec // dir/path are our own fixed cache location, never user input
+		if err != nil {
+			continue
+		}
+		i := strings.IndexByte(string(raw), '\n')
+		if i < 0 {
+			continue
+		}
+		ts, err := strconv.ParseInt(string(raw[:i]), 10, 64)
+		if err != nil || time.Since(time.Unix(ts, 0)) < maxAge {
+			continue
+		}
+		_ = os.Remove(path)
+	}
 }
 
 // Set records value under key within dir, timestamped now. A failure to
