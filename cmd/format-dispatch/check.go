@@ -53,6 +53,7 @@ func runCheck(args []string, out, errOut io.Writer) int {
 	}
 	var wouldChange []string
 	var registry *dispatch.Registry
+	registryByProjectRoot := make(map[string]*dispatch.Registry)
 	var cfg config.Config
 	var cfgLoaded bool
 	for _, abs := range files {
@@ -90,7 +91,7 @@ func runCheck(args []string, out, errOut io.Writer) int {
 		} else if disabled {
 			continue
 		} else {
-			registryForFile = registryWithProjectConfig(registry, cfg, ext, projectCfg)
+			registryForFile = registryForCheck(registry, cfg, ext, projectCfg, projectRoot, registryByProjectRoot)
 		}
 		fileCtx, fileCancel := context.WithTimeoutCause(ctx, formatterTimeout, errFormatterTimeout)
 		changed, err := wouldReformat(fileCtx, registryForFile, projectRoot, abs, ext)
@@ -113,6 +114,18 @@ func runCheck(args []string, out, errOut io.Writer) int {
 	}
 	_, _ = fmt.Fprintf(out, "format-dispatch --check: %d file(s) need formatting\n", len(wouldChange))
 	return 1
+}
+
+func registryForCheck(registry *dispatch.Registry, userCfg config.Config, ext string, projectCfg config.Config, projectRoot string, cache map[string]*dispatch.Registry) *dispatch.Registry {
+	if !strings.EqualFold(ext, ".json") || !projectCfg.IsFormatterDisabled("biome") {
+		return registryWithProjectConfig(registry, userCfg, ext, projectCfg)
+	}
+	if cached, ok := cache[projectRoot]; ok {
+		return cached
+	}
+	registryForFile := registryWithProjectConfig(registry, userCfg, ext, projectCfg)
+	cache[projectRoot] = registryForFile
+	return registryForFile
 }
 
 // checkProjectRoot preserves the hook's project-root choice when --check is
