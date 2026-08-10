@@ -44,6 +44,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   extensions while `.json` falls back to native formatting; `--check`
   applies the same opt-outs as the live hook.
 
+### Changed
+
+- `--check` reuses the project-biome-disabled registry per project root,
+  avoiding a `NewRegistry` rebuild for each `.json` file.
+
 ### Fixed
 
 - `--check` now resolves multi-dot registered suffixes and extensionless
