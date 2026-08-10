@@ -51,8 +51,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
-- The `--check` multi-JSON memo tests now assert per-`projectRoot` registry
-  reuse and include an upward `biome.json` sibling.
 - `disabledFormatters` entries are trimmed before matching.
 - `--check` now resolves multi-dot registered suffixes and extensionless
   shell shebangs the same way the live hook does, so CI no longer skips
