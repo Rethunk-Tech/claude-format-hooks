@@ -436,6 +436,37 @@ func TestCheckProjectRoot(t *testing.T) {
 				return nil, abs, workingDir
 			},
 		},
+		{
+			name: "directory fallback when working directory is unavailable",
+			setup: func(t *testing.T) ([]string, string, string) {
+				t.Helper()
+				if filepath.Separator == '\\' {
+					t.Skip("removing the current directory is not portable")
+				}
+				t.Setenv("CLAUDE_PROJECT_DIR", "")
+				workingDir := t.TempDir()
+				outside := t.TempDir()
+				abs := filepath.Join(outside, "target.json")
+				t.Chdir(workingDir)
+				qt.Assert(t, qt.IsNil(os.RemoveAll(workingDir)))
+				return []string{"relative-target.json"}, abs, filepath.Dir(abs)
+			},
+		},
+		{
+			name: "configured relative root is returned when working directory is unavailable",
+			setup: func(t *testing.T) ([]string, string, string) {
+				t.Helper()
+				if filepath.Separator == '\\' {
+					t.Skip("removing the current directory is not portable")
+				}
+				workingDir := t.TempDir()
+				t.Chdir(workingDir)
+				qt.Assert(t, qt.IsNil(os.RemoveAll(workingDir)))
+				t.Setenv("CLAUDE_PROJECT_DIR", ".")
+				abs := filepath.Join(t.TempDir(), "target.json")
+				return nil, abs, "."
+			},
+		},
 	}
 
 	for _, tc := range tests {
