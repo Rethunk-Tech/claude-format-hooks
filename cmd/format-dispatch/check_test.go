@@ -394,6 +394,58 @@ func TestCheckProjectConfigMalformedWarnsAndContinues(t *testing.T) {
 	qt.Check(t, qt.Equals(readFile(t, path), unformattedJSON))
 }
 
+func TestCheckProjectRoot(t *testing.T) {
+	tests := []struct {
+		name  string
+		setup func(*testing.T) ([]string, string, string)
+	}{
+		{
+			name: "CLAUDE_PROJECT_DIR is absolute normalized",
+			setup: func(t *testing.T) ([]string, string, string) {
+				t.Helper()
+				workingDir := t.TempDir()
+				t.Chdir(workingDir)
+				projectRoot := filepath.Join(workingDir, "project")
+				qt.Assert(t, qt.IsNil(os.Mkdir(projectRoot, 0o750)))
+				t.Setenv("CLAUDE_PROJECT_DIR", filepath.Join(".", "project"))
+				abs := filepath.Join(projectRoot, "target.json")
+				return nil, abs, projectRoot
+			},
+		},
+		{
+			name: "longest containing path wins and file paths use their directory",
+			setup: func(t *testing.T) ([]string, string, string) {
+				t.Helper()
+				t.Setenv("CLAUDE_PROJECT_DIR", "")
+				projectRoot := t.TempDir()
+				nested := filepath.Join(projectRoot, "nested")
+				qt.Assert(t, qt.IsNil(os.Mkdir(nested, 0o750)))
+				abs := writeCheckFile(t, nested, "target.json", formattedJSON)
+				return []string{projectRoot, abs}, abs, nested
+			},
+		},
+		{
+			name: "working directory wins when no path contains target",
+			setup: func(t *testing.T) ([]string, string, string) {
+				t.Helper()
+				t.Setenv("CLAUDE_PROJECT_DIR", "")
+				workingDir := t.TempDir()
+				t.Chdir(workingDir)
+				outside := t.TempDir()
+				abs := filepath.Join(outside, "target.json")
+				return nil, abs, workingDir
+			},
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			paths, abs, want := tc.setup(t)
+			qt.Check(t, qt.Equals(checkProjectRoot(paths, abs), want))
+		})
+	}
+}
+
 func TestCheckDispatchesNestedBiomeFromProjectRoot(t *testing.T) {
 	if filepath.Separator == '\\' {
 		t.Skip("fake formatter script is POSIX-shell only")
