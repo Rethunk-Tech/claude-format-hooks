@@ -90,6 +90,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Documents conditional Biome routing for `.json`, native Go and protobuf
   support, Windows release targets, installer `ProvisionTools`, and the
   `--check` CI gate.
+- Documents `disabledFormatters` configuration in `HUMANS.md` for user- and
+  project-level formatter opt-outs.
 
 ## [0.3.0] - 2026-07-19
 
