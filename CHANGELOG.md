@@ -51,6 +51,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- `disabledFormatters` entries are trimmed before matching.
 - `--check` now resolves multi-dot registered suffixes and extensionless
   shell shebangs the same way the live hook does, so CI no longer skips
   those targets.
