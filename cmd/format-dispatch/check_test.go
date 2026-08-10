@@ -175,6 +175,23 @@ func TestCheckHonorsProjectConfigDisablesBiomeForJSONRouter(t *testing.T) {
 		qt.Commentf("project-disabled biome must still check native JSON formatting"))
 }
 
+func TestCheckReusesProjectDisabledBiomeRegistryForMultipleJSONFiles(t *testing.T) {
+	projectRoot := t.TempDir()
+	firstPath := writeCheckFile(t, projectRoot, "first.json", unformattedJSON)
+	secondPath := writeCheckFile(t, projectRoot, "second.json", unformattedJSON)
+	writeCheckFile(t, projectRoot, projectConfigFile, `{"disabledFormatters":["biome"]}`)
+	configPath := filepath.Join(t.TempDir(), "claude-format-hooks.json")
+	writeFile(t, configPath, `{}`)
+
+	t.Setenv("CLAUDE_PROJECT_DIR", projectRoot)
+	t.Setenv("CLAUDE_FORMAT_HOOKS_CONFIG", configPath)
+
+	var out, errOut bytes.Buffer
+	qt.Check(t, qt.Equals(runCheck([]string{projectRoot}, &out, &errOut), 1))
+	qt.Check(t, qt.StringContains(out.String(), firstPath))
+	qt.Check(t, qt.StringContains(out.String(), secondPath))
+}
+
 func TestCheckHonorsProjectConfigDisablesBiomeForJSONC(t *testing.T) {
 	projectRoot := t.TempDir()
 	path := writeCheckFile(t, projectRoot, "bad.jsonc", `{"a":1}`)
