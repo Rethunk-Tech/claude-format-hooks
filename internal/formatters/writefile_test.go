@@ -57,6 +57,24 @@ func TestWriteFormattedFollowsSymlinkToTarget(t *testing.T) {
 	qt.Check(t, qt.Equals(info.Mode()&os.ModeSymlink, os.ModeSymlink), qt.Commentf("the symlink node must remain intact"))
 }
 
+func TestWriteFormattedDanglingSymlinkNoOp(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("Windows symlink creation requires elevated privileges")
+	}
+	dir := t.TempDir()
+	target := filepath.Join(dir, "missing-target")
+	link := filepath.Join(dir, "link")
+	qt.Assert(t, qt.IsNil(os.Symlink(target, link)))
+
+	qt.Assert(t, qt.IsNil(writeFormatted(link, []byte("old"), []byte("new"), 0o644)))
+
+	_, err := os.Stat(target)
+	qt.Check(t, qt.IsTrue(os.IsNotExist(err)), qt.Commentf("a dangling symlink must not create its missing target"))
+	info, err := os.Lstat(link)
+	qt.Assert(t, qt.IsNil(err))
+	qt.Check(t, qt.Equals(info.Mode()&os.ModeSymlink, os.ModeSymlink), qt.Commentf("the symlink node must remain intact"))
+}
+
 func TestWriteFormattedSkipsStaleSource(t *testing.T) {
 	path := filepath.Join(t.TempDir(), "f")
 	qt.Assert(t, qt.IsNil(os.WriteFile(path, []byte("newer"), 0o644))) //nolint:gosec // test fixture
