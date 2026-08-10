@@ -55,6 +55,36 @@ deferred.
 
 Wave 8 (2026-08-10) landed: `--check` reuses the project-biome-disabled
 registry per project root; CHANGELOG and fleet resurvey updated.
+Wave 8b polish: `.proto`/`buf` + native `Name()` test coverage;
+CHANGELOG Fixed bullet for `disabledFormatters` trim. Audit: 0 must-fix /
+0 should-fix; optional carry-forwards below.
+
+---
+
+## Residual — Wave-8 audit carry-forwards (optional)
+
+### Prove `--check` registry memoization (not only output parity)
+
+`TestCheckReusesProjectDisabledBiomeRegistryForMultipleJSONFiles` asserts
+both unformatted `.json` files would reformat under project-disabled
+biome. Contracts chose behavior-first; removing the cache would still
+pass. Optional: a call-count or equivalent harness that fails if
+`NewRegistry` rebuilds per file for the same `projectRoot`.
+
+**Acceptance**
+
++ Test fails if the per-`projectRoot` cache is removed, or leave-as-is note
+  that behavioral parity remains the deliberate floor.
+
+### Godoc on `registryForCheck`
+
+`registryForCheck` caches only the project-biome-disabled `.json`
+`NewRegistry` rebuild, keyed by `projectRoot`. A one-line godoc would
+match `registryWithProjectConfig` style.
+
+**Acceptance**
+
++ Short godoc on `registryForCheck`, or leave-as-is.
 
 ---
 
