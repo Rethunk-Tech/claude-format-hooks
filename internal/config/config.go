@@ -91,11 +91,12 @@ func (c Config) IsDisabled(ext string) bool {
 	return slices.ContainsFunc(c.Disabled, func(d string) bool { return strings.EqualFold(d, ext) })
 }
 
-// IsFormatterDisabled reports whether name is in the user's disabled
-// formatter list. Formatter names are matched case-insensitively.
+// IsFormatterDisabled reports whether name appears in a disabled formatter
+// list. User-level and project configuration use this helper. Formatter names
+// are matched case-insensitively.
 func (c Config) IsFormatterDisabled(name string) bool {
 	return slices.ContainsFunc(c.DisabledFormatters, func(d string) bool {
-		return strings.EqualFold(d, name)
+		return strings.EqualFold(strings.TrimSpace(d), name)
 	})
 }
 

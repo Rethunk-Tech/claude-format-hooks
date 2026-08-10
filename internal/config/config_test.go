@@ -71,7 +71,7 @@ func TestIsDisabled(t *testing.T) {
 }
 
 func TestIsFormatterDisabled(t *testing.T) {
-	cfg := Config{DisabledFormatters: []string{"biome", "Ruff/Black"}}
+	cfg := Config{DisabledFormatters: []string{" biome ", " Ruff/Black\t"}}
 
 	qt.Check(t, qt.IsTrue(cfg.IsFormatterDisabled("biome")))
 	qt.Check(t, qt.IsTrue(cfg.IsFormatterDisabled("BIOME")), qt.Commentf("case-insensitive"))
