@@ -77,6 +77,10 @@ func TestIsFormatterDisabled(t *testing.T) {
 	qt.Check(t, qt.IsTrue(cfg.IsFormatterDisabled("BIOME")), qt.Commentf("case-insensitive"))
 	qt.Check(t, qt.IsTrue(cfg.IsFormatterDisabled("ruff/black")), qt.Commentf("case-insensitive against a mixed-case entry"))
 	qt.Check(t, qt.IsFalse(cfg.IsFormatterDisabled("json")))
+
+	// Whitespace-only / empty list entries trim to "" and must not disable a real name.
+	cfgPad := Config{DisabledFormatters: []string{" \t ", ""}}
+	qt.Check(t, qt.IsFalse(cfgPad.IsFormatterDisabled("biome")))
 }
 
 func TestResolveIndentEditorConfigLayering(t *testing.T) {
