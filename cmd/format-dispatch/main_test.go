@@ -6,6 +6,8 @@ import (
 	"testing"
 
 	"github.com/go-quicktest/qt"
+
+	"github.com/Rethunk-Tech/claude-format-hooks/internal/config"
 )
 
 func TestWithin(t *testing.T) {
@@ -72,4 +74,25 @@ func TestConfigPath(t *testing.T) {
 		want := filepath.Join(home, ".claude", "claude-format-hooks.json")
 		qt.Check(t, qt.Equals(configPath(), want))
 	})
+}
+
+func TestProjectRebuildsJSONRegistry(t *testing.T) {
+	cases := []struct {
+		name        string
+		ext         string
+		disabled    []string
+		wantRebuild bool
+	}{
+		{"json with biome disabled", ".json", []string{"biome"}, true},
+		{"json with no disabled formatters", ".json", nil, false},
+		{"uppercase json with biome disabled", ".JSON", []string{"biome"}, true},
+		{"typescript with biome disabled", ".ts", []string{"biome"}, false},
+		{"json with another formatter disabled", ".json", []string{"prettier"}, false},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			cfg := config.Config{DisabledFormatters: tc.disabled}
+			qt.Check(t, qt.Equals(projectRebuildsJSONRegistry(tc.ext, cfg), tc.wantRebuild))
+		})
+	}
 }
