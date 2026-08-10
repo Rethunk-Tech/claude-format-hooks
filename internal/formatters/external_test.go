@@ -292,6 +292,9 @@ func TestTerraformFormatterSuccessAndFailure(t *testing.T) {
 	paths := []string{
 		filepath.Join(dir, "f.tf"),
 		filepath.Join(dir, "f.tfvars"),
+		filepath.Join(dir, "f.tftest.hcl"),
+		filepath.Join(dir, "f.tfmock.hcl"),
+		filepath.Join(dir, "f.tfquery.hcl"),
 	}
 
 	t.Run("success", func(t *testing.T) {
