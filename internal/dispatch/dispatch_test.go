@@ -10,17 +10,18 @@ import (
 	"github.com/Rethunk-Tech/claude-format-hooks/internal/config"
 )
 
+var supportedExtensions = []string{
+	".json", ".sh", ".bash", ".go",
+	".ts", ".tsx", ".js", ".jsx", ".mjs", ".cjs", ".mts", ".cts", ".css", ".jsonc",
+	".md", ".mdx", ".markdown", ".toml", ".yaml", ".yml", ".html", ".scss", ".less",
+	".graphql", ".gql", ".sql", ".py", ".pyi", ".ipynb", ".rs", ".tf", ".tfvars",
+	".tftest.hcl", ".tfmock.hcl", ".tfquery.hcl", ".proto",
+}
+
 func TestSupported(t *testing.T) {
 	r := NewRegistry(config.Default())
 
-	supported := []string{
-		".json", ".sh", ".bash", ".go",
-		".ts", ".tsx", ".js", ".jsx", ".mjs", ".cjs", ".mts", ".cts", ".css", ".jsonc",
-		".md", ".mdx", ".markdown", ".toml", ".yaml", ".yml", ".html", ".scss", ".less",
-		".graphql", ".gql", ".sql", ".py", ".pyi", ".ipynb", ".rs", ".tf", ".tfvars",
-		".tftest.hcl", ".tfmock.hcl", ".tfquery.hcl", ".proto",
-	}
-	for _, ext := range supported {
+	for _, ext := range supportedExtensions {
 		qt.Check(t, qt.IsTrue(r.Supported(ext)), qt.Commentf("ext=%q", ext))
 	}
 
@@ -90,50 +91,55 @@ func TestTerraformMultiDotExtensionsRespectExactDisables(t *testing.T) {
 func TestName(t *testing.T) {
 	r := NewRegistry(config.Default())
 
-	cases := []struct {
+	want := map[string]string{
+		".json":        "json",
+		".sh":          "shfmt",
+		".bash":        "shfmt",
+		".go":          "gofmt",
+		".ts":          "biome",
+		".tsx":         "biome",
+		".js":          "biome",
+		".jsx":         "biome",
+		".mjs":         "biome",
+		".cjs":         "biome",
+		".mts":         "biome",
+		".cts":         "biome",
+		".css":         "biome",
+		".jsonc":       "biome",
+		".md":          "markdownlint-cli2",
+		".mdx":         "markdownlint-cli2",
+		".markdown":    "markdownlint-cli2",
+		".toml":        "taplo",
+		".yaml":        "prettier",
+		".yml":         "prettier",
+		".html":        "prettier",
+		".scss":        "prettier",
+		".less":        "prettier",
+		".graphql":     "prettier",
+		".gql":         "prettier",
+		".sql":         "sqlfluff",
+		".py":          "ruff/black",
+		".pyi":         "ruff/black",
+		".ipynb":       "ruff/black-notebook",
+		".rs":          "rustfmt",
+		".tf":          "terraform",
+		".tfvars":      "terraform",
+		".tftest.hcl":  "terraform",
+		".tfmock.hcl":  "terraform",
+		".tfquery.hcl": "terraform",
+		".proto":       "buf",
+	}
+	for _, ext := range supportedExtensions {
+		qt.Check(t, qt.Equals(r.Name(ext), want[ext]), qt.Commentf("ext=%q", ext))
+	}
+
+	for _, tc := range []struct {
 		ext  string
 		want string
 	}{
-		{".json", "json"},
-		{".sh", "shfmt"},
-		{".bash", "shfmt"},
-		{".go", "gofmt"},
-		{".ts", "biome"},
-		{".tsx", "biome"},
-		{".js", "biome"},
-		{".jsx", "biome"},
-		{".mjs", "biome"},
-		{".cjs", "biome"},
-		{".mts", "biome"},
-		{".cts", "biome"},
-		{".css", "biome"},
-		{".jsonc", "biome"},
-		{".md", "markdownlint-cli2"},
-		{".mdx", "markdownlint-cli2"},
-		{".markdown", "markdownlint-cli2"},
-		{".toml", "taplo"},
-		{".yaml", "prettier"},
-		{".yml", "prettier"},
-		{".html", "prettier"},
-		{".scss", "prettier"},
-		{".less", "prettier"},
-		{".graphql", "prettier"},
-		{".gql", "prettier"},
-		{".sql", "sqlfluff"},
-		{".py", "ruff/black"},
-		{".pyi", "ruff/black"},
-		{".ipynb", "ruff/black-notebook"},
-		{".rs", "rustfmt"},
-		{".tf", "terraform"},
-		{".tfvars", "terraform"},
-		{".tftest.hcl", "terraform"},
-		{".tfmock.hcl", "terraform"},
-		{".tfquery.hcl", "terraform"},
-		{".proto", "buf"},
 		{".unknown", ""},
 		{".JSON", "json"},
-	}
-	for _, tc := range cases {
+	} {
 		qt.Check(t, qt.Equals(r.Name(tc.ext), tc.want), qt.Commentf("ext=%q", tc.ext))
 	}
 }
