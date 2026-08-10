@@ -377,6 +377,14 @@ func projectDisables(projectRoot, ext, formatterName string) (disabled bool, cfg
 	return cfg.IsDisabled(ext) || cfg.IsFormatterDisabled(formatterName), cfg, nil
 }
 
+// projectRebuildsJSONRegistry is true when project config forces a NewRegistry
+// rebuild for .json — the json router still Names itself "json" while biome may
+// run underneath, so a project-level "biome" disable is invisible to extension
+// filtering alone. Keep --check's cache guard on this same predicate.
+func projectRebuildsJSONRegistry(ext string, projectCfg config.Config) bool {
+	return strings.EqualFold(ext, ".json") && projectCfg.IsFormatterDisabled("biome")
+}
+
 // registryWithProjectConfig applies project formatter opt-outs that affect a
 // router's internal choice, while keeping extension-specific project opt-outs
 // in projectDisables. jsonRouter.Name() is "json" even when it delegates to
@@ -384,7 +392,7 @@ func projectDisables(projectRoot, ext, formatterName string) (disabled bool, cfg
 // --check) rather than relying on registry name filtering alone. Any future
 // router that delegates to another formatter name has the same requirement.
 func registryWithProjectConfig(registry *dispatch.Registry, userCfg config.Config, ext string, projectCfg config.Config) *dispatch.Registry {
-	if !strings.EqualFold(ext, ".json") || !projectCfg.IsFormatterDisabled("biome") {
+	if !projectRebuildsJSONRegistry(ext, projectCfg) {
 		return registry
 	}
 	merged := userCfg
