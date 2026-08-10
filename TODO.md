@@ -72,6 +72,35 @@ bullet; fleet resurvey wave-10 (all zero / no-go). Audit fixup: assert
 memo path rebuilds a distinct registry; `.JSON` non-cache case; trimmed
 biome disable through the predicate.
 
+Wave 11 (2026-08-10) landed: direct `checkProjectRoot` /
+`resolveTarget` tables; dangling-symlink `writeFormatted` no-op;
+Terraform multi-dot external paths; `TestName` parity via shared
+`supportedExtensions`; `bunGlobalDir` HOME fallback. Audit fixup:
+`t.Setenv` missing-home isolation; optionals tracked below.
+
+---
+
+## Residual — Wave-11 audit optionals
+
+### `resolveTarget` Rel-error skip
+
+`filepath.Rel` failure still returns `skip: relative path error` and
+stays uncovered at 94.7% func cover. Wave contract excludes mock-based
+`Abs`/`Rel` failure tests; reopen only with a portable fixture that
+forces `Rel` to fail without production hooks.
+
+### `checkProjectRoot` directory-fallback paths arg
+
+The cwd-gone subtest passes a dummy `relative-target.json` that never
+participates in longest-root selection. Behavior is correct; clarify or
+pass `nil` paths if the case is revisited.
+
+### Dangling-symlink writeFormatted assertion
+
+`TestWriteFormattedDanglingSymlinkNoOp` checks target absence + symlink
+mode but does not `Readlink`/`ReadFile` the link name. Production
+returns before any write; low mismatch risk.
+
 ---
 
 ## Residual — Ops
