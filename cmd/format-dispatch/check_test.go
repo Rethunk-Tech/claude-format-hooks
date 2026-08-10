@@ -216,6 +216,37 @@ func TestRegistryForCheckMemoizesPerProjectRoot(t *testing.T) {
 	qt.Check(t, qt.IsTrue(first != other))
 }
 
+func TestRegistryForCheckDoesNotCacheWhenPredicateFalse(t *testing.T) {
+	userCfg := config.Config{}
+	registry := dispatch.NewRegistry(userCfg)
+	tests := []struct {
+		name       string
+		extension  string
+		projectCfg config.Config
+	}{
+		{name: "json", extension: ".json"},
+		{
+			name:       "typescript with biome disabled",
+			extension:  ".ts",
+			projectCfg: config.Config{DisabledFormatters: []string{"biome"}},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			projectRoot := t.TempDir()
+			cache := make(map[string]*dispatch.Registry)
+
+			first := registryForCheck(registry, userCfg, tt.extension, tt.projectCfg, projectRoot, cache)
+			second := registryForCheck(registry, userCfg, tt.extension, tt.projectCfg, projectRoot, cache)
+
+			qt.Check(t, qt.IsTrue(first == registry))
+			qt.Check(t, qt.IsTrue(second == registry))
+			qt.Check(t, qt.Equals(len(cache), 0))
+		})
+	}
+}
+
 func TestCheckHonorsProjectConfigDisablesBiomeForJSONC(t *testing.T) {
 	projectRoot := t.TempDir()
 	path := writeCheckFile(t, projectRoot, "bad.jsonc", `{"a":1}`)
