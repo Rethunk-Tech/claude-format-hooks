@@ -61,6 +61,105 @@ func TestWithinSymlinks(t *testing.T) {
 	})
 }
 
+func TestResolveTarget(t *testing.T) {
+	tests := []struct {
+		name  string
+		setup func(*testing.T) (path, wantAbs, wantRoot, wantSkip string)
+	}{
+		{
+			name: "missing file",
+			setup: func(t *testing.T) (string, string, string, string) {
+				t.Helper()
+				t.Setenv("CLAUDE_PROJECT_DIR", "")
+				path := filepath.Join(t.TempDir(), "missing.json")
+				return path, path, "", "skip: stat failed or is a directory"
+			},
+		},
+		{
+			name: "directory",
+			setup: func(t *testing.T) (string, string, string, string) {
+				t.Helper()
+				t.Setenv("CLAUDE_PROJECT_DIR", "")
+				path := t.TempDir()
+				return path, path, "", "skip: stat failed or is a directory"
+			},
+		},
+		{
+			name: "outside configured project root",
+			setup: func(t *testing.T) (string, string, string, string) {
+				t.Helper()
+				projectRoot := t.TempDir()
+				outside := filepath.Join(t.TempDir(), "outside.json")
+				writeFile(t, outside, "content")
+				t.Setenv("CLAUDE_PROJECT_DIR", projectRoot)
+				return outside, outside, projectRoot, "skip: outside project root"
+			},
+		},
+		{
+			name: "outside working directory",
+			setup: func(t *testing.T) (string, string, string, string) {
+				t.Helper()
+				t.Setenv("CLAUDE_PROJECT_DIR", "")
+				workingDir := t.TempDir()
+				t.Chdir(workingDir)
+				outside := filepath.Join(t.TempDir(), "outside.json")
+				writeFile(t, outside, "content")
+				return outside, outside, workingDir, "skip: outside project root"
+			},
+		},
+		{
+			name: "vendored directory",
+			setup: func(t *testing.T) (string, string, string, string) {
+				t.Helper()
+				projectRoot := t.TempDir()
+				path := filepath.Join(projectRoot, "node_modules", "package", "file.json")
+				writeFile(t, path, "content")
+				t.Setenv("CLAUDE_PROJECT_DIR", projectRoot)
+				return path, path, projectRoot, "skip: vendored directory"
+			},
+		},
+		{
+			name: "success resolves relative path against working directory",
+			setup: func(t *testing.T) (string, string, string, string) {
+				t.Helper()
+				t.Setenv("CLAUDE_PROJECT_DIR", "")
+				projectRoot := t.TempDir()
+				t.Chdir(projectRoot)
+				writeFile(t, filepath.Join(projectRoot, "target.json"), "content")
+				path := "target.json"
+				return path, filepath.Join(projectRoot, path), projectRoot, ""
+			},
+		},
+		{
+			name: "directory fallback when working directory is unavailable",
+			setup: func(t *testing.T) (string, string, string, string) {
+				t.Helper()
+				if filepath.Separator == '\\' {
+					t.Skip("removing the current directory is not portable")
+				}
+				t.Setenv("CLAUDE_PROJECT_DIR", "")
+				workingDir := t.TempDir()
+				outside := t.TempDir()
+				path := filepath.Join(outside, "target.json")
+				writeFile(t, path, "content")
+				t.Chdir(workingDir)
+				qt.Assert(t, qt.IsNil(os.RemoveAll(workingDir)))
+				return path, path, outside, ""
+			},
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			path, wantAbs, wantRoot, wantSkip := tc.setup(t)
+			abs, projectRoot, skipReason := resolveTarget(path)
+			qt.Check(t, qt.Equals(abs, wantAbs))
+			qt.Check(t, qt.Equals(projectRoot, wantRoot))
+			qt.Check(t, qt.Equals(skipReason, wantSkip))
+		})
+	}
+}
+
 func TestConfigPath(t *testing.T) {
 	t.Run("env override wins", func(t *testing.T) {
 		t.Setenv("CLAUDE_FORMAT_HOOKS_CONFIG", "/custom/path.json")
