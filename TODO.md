@@ -58,11 +58,33 @@ registry per project root; CHANGELOG and fleet resurvey updated.
 Wave 8b polish: `.proto`/`buf` + native `Name()` test coverage;
 CHANGELOG Fixed bullet for `disabledFormatters` trim. Audit fixup:
 shared `projectRebuildsJSONRegistry` predicate + `registryForCheck`
-godoc. Optional carry-forwards below.
+godoc; Wave-9 audit follow-ons tracked below.
 
 Wave 9 (2026-08-10) landed: direct `registryForCheck` memoization proof
 with per-project-root pointer reuse; multi-JSON memo coverage with an
-upward `biome.json` sibling; CHANGELOG Fixed note.
+upward `biome.json` sibling; CHANGELOG Fixed note. Audit fixup: removed
+the stale Wave-8 pointer; per-project-root isolation remains the deliberate
+test floor.
+
+---
+
+## Residual — Wave-9 audit optionals
+
+### Integration proof for memoization
+
+Direct `registryForCheck` unit coverage proves per-project-root pointer reuse
+and remains the deliberate floor. Optional: add `runCheck` call-count or
+shared-cache integration proof.
+
+### CHANGELOG placement for test coverage
+
+The Unreleased Fixed bullet records memo test coverage. Optional: consider
+moving it under Changed/Tests if release notes should stay operator-facing.
+
+### Negative memo-path unit case
+
+Optional: add a unit case asserting `len(cache)==0` when
+`projectRebuildsJSONRegistry` is false.
 
 ---
 
