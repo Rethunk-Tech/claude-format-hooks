@@ -18,7 +18,7 @@ func TestSupported(t *testing.T) {
 		".ts", ".tsx", ".js", ".jsx", ".mjs", ".cjs", ".mts", ".cts", ".css", ".jsonc",
 		".md", ".mdx", ".markdown", ".toml", ".yaml", ".yml", ".html", ".scss", ".less",
 		".graphql", ".gql", ".sql", ".py", ".pyi", ".ipynb", ".rs", ".tf", ".tfvars",
-		".tftest.hcl", ".tfmock.hcl", ".tfquery.hcl",
+		".tftest.hcl", ".tfmock.hcl", ".tfquery.hcl", ".proto",
 	}
 	for _, ext := range supported {
 		qt.Check(t, qt.IsTrue(r.Supported(ext)), qt.Commentf("ext=%q", ext))
@@ -93,6 +93,7 @@ func TestName(t *testing.T) {
 	qt.Check(t, qt.Equals(r.Name(".json"), "json"))
 	qt.Check(t, qt.Equals(r.Name(".sh"), "shfmt"))
 	qt.Check(t, qt.Equals(r.Name(".ipynb"), "ruff/black-notebook"))
+	qt.Check(t, qt.Equals(r.Name(".proto"), "buf"))
 	qt.Check(t, qt.Equals(r.Name(".unknown"), ""))
 }
 
