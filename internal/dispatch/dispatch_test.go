@@ -90,11 +90,52 @@ func TestTerraformMultiDotExtensionsRespectExactDisables(t *testing.T) {
 func TestName(t *testing.T) {
 	r := NewRegistry(config.Default())
 
-	qt.Check(t, qt.Equals(r.Name(".json"), "json"))
-	qt.Check(t, qt.Equals(r.Name(".sh"), "shfmt"))
-	qt.Check(t, qt.Equals(r.Name(".ipynb"), "ruff/black-notebook"))
-	qt.Check(t, qt.Equals(r.Name(".proto"), "buf"))
-	qt.Check(t, qt.Equals(r.Name(".unknown"), ""))
+	cases := []struct {
+		ext  string
+		want string
+	}{
+		{".json", "json"},
+		{".sh", "shfmt"},
+		{".bash", "shfmt"},
+		{".go", "gofmt"},
+		{".ts", "biome"},
+		{".tsx", "biome"},
+		{".js", "biome"},
+		{".jsx", "biome"},
+		{".mjs", "biome"},
+		{".cjs", "biome"},
+		{".mts", "biome"},
+		{".cts", "biome"},
+		{".css", "biome"},
+		{".jsonc", "biome"},
+		{".md", "markdownlint-cli2"},
+		{".mdx", "markdownlint-cli2"},
+		{".markdown", "markdownlint-cli2"},
+		{".toml", "taplo"},
+		{".yaml", "prettier"},
+		{".yml", "prettier"},
+		{".html", "prettier"},
+		{".scss", "prettier"},
+		{".less", "prettier"},
+		{".graphql", "prettier"},
+		{".gql", "prettier"},
+		{".sql", "sqlfluff"},
+		{".py", "ruff/black"},
+		{".pyi", "ruff/black"},
+		{".ipynb", "ruff/black-notebook"},
+		{".rs", "rustfmt"},
+		{".tf", "terraform"},
+		{".tfvars", "terraform"},
+		{".tftest.hcl", "terraform"},
+		{".tfmock.hcl", "terraform"},
+		{".tfquery.hcl", "terraform"},
+		{".proto", "buf"},
+		{".unknown", ""},
+		{".JSON", "json"},
+	}
+	for _, tc := range cases {
+		qt.Check(t, qt.Equals(r.Name(tc.ext), tc.want), qt.Commentf("ext=%q", tc.ext))
+	}
 }
 
 func TestDispatchRoutesToFormatter(t *testing.T) {
