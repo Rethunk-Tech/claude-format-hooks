@@ -26,7 +26,9 @@ type jsonFormatter struct{ cfg config.Config }
 func NewJSON(cfg config.Config) Formatter { return jsonFormatter{cfg: cfg} }
 
 // jsonRouter sends .json to biome where the project has a biome config unless
-// biome is disabled, and to the native formatter everywhere else.
+// biome is disabled, and to the native formatter everywhere else. Its Name
+// remains "json" even when Format delegates to biome, so callers applying
+// project formatter opt-outs must account for the delegated formatter name.
 //
 // Biome's config governs .json as much as it governs .ts — indent, line width
 // and `expand`, which decides whether an object collapses onto one line. The
@@ -43,7 +45,9 @@ type jsonRouter struct {
 
 // NewJSONRouter returns the .json formatter: biome when the project has a
 // biome config and biome is enabled, the dependency-free native formatter
-// otherwise.
+// otherwise. Project-level "biome" disables therefore cannot be enforced by
+// registry name filtering alone; hook and --check callers must preserve the
+// router's delegated formatter opt-outs.
 func NewJSONRouter(cfg config.Config) Formatter {
 	return jsonRouter{
 		biome:         NewBiome(),

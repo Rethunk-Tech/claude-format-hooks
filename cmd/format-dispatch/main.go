@@ -379,7 +379,10 @@ func projectDisables(projectRoot, ext, formatterName string) (disabled bool, cfg
 
 // registryWithProjectConfig applies project formatter opt-outs that affect a
 // router's internal choice, while keeping extension-specific project opt-outs
-// in projectDisables.
+// in projectDisables. jsonRouter.Name() is "json" even when it delegates to
+// biome, so a project-level "biome" disable must be applied here (and in
+// --check) rather than relying on registry name filtering alone. Any future
+// router that delegates to another formatter name has the same requirement.
 func registryWithProjectConfig(registry *dispatch.Registry, userCfg config.Config, ext string, projectCfg config.Config) *dispatch.Registry {
 	if !strings.EqualFold(ext, ".json") || !projectCfg.IsFormatterDisabled("biome") {
 		return registry
