@@ -128,6 +128,51 @@ func TestApplyBunGlobalOverridesReportsAMissingManifest(t *testing.T) {
 	qt.Check(t, qt.IsNotNil(applyBunGlobalOverrides(t.Context(), io.Discard)))
 }
 
+func TestBunGlobalDir(t *testing.T) {
+	t.Run("home fallback", func(t *testing.T) {
+		home := t.TempDir()
+		t.Setenv("BUN_INSTALL", "")
+		t.Setenv("HOME", home)
+		if runtime.GOOS == "windows" {
+			t.Setenv("USERPROFILE", home)
+		}
+
+		got, err := bunGlobalDir()
+
+		qt.Assert(t, qt.IsNil(err))
+		qt.Check(t, qt.Equals(got, filepath.Join(home, ".bun", "install", "global")))
+	})
+
+	t.Run("missing home", func(t *testing.T) {
+		keys := []string{"HOME", "USERPROFILE", "HOMEDRIVE", "HOMEPATH"}
+		saved := make(map[string]string, len(keys))
+		present := make(map[string]bool, len(keys))
+		for _, key := range keys {
+			value, ok := os.LookupEnv(key)
+			saved[key] = value
+			present[key] = ok
+		}
+		defer func() {
+			for _, key := range keys {
+				if present[key] {
+					_ = os.Setenv(key, saved[key])
+				} else {
+					_ = os.Unsetenv(key)
+				}
+			}
+		}()
+
+		t.Setenv("BUN_INSTALL", "")
+		for _, key := range keys {
+			qt.Assert(t, qt.IsNil(os.Unsetenv(key)))
+		}
+
+		_, err := bunGlobalDir()
+
+		qt.Check(t, qt.IsNotNil(err))
+	})
+}
+
 func TestFirstLineTruncatesAtTheNewline(t *testing.T) {
 	qt.Check(t, qt.Equals(string(firstLine([]byte("first\nsecond\nthird"))), "first"))
 	qt.Check(t, qt.Equals(string(firstLine([]byte("only"))), "only"))
