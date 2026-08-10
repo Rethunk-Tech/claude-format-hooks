@@ -206,7 +206,14 @@ func TestRegistryForCheckMemoizesPerProjectRoot(t *testing.T) {
 	second := registryForCheck(registry, userCfg, ".json", projectCfg, projectRoot, cache)
 
 	qt.Check(t, qt.IsTrue(first == second))
+	qt.Check(t, qt.IsTrue(cache[projectRoot] == first))
 	qt.Check(t, qt.Equals(len(cache), 1))
+
+	otherProjectRoot := t.TempDir()
+	other := registryForCheck(registry, userCfg, ".json", projectCfg, otherProjectRoot, cache)
+
+	qt.Check(t, qt.Equals(len(cache), 2))
+	qt.Check(t, qt.IsTrue(first != other))
 }
 
 func TestCheckHonorsProjectConfigDisablesBiomeForJSONC(t *testing.T) {
