@@ -46,60 +46,28 @@ fleet survey all no-go (`.vue`/`.svelte`/`.astro`/`.nix`/`.zig` = 0).
 Fixup: canonical Name() list + notebook distinction; json/jsonc
 disabledFormatters tests; EditorConfig numbering glue.
 
+Wave 7 (2026-08-10) landed: `IsFormatterDisabled` trims list entries;
+caller-agnostic godoc; CHANGELOG Documentation bullet for
+`disabledFormatters`; router project-disable invariant comments on
+`jsonRouter` / `registryWithProjectConfig`; whitespace-only entry test.
+Audit: 0 must-fix; memoization / remote CI / fleet resurvey stay
+deferred.
+
 ---
 
-## Residual — Wave-6 audit carry-forwards (optional)
-
-### Trim whitespace in `disabledFormatters` entries
-
-`IsFormatterDisabled` uses `EqualFold` without `TrimSpace`, so a value
-like `"biome "` silently fails to match.
-
-**Acceptance**
-
-+ Leading/trailing whitespace on list entries is ignored (or rejected
-  loudly at Load with a clear diagnostic).
-
-### CHANGELOG Documentation bullet for `disabledFormatters`
-
-Unreleased Documentation section still omits the new opt-out; Added
-already covers the feature.
-
-**Acceptance**
-
-+ Documentation bullet mentions `disabledFormatters` / HUMANS config.
-
-### Clarify `IsFormatterDisabled` comment (user vs project)
-
-Helper is reused for project configs via `projectDisables`; comment still
-says "user".
-
-**Acceptance**
-
-+ Comment names both callers (or is caller-agnostic).
+## Residual — Wave-7 audit carry-forwards (optional)
 
 ### Cache project-biome-disabled registry in `--check`
 
 `registryWithProjectConfig` rebuilds `NewRegistry` per `.json` when the
 project disables biome. Fine for small trees; optional memoization if
-`--check` on large monorepos shows cost.
+`--check` on large monorepos shows cost. Wave-7 audit: no measured need —
+leave-as-is until a large-tree cost shows up.
 
 **Acceptance**
 
 + Same merged registry reused across files that share the same user+project
-  disable set, or measured no-op leave-as-is note.
-
-### Router-style formatters need explicit project-disable wiring
-
-`jsonRouter.Name()` is `"json"` while biome may run underneath, so
-project-level `"biome"` disable needs `registryWithProjectConfig`. Any
-future router that delegates to another `Name()` must get the same hook/
-`--check` treatment — do not assume registry name-filter alone is enough.
-
-**Acceptance**
-
-+ Documented invariant near `jsonRouter` / `registryWithProjectConfig`, or
-  a shared helper that future routers must call.
+  disable set, or measured no-op leave-as-is note (leave-as-is recorded).
 
 ---
 
@@ -123,9 +91,10 @@ clear the CI workflow failure.
 
 Wave-6 survey across `/usr/local/src/com.github/Rethunk-Tech/` found
 **zero** hand-authored `.vue`/`.svelte`/`.astro`/`.nix`/`.zig` under
-vendored-dir exclusions — all **no-go**. Re-run when the fleet gains
-candidate sources; any go still needs dispatch registration + HUMANS row
-together. For `.nix`, pick one of `nixfmt`/`alejandra` by PATH dominance.
+vendored-dir exclusions — all **no-go**. Wave-7 audit reconfirmed zero.
+Re-run when the fleet gains candidate sources; any go still needs
+dispatch registration + HUMANS row together. For `.nix`, pick one of
+`nixfmt`/`alejandra` by PATH dominance.
 
 ---
 
