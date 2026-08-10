@@ -181,6 +181,7 @@ func TestCheckReusesProjectDisabledBiomeRegistryForMultipleJSONFiles(t *testing.
 	projectRoot := t.TempDir()
 	firstPath := writeCheckFile(t, projectRoot, "first.json", unformattedJSON)
 	secondPath := writeCheckFile(t, projectRoot, "second.json", unformattedJSON)
+	writeCheckFile(t, projectRoot, "biome.json", "{}\n")
 	writeCheckFile(t, projectRoot, projectConfigFile, `{"disabledFormatters":["biome"]}`)
 	configPath := filepath.Join(t.TempDir(), "claude-format-hooks.json")
 	writeFile(t, configPath, `{}`)
