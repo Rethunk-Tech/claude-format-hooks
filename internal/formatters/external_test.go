@@ -11,6 +11,7 @@ import (
 
 	"github.com/go-quicktest/qt"
 
+	"github.com/Rethunk-Tech/claude-format-hooks/internal/config"
 	"github.com/Rethunk-Tech/claude-format-hooks/internal/diskcache"
 )
 
@@ -52,6 +53,10 @@ func TestExternalFormatterNames(t *testing.T) {
 		f    Formatter
 		want string
 	}{
+		{NewJSONRouter(config.Default()), "json"},
+		{NewShell(config.Default()), "shfmt"},
+		{NewGo(), "gofmt"},
+		{NewProto(), "buf"},
 		{NewBiome(), "biome"},
 		{NewMarkdown(), "markdownlint-cli2"},
 		{NewTOML(), "taplo"},
