@@ -145,27 +145,11 @@ func TestBunGlobalDir(t *testing.T) {
 
 	t.Run("missing home", func(t *testing.T) {
 		keys := []string{"HOME", "USERPROFILE", "HOMEDRIVE", "HOMEPATH"}
-		saved := make(map[string]string, len(keys))
-		present := make(map[string]bool, len(keys))
 		for _, key := range keys {
-			value, ok := os.LookupEnv(key)
-			saved[key] = value
-			present[key] = ok
+			t.Setenv(key, "")
 		}
-		defer func() {
-			for _, key := range keys {
-				if present[key] {
-					_ = os.Setenv(key, saved[key])
-				} else {
-					_ = os.Unsetenv(key)
-				}
-			}
-		}()
 
 		t.Setenv("BUN_INSTALL", "")
-		for _, key := range keys {
-			qt.Assert(t, qt.IsNil(os.Unsetenv(key)))
-		}
 
 		_, err := bunGlobalDir()
 
