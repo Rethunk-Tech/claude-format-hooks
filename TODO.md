@@ -60,34 +60,9 @@ CHANGELOG Fixed bullet for `disabledFormatters` trim. Audit fixup:
 shared `projectRebuildsJSONRegistry` predicate + `registryForCheck`
 godoc. Optional carry-forwards below.
 
----
-
-## Residual — Wave-8 audit carry-forwards (optional)
-
-### Prove `--check` registry memoization (not only output parity)
-
-`TestCheckReusesProjectDisabledBiomeRegistryForMultipleJSONFiles` asserts
-both unformatted `.json` files would reformat under project-disabled
-biome. Contracts chose behavior-first; removing the cache would still
-pass. Optional: a call-count or equivalent harness that fails if
-`NewRegistry` rebuilds per file for the same `projectRoot`.
-
-**Acceptance**
-
-+ Test fails if the per-`projectRoot` cache is removed, or leave-as-is note
-  that behavioral parity remains the deliberate floor.
-
-### Multi-JSON memo test with `biome.json` sibling
-
-The single-file project-disable biome JSON test includes a `biome.json`;
-the multi-file memo test does not. Optional: add a `biome.json` sibling so
-a second-file native-fallback regression under an upward biome config is
-covered by the memo-specific case.
-
-**Acceptance**
-
-+ Multi-JSON memo test includes `biome.json` and still reports both files,
-  or leave-as-is (single-file case already covers the sibling).
+Wave 9 (2026-08-10) landed: direct `registryForCheck` memoization proof
+with per-project-root pointer reuse; multi-JSON memo coverage with an
+upward `biome.json` sibling; CHANGELOG Fixed note.
 
 ---
 
@@ -112,7 +87,8 @@ succeeded and does not clear the CI workflow failure.
 Wave-6 survey across `/usr/local/src/com.github/Rethunk-Tech/` found
 **zero** hand-authored `.vue`/`.svelte`/`.astro`/`.nix`/`.zig` under
 vendored-dir exclusions — all **no-go**. Wave-7 audit and the Wave-8
-resurvey reconfirmed zero; see `.orchestrate/fleet-survey-wave8.md`.
+resurvey reconfirmed zero, and the Wave-9 resurvey found zero again; see
+`.orchestrate/fleet-survey-wave9.md`.
 Re-run when the fleet gains candidate sources; any go still needs
 dispatch registration + HUMANS row together. For `.nix`, pick one of
 `nixfmt`/`alejandra` by PATH dominance.
