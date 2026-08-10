@@ -205,6 +205,7 @@ func TestRegistryForCheckMemoizesPerProjectRoot(t *testing.T) {
 	first := registryForCheck(registry, userCfg, ".json", projectCfg, projectRoot, cache)
 	second := registryForCheck(registry, userCfg, ".json", projectCfg, projectRoot, cache)
 
+	qt.Check(t, qt.IsTrue(first != registry))
 	qt.Check(t, qt.IsTrue(first == second))
 	qt.Check(t, qt.IsTrue(cache[projectRoot] == first))
 	qt.Check(t, qt.Equals(len(cache), 1))
@@ -225,6 +226,7 @@ func TestRegistryForCheckDoesNotCacheWhenPredicateFalse(t *testing.T) {
 		projectCfg config.Config
 	}{
 		{name: "json", extension: ".json"},
+		{name: "uppercase json", extension: ".JSON"},
 		{
 			name:       "typescript with biome disabled",
 			extension:  ".ts",

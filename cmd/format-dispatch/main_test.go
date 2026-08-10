@@ -84,6 +84,7 @@ func TestProjectRebuildsJSONRegistry(t *testing.T) {
 		wantRebuild bool
 	}{
 		{"json with biome disabled", ".json", []string{"biome"}, true},
+		{"json with trimmed biome disabled", ".json", []string{" biome "}, true},
 		{"json with no disabled formatters", ".json", nil, false},
 		{"uppercase json with biome disabled", ".JSON", []string{"biome"}, true},
 		{"typescript with biome disabled", ".ts", []string{"biome"}, false},
