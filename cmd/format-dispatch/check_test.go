@@ -8,6 +8,8 @@ import (
 	"testing"
 	"time"
 
+	"github.com/Rethunk-Tech/claude-format-hooks/internal/config"
+	"github.com/Rethunk-Tech/claude-format-hooks/internal/dispatch"
 	"github.com/go-quicktest/qt"
 )
 
@@ -190,6 +192,20 @@ func TestCheckReusesProjectDisabledBiomeRegistryForMultipleJSONFiles(t *testing.
 	qt.Check(t, qt.Equals(runCheck([]string{projectRoot}, &out, &errOut), 1))
 	qt.Check(t, qt.StringContains(out.String(), firstPath))
 	qt.Check(t, qt.StringContains(out.String(), secondPath))
+}
+
+func TestRegistryForCheckMemoizesPerProjectRoot(t *testing.T) {
+	projectRoot := t.TempDir()
+	userCfg := config.Config{}
+	projectCfg := config.Config{DisabledFormatters: []string{"biome"}}
+	registry := dispatch.NewRegistry(userCfg)
+	cache := make(map[string]*dispatch.Registry)
+
+	first := registryForCheck(registry, userCfg, ".json", projectCfg, projectRoot, cache)
+	second := registryForCheck(registry, userCfg, ".json", projectCfg, projectRoot, cache)
+
+	qt.Check(t, qt.IsTrue(first == second))
+	qt.Check(t, qt.Equals(len(cache), 1))
 }
 
 func TestCheckHonorsProjectConfigDisablesBiomeForJSONC(t *testing.T) {
