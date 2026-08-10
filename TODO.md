@@ -53,21 +53,8 @@ caller-agnostic godoc; CHANGELOG Documentation bullet for
 Audit: 0 must-fix; memoization / remote CI / fleet resurvey stay
 deferred.
 
----
-
-## Residual — Wave-7 audit carry-forwards (optional)
-
-### Cache project-biome-disabled registry in `--check`
-
-`registryWithProjectConfig` rebuilds `NewRegistry` per `.json` when the
-project disables biome. Fine for small trees; optional memoization if
-`--check` on large monorepos shows cost. Wave-7 audit: no measured need —
-leave-as-is until a large-tree cost shows up.
-
-**Acceptance**
-
-+ Same merged registry reused across files that share the same user+project
-  disable set, or measured no-op leave-as-is note (leave-as-is recorded).
+Wave 8 (2026-08-10) landed: `--check` reuses the project-biome-disabled
+registry per project root; CHANGELOG and fleet resurvey updated.
 
 ---
 
@@ -75,12 +62,12 @@ leave-as-is until a large-tree cost shows up.
 
 ### Diagnose and clear red CI on `origin/main`
 
-Remote tip `2fd5ab2` still shows failed CI workflow run
-`30131468133` (test×3 + lint). Job logs are **expired / unavailable**.
-Local `main` is ahead with green `go build`/`go vet`/scoped race tests;
-clearing the badge needs an explicit operator push (not authorized). A
-later Dependabot `go_modules` run on the same SHA succeeded and does not
-clear the CI workflow failure.
+Remote tip is still `2fd5ab2`, with failed CI workflow run
+`30131468133` (test×3 + lint); job logs remain **expired / unavailable**.
+Local `main` is ahead with green `go build`/`go vet`/scoped race tests.
+Clearing the badge still needs an explicit operator push of the ahead local
+`main` (not authorized). A later Dependabot `go_modules` run on the same SHA
+succeeded and does not clear the CI workflow failure.
 
 **Acceptance**
 
@@ -91,7 +78,8 @@ clear the CI workflow failure.
 
 Wave-6 survey across `/usr/local/src/com.github/Rethunk-Tech/` found
 **zero** hand-authored `.vue`/`.svelte`/`.astro`/`.nix`/`.zig` under
-vendored-dir exclusions — all **no-go**. Wave-7 audit reconfirmed zero.
+vendored-dir exclusions — all **no-go**. Wave-7 audit and the Wave-8
+resurvey reconfirmed zero; see `.orchestrate/fleet-survey-wave8.md`.
 Re-run when the fleet gains candidate sources; any go still needs
 dispatch registration + HUMANS row together. For `.nix`, pick one of
 `nixfmt`/`alejandra` by PATH dominance.
