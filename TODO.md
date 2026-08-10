@@ -66,25 +66,11 @@ upward `biome.json` sibling; CHANGELOG Fixed note. Audit fixup: removed
 the stale Wave-8 pointer; per-project-root isolation remains the deliberate
 test floor.
 
----
-
-## Residual — Wave-9 audit optionals
-
-### Integration proof for memoization
-
-Direct `registryForCheck` unit coverage proves per-project-root pointer reuse
-and remains the deliberate floor. Optional: add `runCheck` call-count or
-shared-cache integration proof.
-
-### CHANGELOG placement for test coverage
-
-The Unreleased Fixed bullet records memo test coverage. Optional: consider
-moving it under Changed/Tests if release notes should stay operator-facing.
-
-### Negative memo-path unit case
-
-Optional: add a unit case asserting `len(cache)==0` when
-`projectRebuildsJSONRegistry` is false.
+Wave 10 (2026-08-10) landed: negative `registryForCheck` non-cache path;
+direct `projectRebuildsJSONRegistry` table; drop test-only CHANGELOG Fixed
+bullet; fleet resurvey wave-10 (all zero / no-go). Audit fixup: assert
+memo path rebuilds a distinct registry; `.JSON` non-cache case; trimmed
+biome disable through the predicate.
 
 ---
 
@@ -108,9 +94,8 @@ succeeded and does not clear the CI workflow failure.
 
 Wave-6 survey across `/usr/local/src/com.github/Rethunk-Tech/` found
 **zero** hand-authored `.vue`/`.svelte`/`.astro`/`.nix`/`.zig` under
-vendored-dir exclusions — all **no-go**. Wave-7 audit and the Wave-8
-resurvey reconfirmed zero, and the Wave-9 resurvey found zero again; see
-`.orchestrate/fleet-survey-wave9.md`.
+vendored-dir exclusions — all **no-go**. Waves 7–10 resurveys reconfirmed
+zero; see `.orchestrate/fleet-survey-wave10.md`.
 Re-run when the fleet gains candidate sources; any go still needs
 dispatch registration + HUMANS row together. For `.nix`, pick one of
 `nixfmt`/`alejandra` by PATH dominance.
@@ -130,3 +115,6 @@ dispatch registration + HUMANS row together. For `.nix`, pick one of
   paths are atomic independently; extract only if a third caller appears.
 + Overloading bare formatter names into `disabled` (wave 6 chose separate
   `disabledFormatters` key).
++ `runCheck` NewRegistry call-count / shared-cache integration proof —
+  Wave-9 unit floor is deliberate; Wave-10 closed the complementary
+  negative path without production instrumentation.
