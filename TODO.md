@@ -56,8 +56,9 @@ deferred.
 Wave 8 (2026-08-10) landed: `--check` reuses the project-biome-disabled
 registry per project root; CHANGELOG and fleet resurvey updated.
 Wave 8b polish: `.proto`/`buf` + native `Name()` test coverage;
-CHANGELOG Fixed bullet for `disabledFormatters` trim. Audit: 0 must-fix /
-0 should-fix; optional carry-forwards below.
+CHANGELOG Fixed bullet for `disabledFormatters` trim. Audit fixup:
+shared `projectRebuildsJSONRegistry` predicate + `registryForCheck`
+godoc. Optional carry-forwards below.
 
 ---
 
@@ -76,15 +77,17 @@ pass. Optional: a call-count or equivalent harness that fails if
 + Test fails if the per-`projectRoot` cache is removed, or leave-as-is note
   that behavioral parity remains the deliberate floor.
 
-### Godoc on `registryForCheck`
+### Multi-JSON memo test with `biome.json` sibling
 
-`registryForCheck` caches only the project-biome-disabled `.json`
-`NewRegistry` rebuild, keyed by `projectRoot`. A one-line godoc would
-match `registryWithProjectConfig` style.
+The single-file project-disable biome JSON test includes a `biome.json`;
+the multi-file memo test does not. Optional: add a `biome.json` sibling so
+a second-file native-fallback regression under an upward biome config is
+covered by the memo-specific case.
 
 **Acceptance**
 
-+ Short godoc on `registryForCheck`, or leave-as-is.
++ Multi-JSON memo test includes `biome.json` and still reports both files,
+  or leave-as-is (single-file case already covers the sibling).
 
 ---
 
