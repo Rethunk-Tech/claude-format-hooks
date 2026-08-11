@@ -2,6 +2,7 @@ package main
 
 import (
 	"bytes"
+	"context"
 	"os"
 	"path/filepath"
 	"runtime"
@@ -89,6 +90,119 @@ func TestCheckAcceptsIndividualFiles(t *testing.T) {
 
 	out.Reset()
 	qt.Check(t, qt.Equals(runCheck([]string{bad}, &out, &errOut), 1))
+}
+
+func TestWouldReformatComparesFormattedCopies(t *testing.T) {
+	dir := t.TempDir()
+	registry := dispatch.NewRegistry(config.Default())
+
+	tests := []struct {
+		name    string
+		content string
+		changed bool
+	}{
+		{name: "already formatted", content: formattedJSON},
+		{name: "would change", content: unformattedJSON, changed: true},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			path := writeCheckFile(t, dir, tt.name+".json", tt.content)
+
+			changed, err := wouldReformat(context.Background(), registry, dir, path, ".json")
+
+			qt.Assert(t, qt.IsNil(err))
+			qt.Check(t, qt.Equals(changed, tt.changed))
+			qt.Check(t, qt.Equals(readFile(t, path), tt.content))
+		})
+	}
+}
+
+func TestWouldReformatReportsReadFileError(t *testing.T) {
+	dir := t.TempDir()
+	registry := dispatch.NewRegistry(config.Default())
+	missing := filepath.Join(dir, "missing.json")
+
+	changed, err := wouldReformat(context.Background(), registry, dir, missing, ".json")
+
+	qt.Check(t, qt.Equals(changed, false))
+	if err == nil {
+		t.Fatal("wouldReformat must report a missing source file")
+	}
+}
+
+func TestWouldReformatReturnsContextCauseAfterDispatch(t *testing.T) {
+	dir := t.TempDir()
+	path := writeCheckFile(t, dir, "bad.json", unformattedJSON)
+	registry := dispatch.NewRegistry(config.Default())
+	ctx, cancel := context.WithCancelCause(context.Background())
+	cause := context.Canceled
+	cancel(cause)
+
+	changed, err := wouldReformat(ctx, registry, dir, path, ".json")
+
+	qt.Check(t, qt.Equals(changed, false))
+	qt.Check(t, qt.Equals(err, cause))
+}
+
+func TestWouldReformatReportsFormattedCopyReadError(t *testing.T) {
+	if filepath.Separator == '\\' {
+		t.Skip("fake formatter script is POSIX-shell only")
+	}
+	projectRoot := t.TempDir()
+	path := writeCheckFile(t, projectRoot, "bad.ts", "const value=42\n")
+	configPath := filepath.Join(t.TempDir(), "claude-format-hooks.json")
+	writeFile(t, configPath, `{}`)
+	toolDir := t.TempDir()
+	script := "#!/bin/sh\nfor arg in \"$@\"; do\n  case \"$arg\" in\n    *.ts) rm -f \"$arg\"; exit 0 ;;\n  esac\ndone\nexit 1\n"
+	for _, name := range []string{"biome", "bunx"} {
+		tool := filepath.Join(toolDir, name)
+		qt.Assert(t, qt.IsNil(os.WriteFile(tool, []byte(script), 0o755))) //nolint:gosec // test fixture
+	}
+	t.Setenv("CLAUDE_PROJECT_DIR", projectRoot)
+	t.Setenv("CLAUDE_FORMAT_HOOKS_CONFIG", configPath)
+	t.Setenv("CLAUDE_FORMAT_HOOKS_CACHE", filepath.Join(t.TempDir(), "cache"))
+	t.Setenv("PATH", toolDir+string(os.PathListSeparator)+os.Getenv("PATH"))
+	registry := dispatch.NewRegistry(config.Default())
+
+	changed, err := wouldReformat(context.Background(), registry, projectRoot, path, ".ts")
+
+	qt.Check(t, qt.Equals(changed, false))
+	if err == nil {
+		t.Fatal("wouldReformat must report a formatter that removes its scratch copy")
+	}
+}
+
+func TestCopyBesideCreatesAndCleansSibling(t *testing.T) {
+	dir := t.TempDir()
+	abs := filepath.Join(dir, "target.json")
+	content := []byte(unformattedJSON)
+
+	path, cleanup, err := copyBeside(abs, content)
+
+	qt.Assert(t, qt.IsNil(err))
+	qt.Check(t, qt.Equals(filepath.Dir(path), dir))
+	qt.Check(t, qt.IsTrue(strings.HasPrefix(filepath.Base(path), ".fmtcheck-")))
+	qt.Check(t, qt.Equals(filepath.Ext(path), ".json"))
+	qt.Check(t, qt.Equals(readFile(t, path), string(content)))
+
+	cleanup()
+	_, statErr := os.Stat(path)
+	qt.Check(t, qt.IsTrue(os.IsNotExist(statErr)))
+}
+
+func TestCopyBesideReportsFileAsDirectoryWriteFailure(t *testing.T) {
+	dir := t.TempDir()
+	blocker := filepath.Join(dir, "not-a-directory")
+	qt.Assert(t, qt.IsNil(os.WriteFile(blocker, nil, 0o600))) //nolint:gosec // test fixture
+
+	path, cleanup, err := copyBeside(filepath.Join(blocker, "target.json"), []byte(unformattedJSON))
+
+	qt.Check(t, qt.Equals(path, ""))
+	qt.Check(t, qt.IsNil(cleanup))
+	if err == nil {
+		t.Fatal("copyBeside must report a sibling write below a regular file")
+	}
 }
 
 func TestCheckResolvesExtensionlessShellShebang(t *testing.T) {
