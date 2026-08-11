@@ -304,11 +304,11 @@ func writeAtomic(path string, data []byte, perm os.FileMode) error {
 	}()
 
 	if _, err := tmp.Write(data); err != nil {
-		_ = tmp.Close()
+		_ = writeAtomicClose(tmp)
 		return err
 	}
 	if err := writeAtomicChmod(tmp, perm); err != nil {
-		_ = tmp.Close()
+		_ = writeAtomicClose(tmp)
 		return err
 	}
 	if err := writeAtomicClose(tmp); err != nil {
