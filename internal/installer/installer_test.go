@@ -559,8 +559,14 @@ func TestWriteAtomicCreateTempFailureInReadOnlyDirectory(t *testing.T) {
 	t.Cleanup(func() {
 		_ = os.Chmod(dir, 0o700)
 	})
+	probe, err := os.CreateTemp(dir, "permission-probe-*")
+	if err == nil {
+		_ = probe.Close()
+		_ = os.Remove(probe.Name())
+		t.Skip("directory remains writable after chmod")
+	}
 
-	err := writeAtomic(filepath.Join(dir, "f.json"), []byte(`{"a":1}`), 0o600)
+	err = writeAtomic(filepath.Join(dir, "f.json"), []byte(`{"a":1}`), 0o600)
 	qt.Check(t, qt.IsNotNil(err))
 }
 
@@ -612,6 +618,11 @@ func TestApplyChangeReportsMkdirFailure(t *testing.T) {
 	t.Cleanup(func() {
 		_ = os.Chmod(blocked, 0o700)
 	})
+	probe := filepath.Join(blocked, "permission-probe")
+	if err := os.Mkdir(probe, 0o700); err == nil {
+		_ = os.Remove(probe)
+		t.Skip("directory remains writable after chmod")
+	}
 
 	settingsPath := filepath.Join(blocked, "nested", "settings.json")
 	var out strings.Builder
@@ -636,6 +647,11 @@ func TestApplyChangeReportsSettingsWriteFailure(t *testing.T) {
 	t.Cleanup(func() {
 		_ = os.Chmod(dir, 0o700)
 	})
+	probe := filepath.Join(dir, "permission-probe")
+	if err := os.WriteFile(probe, []byte("probe"), 0o600); err == nil {
+		_ = os.Remove(probe)
+		t.Skip("directory remains writable after chmod")
+	}
 
 	settingsPath := filepath.Join(dir, "settings.json")
 	var out strings.Builder
