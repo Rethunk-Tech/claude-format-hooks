@@ -54,15 +54,15 @@ Full install steps, prerequisites, and configuration: [HUMANS.md](HUMANS.md).
 
 ## Documentation
 
-| Document | Purpose |
-| --- | --- |
-| [Humans guide](HUMANS.md) | Install, configuration, supported extensions, troubleshooting |
-| [Agents guide](AGENTS.md) | Architecture, design rationale, package layout, invariants |
-| [Contributing](CONTRIBUTING.md) | Build, test, and pull request workflow |
-| [Security](SECURITY.md) | Vulnerability reporting |
-| [Changelog](CHANGELOG.md) | Release history (Keep a Changelog style) |
-| [Code of conduct](CODE_OF_CONDUCT.md) | Community standards and enforcement |
-| [License](LICENSE) | MIT License |
+| Document                              | Purpose                                                       |
+| ------------------------------------- | ------------------------------------------------------------- |
+| [Humans guide](HUMANS.md)             | Install, configuration, supported extensions, troubleshooting |
+| [Agents guide](AGENTS.md)             | Architecture, design rationale, package layout, invariants    |
+| [Contributing](CONTRIBUTING.md)       | Build, test, and pull request workflow                        |
+| [Security](SECURITY.md)               | Vulnerability reporting                                       |
+| [Changelog](CHANGELOG.md)             | Release history (Keep a Changelog style)                      |
+| [Code of conduct](CODE_OF_CONDUCT.md) | Community standards and enforcement                           |
+| [License](LICENSE)                    | MIT License                                                   |
 
 ## License
 

@@ -142,21 +142,21 @@ hanging on stdin — safe to run by hand while debugging.
 
 ## Supported extensions
 
-| Extension | Formatter | Native? |
-| --- | --- | --- |
-| `.json` | `biome check --write` when an upward `biome.json`/`biome.jsonc` is found and `biome` is available through `bunx`/`PATH`; otherwise `encoding/json.Indent` | conditional |
-| `.sh`, `.bash` | `mvdan.cc/sh/v3` | yes |
-| `.go` | `go/format.Source` | yes |
-| `.ts`, `.tsx`, `.js`, `.jsx`, `.mjs`, `.cjs`, `.mts`, `.cts`, `.css`, `.jsonc` | `biome check --write` | no (PATH, else bunx) |
-| `.md`, `.mdx`, `.markdown` | `markdownlint-cli2 --fix` | no (PATH, else bunx) |
-| `.toml` | `taplo format` | no (PATH, else bunx) |
-| `.yaml`, `.yml`, `.html`, `.scss`, `.less`, `.graphql`, `.gql` | `prettier --write` | no (PATH, else bunx) |
-| `.sql` | `sqlfluff fix` | no (system binary) |
-| `.py`, `.pyi` | `ruff format` (preferred) or `black` | no (system binary) |
-| `.ipynb` | `ruff format` (preferred) or `black` with notebook support | no (system binary) |
-| `.rs` | `rustfmt` | no (system binary) |
-| `.tf`, `.tfvars`, `.tftest.hcl`, `.tfmock.hcl`, `.tfquery.hcl` | `terraform fmt` | no (system binary) |
-| `.proto` | `buf format -w` | no (system binary) |
+| Extension                                                                      | Formatter                                                                                                                                                 | Native?              |
+| ------------------------------------------------------------------------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------- |
+| `.json`                                                                        | `biome check --write` when an upward `biome.json`/`biome.jsonc` is found and `biome` is available through `bunx`/`PATH`; otherwise `encoding/json.Indent` | conditional          |
+| `.sh`, `.bash`                                                                 | `mvdan.cc/sh/v3`                                                                                                                                          | yes                  |
+| `.go`                                                                          | `go/format.Source`                                                                                                                                        | yes                  |
+| `.ts`, `.tsx`, `.js`, `.jsx`, `.mjs`, `.cjs`, `.mts`, `.cts`, `.css`, `.jsonc` | `biome check --write`                                                                                                                                     | no (PATH, else bunx) |
+| `.md`, `.mdx`, `.markdown`                                                     | `markdownlint-cli2 --fix`                                                                                                                                 | no (PATH, else bunx) |
+| `.toml`                                                                        | `taplo format`                                                                                                                                            | no (PATH, else bunx) |
+| `.yaml`, `.yml`, `.html`, `.scss`, `.less`, `.graphql`, `.gql`                 | `prettier --write`                                                                                                                                        | no (PATH, else bunx) |
+| `.sql`                                                                         | `sqlfluff fix`                                                                                                                                            | no (system binary)   |
+| `.py`, `.pyi`                                                                  | `ruff format` (preferred) or `black`                                                                                                                      | no (system binary)   |
+| `.ipynb`                                                                       | `ruff format` (preferred) or `black` with notebook support                                                                                                | no (system binary)   |
+| `.rs`                                                                          | `rustfmt`                                                                                                                                                 | no (system binary)   |
+| `.tf`, `.tfvars`, `.tftest.hcl`, `.tfmock.hcl`, `.tfquery.hcl`                 | `terraform fmt`                                                                                                                                           | no (system binary)   |
+| `.proto`                                                                       | `buf format -w`                                                                                                                                           | no (system binary)   |
 
 Extensionless paths beginning with a `bash`, `sh`, `zsh`, or `dash` shebang
 use the same native shell formatter as `.sh`. Multi-dot Terraform suffixes
@@ -172,7 +172,7 @@ biome's built-in defaults.
 
 ## Checking formatting in CI (`--check`)
 
-`format-dispatch --check PATH...` reports which files a formatter *would*
+`format-dispatch --check PATH...` reports which files a formatter _would_
 change, without changing them, and exits 1 if there are any. Directories are
 walked; vendored directories and unsupported extensions are skipped.
 
@@ -218,24 +218,24 @@ Three layers, in increasing priority:
 
    ```json
    {
-    "json": { "indentSize": 2, "useTabs": false },
-    "shell": { "indentSize": 2, "useTabs": false, "switchCaseIndent": true },
-    "disabled": [".sql"],
-    "disabledFormatters": ["biome"]
+     "json": { "indentSize": 2, "useTabs": false },
+     "shell": { "indentSize": 2, "useTabs": false, "switchCaseIndent": true },
+     "disabled": [".sql"],
+     "disabledFormatters": ["biome"]
    }
    ```
 
-  `disabled` lists extensions to skip entirely, even if their formatter
-  is installed. `disabledFormatters` lists formatter names to skip,
-  case-insensitively; for example, `"biome"` disables all Biome-owned
-  extensions without enumerating them. It leaves `.json` on the native JSON
-  fallback, while `"json"` disables `.json` entirely.
+`disabled` lists extensions to skip entirely, even if their formatter
+is installed. `disabledFormatters` lists formatter names to skip,
+case-insensitively; for example, `"biome"` disables all Biome-owned
+extensions without enumerating them. It leaves `.json` on the native JSON
+fallback, while `"json"` disables `.json` entirely.
 
-  Canonical formatter names for `disabledFormatters` are:
-  `biome`, `json`, `shfmt`, `gofmt`, `markdownlint-cli2`, `taplo`, `prettier`,
-  `sqlfluff`, `ruff/black`, `ruff/black-notebook`, `rustfmt`, `terraform`,
-  and `buf`. `ruff/black` does not cover notebooks; use
-  `ruff/black-notebook` separately for `.ipynb`.
+Canonical formatter names for `disabledFormatters` are:
+`biome`, `json`, `shfmt`, `gofmt`, `markdownlint-cli2`, `taplo`, `prettier`,
+`sqlfluff`, `ruff/black`, `ruff/black-notebook`, `rustfmt`, `terraform`,
+and `buf`. `ruff/black` does not cover notebooks; use
+`ruff/black-notebook` separately for `.ipynb`.
 
 3. **The target project's `.editorconfig`** — if a section covers the
    file being formatted, its `indent_style`/`indent_size` win over your

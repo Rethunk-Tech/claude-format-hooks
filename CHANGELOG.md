@@ -241,7 +241,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `--dryrun`, or a stray extra argument) instead of erroring — it now
   prints usage and exits 1, matching the top-level unrecognized-flag
   behavior.
-- `run()` loaded the user's config file (an `os.ReadFile`) on *every*
+- `run()` loaded the user's config file (an `os.ReadFile`) on _every_
   invocation before checking whether the extension had a formatter at
   all — so every write to a `.py`, `.rs`, or other never-formatted file
   paid a file read the documented "an unsupported extension is an

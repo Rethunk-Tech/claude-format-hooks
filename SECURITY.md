@@ -33,10 +33,10 @@ This project follows semantic versioning. Only the latest minor version
 receives security fixes. Older versions should be upgraded to receive
 patches.
 
-| Version | Supported |
-| -------- | ------------------- |
-| latest | :white_check_mark: |
-| < latest | :x: |
+| Version  | Supported          |
+| -------- | ------------------ |
+| latest   | :white_check_mark: |
+| < latest | :x:                |
 
 ## Scope
 

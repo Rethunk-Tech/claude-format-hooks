@@ -13,8 +13,8 @@ bootstrap. Multi-dot Terraform suffixes stayed deferred (below).
 Wave 2 (2026-08-09) landed: Windows `format-dispatch.exe` basename +
 legacy Wire/Unwire dedupe; extensionless shell-shebang peek (incl. CRLF)
 
-+ `Dispatch(ext)` glue; `.ipynb` via ruff/black-notebook; docs/tests
-aligned.
+- `Dispatch(ext)` glue; `.ipynb` via ruff/black-notebook; docs/tests
+  aligned.
 
 Wave 3 (2026-08-09) landed: longest-suffix `ResolveExtension`; Terraform
 `.tftest.hcl`/`.tfmock.hcl`/`.tfquery.hcl`; `--check` shebang parity;
@@ -128,7 +128,7 @@ ubuntu/macOS/Windows test are green on the new tip (prior red was run
 
 **Acceptance**
 
-+ Remote CI green on the Wave-14 tip for lint + test matrix.
+- Remote CI green on the Wave-14 tip for lint + test matrix.
 
 ### Fleet re-survey (periodic)
 
@@ -177,17 +177,17 @@ defaults are equivalent — unify only if a third seam package appears.
 
 ## Explicitly out of scope (do not re-open without new evidence)
 
-+ CLI framework (Cobra/urfave/kong/ffcli) — decided v0.2.0; see AGENTS.md.
-+ Native YAML/TOML/HTML Go formatters — fidelity failures already recorded
+- CLI framework (Cobra/urfave/kong/ffcli) — decided v0.2.0; see AGENTS.md.
+- Native YAML/TOML/HTML Go formatters — fidelity failures already recorded
   in AGENTS.md Architecture.
-+ Kotlin / XML / Lua / Gradle formatters — surveyed and passed over in
+- Kotlin / XML / Lua / Gradle formatters — surveyed and passed over in
   0.3.0.
-+ Requiring per-tool project config before formatting — removed for biome;
+- Requiring per-tool project config before formatting — removed for biome;
   do not reintroduce.
-+ Shared `internal/atomicfile` extract for installer + formatters — both
+- Shared `internal/atomicfile` extract for installer + formatters — both
   paths are atomic independently; extract only if a third caller appears.
-+ Overloading bare formatter names into `disabled` (wave 6 chose separate
+- Overloading bare formatter names into `disabled` (wave 6 chose separate
   `disabledFormatters` key).
-+ `runCheck` NewRegistry call-count / shared-cache integration proof —
+- `runCheck` NewRegistry call-count / shared-cache integration proof —
   Wave-9 unit floor is deliberate; Wave-10 closed the complementary
   negative path without production instrumentation.
