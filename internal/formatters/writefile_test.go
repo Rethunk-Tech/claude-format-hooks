@@ -2,8 +2,13 @@ package formatters
 
 import (
 	"os"
+	"os/exec"
+	"os/signal"
 	"path/filepath"
 	"runtime"
+	"strconv"
+	"strings"
+	"syscall"
 	"testing"
 
 	"github.com/go-quicktest/qt"
@@ -121,6 +126,16 @@ func TestWriteFormattedReturnsCreateTempError(t *testing.T) {
 	qt.Check(t, qt.IsNotNil(err))
 }
 
+func TestWriteFormattedReturnsWriteError(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "f")
+
+	withFileSizeLimit(t, func() {
+		err := writeFormatted(path, nil, []byte("new"), 0o644)
+
+		qt.Check(t, qt.IsNotNil(err))
+	})
+}
+
 func TestWriteFormattedReturnsReadFileErrorForDirectoryTarget(t *testing.T) {
 	dir := t.TempDir()
 	target := filepath.Join(dir, "target")
@@ -154,6 +169,81 @@ func TestWriteFormattedReturnsRenameErrorForDirectoryTarget(t *testing.T) {
 	entries, readErr := os.ReadDir(dir)
 	qt.Assert(t, qt.IsNil(readErr))
 	qt.Check(t, qt.Equals(len(entries), 1), qt.Commentf("a failed rename must remove the temporary file"))
+}
+
+func TestWriteIfMissingReturnsCreateTempError(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("Windows does not model POSIX directory permissions")
+	}
+	dir := t.TempDir()
+	path := filepath.Join(dir, "config.jsonc")
+	qt.Assert(t, qt.IsNil(os.Chmod(dir, 0o555)))
+	t.Cleanup(func() {
+		_ = os.Chmod(dir, 0o700)
+	})
+
+	err := writeIfMissing(path, []byte("content"))
+
+	qt.Check(t, qt.IsNotNil(err))
+}
+
+func TestWriteIfMissingReturnsLinkErrorForDanglingSymlink(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("Windows symlink creation requires elevated privileges")
+	}
+	dir := t.TempDir()
+	path := filepath.Join(dir, "config.jsonc")
+	target := filepath.Join(dir, "missing")
+	qt.Assert(t, qt.IsNil(os.Symlink(target, path)))
+
+	err := writeIfMissing(path, []byte("content"))
+
+	qt.Check(t, qt.IsNotNil(err))
+	gotTarget, readErr := os.Readlink(path)
+	qt.Assert(t, qt.IsNil(readErr))
+	qt.Check(t, qt.Equals(gotTarget, target))
+}
+
+func TestWriteIfMissingReturnsWriteError(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "config.jsonc")
+
+	withFileSizeLimit(t, func() {
+		err := writeIfMissing(path, []byte("content"))
+
+		qt.Check(t, qt.IsNotNil(err))
+	})
+}
+
+func withFileSizeLimit(t *testing.T, fn func()) {
+	t.Helper()
+	if runtime.GOOS != "linux" {
+		t.Skip("Linux prlimit is required to exercise a real write failure")
+	}
+
+	pid := strconv.Itoa(os.Getpid())
+	output, err := exec.Command("prlimit", "--pid", pid, "--fsize").Output()
+	if err != nil {
+		t.Skipf("prlimit is unavailable: %v", err)
+	}
+	fields := strings.Fields(string(output))
+	if len(fields) < 3 {
+		t.Fatalf("unexpected prlimit output: %q", output)
+	}
+	soft, hard := fields[len(fields)-3], fields[len(fields)-2]
+
+	sigxfsz := syscall.Signal(25)
+	signal.Ignore(sigxfsz)
+	defer signal.Reset(sigxfsz)
+	if err := exec.Command("prlimit", "--pid", pid, "--fsize=0:"+hard).Run(); err != nil {
+		t.Fatalf("set file-size limit: %v", err)
+	}
+	defer func() {
+		if err := exec.Command("prlimit", "--pid", pid, "--fsize="+soft+":"+hard).Run(); err != nil {
+			t.Errorf("restore file-size limit: %v", err)
+		}
+	}()
+
+	fn()
 }
 
 func TestShellFormatterPreservesExecutableBit(t *testing.T) {
