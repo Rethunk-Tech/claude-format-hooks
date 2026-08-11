@@ -6,6 +6,15 @@ import (
 	"path/filepath"
 )
 
+var (
+	writeFormattedChmod = func(file *os.File, mode os.FileMode) error {
+		return file.Chmod(mode)
+	}
+	writeFormattedClose = func(file *os.File) error {
+		return file.Close()
+	}
+)
+
 // writeFormatted writes out to abs, preserving abs's existing file mode
 // (e.g. an executable bit on a shell script) rather than resetting it —
 // falling back to defaultMode only when abs can't be stat'd (the file
@@ -36,15 +45,15 @@ func writeFormatted(abs string, source, out []byte, defaultMode os.FileMode) err
 		_ = os.Remove(tmpName)
 	}()
 
-	if err := tmp.Chmod(mode); err != nil {
-		_ = tmp.Close()
+	if err := writeFormattedChmod(tmp, mode); err != nil {
+		_ = writeFormattedClose(tmp)
 		return err
 	}
 	if _, err := tmp.Write(out); err != nil {
-		_ = tmp.Close()
+		_ = writeFormattedClose(tmp)
 		return err
 	}
-	if err := tmp.Close(); err != nil {
+	if err := writeFormattedClose(tmp); err != nil {
 		return err
 	}
 
