@@ -126,7 +126,7 @@ regressions become a concern.
 ### Confirm green CI after push of Wave-13 tip
 
 Local `main` is ahead of `origin/main` with Wave-13 coverage + audit
-fixups (`12c0a32` tip at closeout). Push is not authorized from this
+fixups (`7ca342c` tip at closeout). Push is not authorized from this
 session. After an operator push, confirm ubuntu lint +
 ubuntu/macOS/Windows test are green on the new tip (prior red was run
 `31445363724` on `36d7fe3`).
