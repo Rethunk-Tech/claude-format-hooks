@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"os"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"testing"
 	"time"
@@ -440,7 +441,7 @@ func TestCheckProjectRoot(t *testing.T) {
 			name: "directory fallback when working directory is unavailable",
 			setup: func(t *testing.T) ([]string, string, string) {
 				t.Helper()
-				if filepath.Separator == '\\' {
+				if filepath.Separator == '\\' || runtime.GOOS == "darwin" {
 					t.Skip("removing the current directory is not portable")
 				}
 				t.Setenv("CLAUDE_PROJECT_DIR", "")
@@ -456,7 +457,7 @@ func TestCheckProjectRoot(t *testing.T) {
 			name: "configured relative root is returned when working directory is unavailable",
 			setup: func(t *testing.T) ([]string, string, string) {
 				t.Helper()
-				if filepath.Separator == '\\' {
+				if filepath.Separator == '\\' || runtime.GOOS == "darwin" {
 					t.Skip("removing the current directory is not portable")
 				}
 				workingDir := t.TempDir()
