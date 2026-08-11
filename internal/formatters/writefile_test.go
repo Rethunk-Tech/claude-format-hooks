@@ -133,10 +133,8 @@ func TestWriteFormattedReturnsCreateTempError(t *testing.T) {
 }
 
 func TestWriteFormattedReturnsWriteError(t *testing.T) {
-	path := filepath.Join(t.TempDir(), "f")
-
-	withFileSizeLimit(t, func() {
-		err := writeFormatted(path, nil, []byte("new"), 0o644)
+	runWithFileSizeLimit(t, func() {
+		err := writeFormatted(filepath.Join(t.TempDir(), "f"), nil, []byte("new"), 0o644)
 
 		qt.Check(t, qt.IsNotNil(err))
 	})
@@ -256,13 +254,24 @@ func TestWriteIfMissingReturnsLinkErrorForDanglingSymlink(t *testing.T) {
 }
 
 func TestWriteIfMissingReturnsWriteError(t *testing.T) {
-	path := filepath.Join(t.TempDir(), "config.jsonc")
-
-	withFileSizeLimit(t, func() {
-		err := writeIfMissing(path, []byte("content"))
+	runWithFileSizeLimit(t, func() {
+		err := writeIfMissing(filepath.Join(t.TempDir(), "config.jsonc"), []byte("content"))
 
 		qt.Check(t, qt.IsNotNil(err))
 	})
+}
+
+func runWithFileSizeLimit(t *testing.T, fn func()) {
+	t.Helper()
+	if os.Getenv("FORMAT_DISPATCH_FILE_SIZE_HELPER") == "1" {
+		withFileSizeLimit(t, fn)
+		return
+	}
+
+	cmd := exec.Command(os.Args[0], "-test.run", "^"+t.Name()+"$")
+	cmd.Env = append(os.Environ(), "FORMAT_DISPATCH_FILE_SIZE_HELPER=1")
+	output, err := cmd.CombinedOutput()
+	qt.Assert(t, qt.IsNil(err), qt.Commentf("file-size helper output: %s", output))
 }
 
 func withFileSizeLimit(t *testing.T, fn func()) {
