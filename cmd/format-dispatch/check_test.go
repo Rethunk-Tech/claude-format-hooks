@@ -7,7 +7,6 @@ import (
 	"io/fs"
 	"os"
 	"path/filepath"
-	"runtime"
 	"strings"
 	"testing"
 	"time"
@@ -557,7 +556,7 @@ func TestCheckProjectRoot(t *testing.T) {
 			name: "directory fallback when working directory is unavailable",
 			setup: func(t *testing.T) ([]string, string, string) {
 				t.Helper()
-				if filepath.Separator == '\\' || runtime.GOOS == "darwin" {
+				if filepath.Separator == '\\' {
 					t.Skip("removing the current directory is not portable")
 				}
 				t.Setenv("CLAUDE_PROJECT_DIR", "")
@@ -565,7 +564,7 @@ func TestCheckProjectRoot(t *testing.T) {
 				outside := t.TempDir()
 				abs := filepath.Join(outside, "target.json")
 				t.Chdir(workingDir)
-				qt.Assert(t, qt.IsNil(os.RemoveAll(workingDir)))
+				skipIfCwdSurvivesRemoval(t, workingDir)
 				return nil, abs, filepath.Dir(abs)
 			},
 		},
@@ -573,12 +572,12 @@ func TestCheckProjectRoot(t *testing.T) {
 			name: "configured relative root is returned when working directory is unavailable",
 			setup: func(t *testing.T) ([]string, string, string) {
 				t.Helper()
-				if filepath.Separator == '\\' || runtime.GOOS == "darwin" {
+				if filepath.Separator == '\\' {
 					t.Skip("removing the current directory is not portable")
 				}
 				workingDir := t.TempDir()
 				t.Chdir(workingDir)
-				qt.Assert(t, qt.IsNil(os.RemoveAll(workingDir)))
+				skipIfCwdSurvivesRemoval(t, workingDir)
 				t.Setenv("CLAUDE_PROJECT_DIR", ".")
 				abs := filepath.Join(t.TempDir(), "target.json")
 				return nil, abs, "."

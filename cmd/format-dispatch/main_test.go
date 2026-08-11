@@ -3,7 +3,6 @@ package main
 import (
 	"os"
 	"path/filepath"
-	"runtime"
 	"testing"
 
 	"github.com/go-quicktest/qt"
@@ -135,7 +134,7 @@ func TestResolveTarget(t *testing.T) {
 			name: "directory fallback when working directory is unavailable",
 			setup: func(t *testing.T) (string, string, string, string) {
 				t.Helper()
-				if filepath.Separator == '\\' || runtime.GOOS == "darwin" {
+				if filepath.Separator == '\\' {
 					t.Skip("removing the current directory is not portable")
 				}
 				t.Setenv("CLAUDE_PROJECT_DIR", "")
@@ -144,7 +143,7 @@ func TestResolveTarget(t *testing.T) {
 				path := filepath.Join(outside, "target.json")
 				writeFile(t, path, "content")
 				t.Chdir(workingDir)
-				qt.Assert(t, qt.IsNil(os.RemoveAll(workingDir)))
+				skipIfCwdSurvivesRemoval(t, workingDir)
 				return path, path, outside, ""
 			},
 		},
