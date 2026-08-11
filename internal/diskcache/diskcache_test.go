@@ -145,6 +145,28 @@ func TestGetTreatsMalformedEntryAsAMiss(t *testing.T) {
 	qt.Check(t, qt.IsFalse(ok))
 }
 
+func TestCacheEntryExpiredRejectsUnreadableAndMalformedEntries(t *testing.T) {
+	dir := t.TempDir()
+	cases := []struct {
+		name string
+		path string
+		body string
+	}{
+		{name: "read error", path: filepath.Join(dir, "missing")},
+		{name: "no newline", path: filepath.Join(dir, "no-newline"), body: "123"},
+		{name: "bad timestamp", path: filepath.Join(dir, "bad-timestamp"), body: "not-a-timestamp\nvalue"},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			if tc.body != "" {
+				qt.Assert(t, qt.IsNil(os.WriteFile(tc.path, []byte(tc.body), 0o600))) //nolint:gosec // test fixture
+			}
+			qt.Check(t, qt.IsFalse(cacheEntryExpired(tc.path, time.Minute)))
+		})
+	}
+}
+
 func TestRemoveDeletesEntry(t *testing.T) {
 	dir := t.TempDir()
 	Set(dir, "k", "value")
