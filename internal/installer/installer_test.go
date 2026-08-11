@@ -5,8 +5,10 @@ import (
 	"os"
 	"path/filepath"
 	"runtime"
+	"strconv"
 	"strings"
 	"testing"
+	"unsafe"
 
 	"github.com/go-quicktest/qt"
 )
@@ -495,6 +497,106 @@ func TestWriteAtomicOverwritesExistingFile(t *testing.T) {
 	qt.Assert(t, qt.IsNil(writeAtomic(path, []byte(`{"new":true}`), 0o600)))
 
 	qt.Check(t, qt.DeepEquals(readFile(t, path), []byte(`{"new":true}`)))
+}
+
+func TestWriteAtomicCreateTempFailure(t *testing.T) {
+	dir := t.TempDir()
+	parent := filepath.Join(dir, "parent")
+	qt.Assert(t, qt.IsNil(os.WriteFile(parent, []byte("not a directory"), 0o600)))
+
+	err := writeAtomic(filepath.Join(parent, "f.json"), []byte(`{"a":1}`), 0o600)
+	qt.Check(t, qt.IsNotNil(err))
+}
+
+func TestWriteAtomicRenameFailure(t *testing.T) {
+	dir := t.TempDir()
+	path := filepath.Join(dir, "f.json")
+	qt.Assert(t, qt.IsNil(os.Mkdir(path, 0o755)))
+
+	err := writeAtomic(path, []byte(`{"a":1}`), 0o600)
+	qt.Check(t, qt.IsNotNil(err))
+	entries, readErr := os.ReadDir(dir)
+	qt.Assert(t, qt.IsNil(readErr))
+	qt.Check(t, qt.HasLen(entries, 1), qt.Commentf("failed rename must remove the temporary file"))
+}
+
+func TestWriteAtomicCreateTempFailureInReadOnlyDirectory(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("Windows does not enforce directory mode bits")
+	}
+
+	dir := t.TempDir()
+	qt.Assert(t, qt.IsNil(os.Chmod(dir, 0o555)))
+	t.Cleanup(func() {
+		_ = os.Chmod(dir, 0o700)
+	})
+
+	err := writeAtomic(filepath.Join(dir, "f.json"), []byte(`{"a":1}`), 0o600)
+	qt.Check(t, qt.IsNotNil(err))
+}
+
+//go:nocheckptr
+func TestWriteAtomicWriteFailure(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("Windows does not expose the Unix invalid-address write error")
+	}
+
+	dir := t.TempDir()
+	invalid := unsafe.Slice((*byte)(unsafe.Pointer(uintptr(1))), 1)
+	err := writeAtomic(filepath.Join(dir, "f.json"), invalid, 0o600)
+	qt.Check(t, qt.IsNotNil(err))
+}
+
+func TestWriteAtomicCloseFailure(t *testing.T) {
+	if runtime.GOOS != "linux" {
+		t.Skip("Linux exposes process file descriptors for this fixture")
+	}
+
+	dir := t.TempDir()
+	stop := make(chan struct{})
+	done := make(chan struct{})
+	go func() {
+		defer close(done)
+		for {
+			select {
+			case <-stop:
+				return
+			default:
+			}
+
+			entries, err := os.ReadDir("/proc/self/fd")
+			if err != nil {
+				continue
+			}
+			for _, entry := range entries {
+				fd, err := strconv.Atoi(entry.Name())
+				if err != nil {
+					continue
+				}
+				link, err := os.Readlink(filepath.Join("/proc/self/fd", entry.Name()))
+				if err != nil || filepath.Dir(link) != dir || !strings.HasSuffix(link, ".tmp") {
+					continue
+				}
+				info, err := os.Stat(link)
+				if err != nil || info.Mode().Perm() != 0o644 {
+					continue
+				}
+				_ = os.NewFile(uintptr(fd), link).Close()
+			}
+		}
+	}()
+	defer func() {
+		close(stop)
+		<-done
+	}()
+
+	for range 10000 {
+		err := writeAtomic(filepath.Join(dir, "f.json"), []byte(`{"a":1}`), 0o644)
+		if err != nil && strings.HasPrefix(err.Error(), "close ") {
+			return
+		}
+	}
+	t.Fatal("did not induce writeAtomic close failure")
 }
 
 func readFile(t *testing.T, path string) []byte {
