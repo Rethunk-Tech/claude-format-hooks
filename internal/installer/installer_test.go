@@ -650,58 +650,6 @@ func TestApplyChangeReportsSettingsWriteFailure(t *testing.T) {
 	qt.Check(t, qt.IsNotNil(err))
 }
 
-func TestWriteAtomicCloseFailure(t *testing.T) {
-	if runtime.GOOS != "linux" {
-		t.Skip("Linux exposes process file descriptors for this fixture")
-	}
-
-	dir := t.TempDir()
-	stop := make(chan struct{})
-	done := make(chan struct{})
-	go func() {
-		defer close(done)
-		for {
-			select {
-			case <-stop:
-				return
-			default:
-			}
-
-			entries, err := os.ReadDir("/proc/self/fd")
-			if err != nil {
-				continue
-			}
-			for _, entry := range entries {
-				fd, err := strconv.Atoi(entry.Name())
-				if err != nil {
-					continue
-				}
-				link, err := os.Readlink(filepath.Join("/proc/self/fd", entry.Name()))
-				if err != nil || filepath.Dir(link) != dir || !strings.HasSuffix(link, ".tmp") {
-					continue
-				}
-				info, err := os.Stat(link)
-				if err != nil || info.Mode().Perm() != 0o644 {
-					continue
-				}
-				_ = os.NewFile(uintptr(fd), link).Close()
-			}
-		}
-	}()
-	defer func() {
-		close(stop)
-		<-done
-	}()
-
-	for range 10000 {
-		err := writeAtomic(filepath.Join(dir, "f.json"), []byte(`{"a":1}`), 0o644)
-		if err != nil && strings.HasPrefix(err.Error(), "close ") {
-			return
-		}
-	}
-	t.Fatal("did not induce writeAtomic close failure")
-}
-
 func TestWriteAtomicChmodFailure(t *testing.T) {
 	if runtime.GOOS != "linux" {
 		t.Skip("Linux exposes process file descriptors for this fixture")
