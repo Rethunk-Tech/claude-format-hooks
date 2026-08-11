@@ -3,6 +3,7 @@ package diskcache
 import (
 	"os"
 	"path/filepath"
+	"runtime"
 	"strconv"
 	"testing"
 	"time"
@@ -165,6 +166,62 @@ func TestCacheEntryExpiredRejectsUnreadableAndMalformedEntries(t *testing.T) {
 			qt.Check(t, qt.IsFalse(cacheEntryExpired(tc.path, time.Minute)))
 		})
 	}
+}
+
+func TestPruneLeavesEntryWithoutNamespace(t *testing.T) {
+	dir := t.TempDir()
+	path := filepath.Join(dir, "k")
+	stale := strconv.FormatInt(time.Now().Add(-time.Hour).Unix(), 10) + "\nvalue"
+	qt.Assert(t, qt.IsNil(os.WriteFile(path, []byte(stale), 0o600))) //nolint:gosec // test fixture
+
+	prune(dir, cacheNamespacePrefix("k"), time.Minute)
+
+	_, err := os.Stat(path)
+	qt.Check(t, qt.IsNil(err), qt.Commentf("entries without a namespace must not be pruned"))
+}
+
+func TestPruneSwallowsReadDirError(t *testing.T) {
+	parent := t.TempDir()
+	file := filepath.Join(parent, "not-a-directory")
+	qt.Assert(t, qt.IsNil(os.WriteFile(file, []byte("x"), 0o600))) //nolint:gosec // test fixture
+
+	prune(filepath.Join(file, "child"), "ns-", time.Minute)
+
+	_, err := os.Stat(file)
+	qt.Check(t, qt.IsNil(err))
+}
+
+func TestPruneKeepsEntryRefreshedBetweenExpirationChecks(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("the pipe descriptor path is not portable to Windows")
+	}
+
+	dir := t.TempDir()
+	key := "ns-refresh"
+	path := filepath.Join(dir, key)
+	readPipe, writePipe, err := os.Pipe()
+	qt.Assert(t, qt.IsNil(err))
+	defer readPipe.Close()
+
+	fdDir := "/dev/fd"
+	if runtime.GOOS == "linux" {
+		fdDir = "/proc/self/fd"
+	}
+	qt.Assert(t, qt.IsNil(os.Symlink(filepath.Join(fdDir, strconv.FormatUint(uint64(readPipe.Fd()), 10)), path)))
+
+	setDone := make(chan struct{})
+	go func() {
+		_, _ = writePipe.Write([]byte(strconv.FormatInt(time.Now().Add(-time.Hour).Unix(), 10) + "\nstale"))
+		_ = writePipe.Close()
+		Set(dir, key, "fresh")
+		close(setDone)
+	}()
+
+	prune(dir, "ns-", time.Minute)
+	<-setDone
+
+	_, err = os.Lstat(path)
+	qt.Check(t, qt.IsNil(err), qt.Commentf("a refreshed entry must not be removed by prune"))
 }
 
 func TestRemoveDeletesEntry(t *testing.T) {
