@@ -120,6 +120,12 @@ func TestWriteFormattedReturnsCreateTempError(t *testing.T) {
 	t.Cleanup(func() {
 		_ = os.Chmod(dir, 0o700)
 	})
+	probe, probeErr := os.CreateTemp(dir, ".chmod-probe-*")
+	if probeErr == nil {
+		_ = probe.Close()
+		_ = os.Remove(probe.Name())
+		t.Skip("directory still writable after chmod 0555")
+	}
 
 	err := writeFormatted(path, []byte("old"), []byte("new"), 0o644)
 
@@ -181,6 +187,12 @@ func TestWriteIfMissingReturnsCreateTempError(t *testing.T) {
 	t.Cleanup(func() {
 		_ = os.Chmod(dir, 0o700)
 	})
+	probe, probeErr := os.CreateTemp(dir, ".chmod-probe-*")
+	if probeErr == nil {
+		_ = probe.Close()
+		_ = os.Remove(probe.Name())
+		t.Skip("directory still writable after chmod 0555")
+	}
 
 	err := writeIfMissing(path, []byte("content"))
 
