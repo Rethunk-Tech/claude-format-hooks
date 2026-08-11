@@ -478,6 +478,36 @@ func TestInstallWritesSettings(t *testing.T) {
 	qt.Check(t, qt.Equals(entries[0].Hooks[0].Command, binPath))
 }
 
+func TestParseSettingsReportsMalformedTopLevelJSON(t *testing.T) {
+	dir := t.TempDir()
+	settingsPath := filepath.Join(dir, "settings.json")
+	qt.Assert(t, qt.IsNil(os.WriteFile(settingsPath, []byte(`{"hooks":`), 0o600)))
+
+	_, _, err := Wire(settingsPath, binPath)
+	qt.Assert(t, qt.IsNotNil(err))
+	qt.Check(t, qt.StringContains(err.Error(), "parse "+settingsPath+":"))
+}
+
+func TestParseSettingsReportsHooksObjectError(t *testing.T) {
+	dir := t.TempDir()
+	settingsPath := filepath.Join(dir, "settings.json")
+	qt.Assert(t, qt.IsNil(os.WriteFile(settingsPath, []byte(`{"hooks":[]}`), 0o600)))
+
+	_, _, err := Wire(settingsPath, binPath)
+	qt.Assert(t, qt.IsNotNil(err))
+	qt.Check(t, qt.StringContains(err.Error(), "parse "+settingsPath+": hooks:"))
+}
+
+func TestParseSettingsReportsPostToolUseArrayError(t *testing.T) {
+	dir := t.TempDir()
+	settingsPath := filepath.Join(dir, "settings.json")
+	qt.Assert(t, qt.IsNil(os.WriteFile(settingsPath, []byte(`{"hooks":{"PostToolUse":{}}}`), 0o600)))
+
+	_, _, err := Wire(settingsPath, binPath)
+	qt.Assert(t, qt.IsNotNil(err))
+	qt.Check(t, qt.StringContains(err.Error(), "parse "+settingsPath+": hooks.PostToolUse:"))
+}
+
 func TestWriteAtomicWritesContentAndLeavesNoTempFile(t *testing.T) {
 	dir := t.TempDir()
 	path := filepath.Join(dir, "f.json")
@@ -544,6 +574,92 @@ func TestWriteAtomicWriteFailure(t *testing.T) {
 	dir := t.TempDir()
 	invalid := unsafe.Slice((*byte)(unsafe.Pointer(uintptr(1))), 1)
 	err := writeAtomic(filepath.Join(dir, "f.json"), invalid, 0o600)
+	qt.Check(t, qt.IsNotNil(err))
+}
+
+func TestApplyChangeReportsBackupWriteFailure(t *testing.T) {
+	dir := t.TempDir()
+	settingsPath := filepath.Join(dir, "settings.json")
+	backupPath := settingsPath + ".bak"
+	qt.Assert(t, qt.IsNil(os.WriteFile(settingsPath, []byte(`{"before":true}`), 0o600)))
+	qt.Assert(t, qt.IsNil(os.Mkdir(backupPath, 0o755)))
+
+	var out strings.Builder
+	err := applyChange(
+		Options{SettingsPath: settingsPath},
+		[]byte(`{"before":true}`),
+		[]byte(`{"after":true}`),
+		false,
+		&out,
+		"updated",
+	)
+	qt.Assert(t, qt.IsNotNil(err))
+	qt.Check(t, qt.StringContains(err.Error(), "backup "+settingsPath+":"))
+}
+
+func TestApplyChangeReportsSettingsReadFailure(t *testing.T) {
+	settingsPath := filepath.Join(t.TempDir(), "settings.json")
+	qt.Assert(t, qt.IsNil(os.Mkdir(settingsPath, 0o755)))
+
+	var out strings.Builder
+	err := applyChange(
+		Options{SettingsPath: settingsPath},
+		[]byte(`{"before":true}`),
+		[]byte(`{"after":true}`),
+		false,
+		&out,
+		"updated",
+	)
+	qt.Check(t, qt.IsNotNil(err))
+}
+
+func TestApplyChangeReportsMkdirFailure(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("Windows does not enforce directory mode bits")
+	}
+
+	dir := t.TempDir()
+	blocked := filepath.Join(dir, "blocked")
+	qt.Assert(t, qt.IsNil(os.Mkdir(blocked, 0o755)))
+	qt.Assert(t, qt.IsNil(os.Chmod(blocked, 0o555)))
+	t.Cleanup(func() {
+		_ = os.Chmod(blocked, 0o700)
+	})
+
+	settingsPath := filepath.Join(blocked, "nested", "settings.json")
+	var out strings.Builder
+	err := applyChange(
+		Options{SettingsPath: settingsPath},
+		[]byte(`{"before":true}`),
+		[]byte(`{"after":true}`),
+		false,
+		&out,
+		"updated",
+	)
+	qt.Check(t, qt.IsNotNil(err))
+}
+
+func TestApplyChangeReportsSettingsWriteFailure(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("Windows does not enforce directory mode bits")
+	}
+
+	dir := t.TempDir()
+	qt.Assert(t, qt.IsNil(os.Chmod(dir, 0o555)))
+	t.Cleanup(func() {
+		_ = os.Chmod(dir, 0o700)
+	})
+
+	settingsPath := filepath.Join(dir, "settings.json")
+	var out strings.Builder
+	err := applyChange(
+		Options{SettingsPath: settingsPath},
+		[]byte(`{"before":true}`),
+		[]byte(`{"after":true}`),
+		false,
+		&out,
+		"updated",
+	)
 	qt.Check(t, qt.IsNotNil(err))
 }
 
