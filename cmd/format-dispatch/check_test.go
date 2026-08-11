@@ -450,7 +450,7 @@ func TestCheckProjectRoot(t *testing.T) {
 				abs := filepath.Join(outside, "target.json")
 				t.Chdir(workingDir)
 				qt.Assert(t, qt.IsNil(os.RemoveAll(workingDir)))
-				return []string{"relative-target.json"}, abs, filepath.Dir(abs)
+				return nil, abs, filepath.Dir(abs)
 			},
 		},
 		{
