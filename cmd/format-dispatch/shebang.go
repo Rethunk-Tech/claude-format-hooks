@@ -9,7 +9,7 @@ import (
 const shebangPeekLimit = 256
 
 func shellShebangExt(path string) (string, bool) {
-	f, err := os.Open(path)
+	f, err := os.Open(path) //nolint:gosec // path is the hook/check target by design
 	if err != nil {
 		return "", false
 	}

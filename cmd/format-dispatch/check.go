@@ -150,7 +150,7 @@ func checkProjectRoot(paths []string, abs string) string {
 		if err != nil {
 			continue
 		}
-		info, err := os.Stat(path)
+		info, err := os.Stat(root)
 		if err == nil && !info.IsDir() {
 			root = filepath.Dir(root)
 		}
