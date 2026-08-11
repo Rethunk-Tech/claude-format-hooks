@@ -682,7 +682,19 @@ func TestCollectCheckTargetsSkipsDirectOutsideAndVendoredFiles(t *testing.T) {
 	outside := writeCheckFile(t, outsideRoot, "outside.json", unformattedJSON)
 	t.Setenv("CLAUDE_PROJECT_DIR", projectRoot)
 
-	targets, err := collectCheckTargets([]string{vendored, outside})
+	targets, err := collectCheckTargets([]string{vendored, outside, outsideRoot})
+	qt.Assert(t, qt.IsNil(err))
+	qt.Check(t, qt.DeepEquals(targets, []string{}))
+}
+
+func TestCollectCheckTargetsSkipsVendoredDirectoryRoot(t *testing.T) {
+	projectRoot := t.TempDir()
+	vendored := filepath.Join(projectRoot, "node_modules")
+	writeCheckFile(t, vendored, "dep.json", unformattedJSON)
+	t.Setenv("CLAUDE_PROJECT_DIR", projectRoot)
+
+	targets, err := collectCheckTargets([]string{vendored})
+
 	qt.Assert(t, qt.IsNil(err))
 	qt.Check(t, qt.DeepEquals(targets, []string{}))
 }
@@ -691,6 +703,16 @@ func TestCollectCheckTargetsSkipsNewVendoredCacheDirectories(t *testing.T) {
 	projectRoot := t.TempDir()
 	keep := writeCheckFile(t, projectRoot, "keep.json", formattedJSON)
 	for _, segment := range []string{
+		".next",
+		".yarn",
+		".git",
+		".agents",
+		"dist",
+		"build",
+		"coverage",
+		"test-results",
+		"vendor",
+		".venv",
 		".terraform",
 		"__pycache__",
 		".ruff_cache",
@@ -704,6 +726,38 @@ func TestCollectCheckTargetsSkipsNewVendoredCacheDirectories(t *testing.T) {
 	targets, err := collectCheckTargets([]string{projectRoot})
 	qt.Assert(t, qt.IsNil(err))
 	qt.Check(t, qt.DeepEquals(targets, []string{keep}))
+}
+
+func TestCollectCheckTargetsSkipsScratchFilesDuringWalk(t *testing.T) {
+	projectRoot := t.TempDir()
+	nested := filepath.Join(projectRoot, "nested")
+	keep := writeCheckFile(t, nested, "keep.json", formattedJSON)
+	writeCheckFile(t, nested, ".fmtcheck-leftover.json", formattedJSON)
+	t.Setenv("CLAUDE_PROJECT_DIR", projectRoot)
+
+	targets, err := collectCheckTargets([]string{projectRoot})
+
+	qt.Assert(t, qt.IsNil(err))
+	qt.Check(t, qt.DeepEquals(targets, []string{keep}))
+}
+
+func TestCollectCheckTargetsReportsWalkError(t *testing.T) {
+	if filepath.Separator == '\\' {
+		t.Skip("directory permissions are not portable")
+	}
+	projectRoot := t.TempDir()
+	unreadable := filepath.Join(projectRoot, "unreadable")
+	writeCheckFile(t, unreadable, "hidden.json", formattedJSON)
+	qt.Assert(t, qt.IsNil(os.Chmod(unreadable, 0o000))) //nolint:gosec // test fixture
+	t.Cleanup(func() {
+		_ = os.Chmod(unreadable, 0o750) //nolint:gosec // restore test fixture permissions
+	})
+
+	_, err := collectCheckTargets([]string{projectRoot})
+
+	if err == nil {
+		t.Skip("test process can read mode-000 directories")
+	}
 }
 
 func TestCheckRejectsNoPaths(t *testing.T) {
