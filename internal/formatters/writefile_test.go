@@ -68,6 +68,8 @@ func TestWriteFormattedDanglingSymlinkNoOp(t *testing.T) {
 
 	qt.Assert(t, qt.IsNil(writeFormatted(link, []byte("old"), []byte("new"), 0o644)))
 
+	_, readErr := os.ReadFile(link) //nolint:gosec // path is the temp dir this test just created
+	qt.Check(t, qt.IsTrue(os.IsNotExist(readErr)), qt.Commentf("reading through a dangling symlink must fail"))
 	gotTarget, err := os.Readlink(link)
 	qt.Assert(t, qt.IsNil(err))
 	qt.Check(t, qt.Equals(gotTarget, target), qt.Commentf("a dangling symlink target must remain unchanged"))
