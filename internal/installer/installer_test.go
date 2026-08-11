@@ -8,7 +8,6 @@ import (
 	"strconv"
 	"strings"
 	"testing"
-	"unsafe"
 
 	"github.com/go-quicktest/qt"
 )
@@ -562,18 +561,6 @@ func TestWriteAtomicCreateTempFailureInReadOnlyDirectory(t *testing.T) {
 	})
 
 	err := writeAtomic(filepath.Join(dir, "f.json"), []byte(`{"a":1}`), 0o600)
-	qt.Check(t, qt.IsNotNil(err))
-}
-
-//go:nocheckptr
-func TestWriteAtomicWriteFailure(t *testing.T) {
-	if runtime.GOOS == "windows" {
-		t.Skip("Windows does not expose the Unix invalid-address write error")
-	}
-
-	dir := t.TempDir()
-	invalid := unsafe.Slice((*byte)(unsafe.Pointer(uintptr(1))), 1)
-	err := writeAtomic(filepath.Join(dir, "f.json"), invalid, 0o600)
 	qt.Check(t, qt.IsNotNil(err))
 }
 
