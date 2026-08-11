@@ -3,12 +3,16 @@ package formatters
 import (
 	"os"
 	"path/filepath"
+	"runtime"
 	"testing"
 
 	"github.com/go-quicktest/qt"
 )
 
 func TestNotebookFormatterPrefersRuffOverBlack(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("fake shell-script tools are POSIX-shell only")
+	}
 	isolateDiskCache(t)
 	dir := t.TempDir()
 	ruffPath := filepath.Join(dir, "ruff")
