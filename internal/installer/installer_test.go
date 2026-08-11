@@ -715,6 +715,74 @@ func TestWriteAtomicCloseFailure(t *testing.T) {
 	t.Fatal("did not induce writeAtomic close failure")
 }
 
+func TestWriteAtomicChmodFailure(t *testing.T) {
+	if runtime.GOOS != "linux" {
+		t.Skip("Linux exposes process file descriptors for this fixture")
+	}
+
+	dir := t.TempDir()
+	data := make([]byte, 64<<20)
+	for range 100 {
+		stop := make(chan struct{})
+		done := make(chan struct{})
+		go func() {
+			defer close(done)
+			for {
+				select {
+				case <-stop:
+					return
+				default:
+				}
+
+				entries, err := os.ReadDir("/proc/self/fd")
+				if err != nil {
+					continue
+				}
+				for _, entry := range entries {
+					fd, err := strconv.Atoi(entry.Name())
+					if err != nil {
+						continue
+					}
+					link, err := os.Readlink(filepath.Join("/proc/self/fd", entry.Name()))
+					if err != nil || filepath.Dir(link) != dir || !strings.HasSuffix(link, ".tmp") {
+						continue
+					}
+
+					original := os.NewFile(uintptr(fd), link)
+					if err := original.Close(); err != nil {
+						continue
+					}
+					replacement, err := os.OpenFile("/dev/null", os.O_WRONLY, 0)
+					if err != nil {
+						continue
+					}
+					if replacement.Fd() != uintptr(fd) {
+						_ = replacement.Close()
+						continue
+					}
+					for {
+						select {
+						case <-stop:
+							_ = replacement.Close()
+							return
+						default:
+							runtime.Gosched()
+						}
+					}
+				}
+			}
+		}()
+
+		err := writeAtomic(filepath.Join(dir, "f.json"), data, 0o600)
+		close(stop)
+		<-done
+		if err != nil && strings.HasPrefix(err.Error(), "chmod ") {
+			return
+		}
+	}
+	t.Fatal("did not induce writeAtomic chmod failure")
+}
+
 func readFile(t *testing.T, path string) []byte {
 	t.Helper()
 	raw, err := os.ReadFile(path)
