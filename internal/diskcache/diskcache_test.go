@@ -201,7 +201,7 @@ func TestPruneKeepsEntryRefreshedBetweenExpirationChecks(t *testing.T) {
 	path := filepath.Join(dir, key)
 	readPipe, writePipe, err := os.Pipe()
 	qt.Assert(t, qt.IsNil(err))
-	defer readPipe.Close()
+	defer func() { _ = readPipe.Close() }()
 
 	fdDir := "/dev/fd"
 	if runtime.GOOS == "linux" {
