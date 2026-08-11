@@ -91,6 +91,71 @@ func TestWriteFormattedSkipsStaleSource(t *testing.T) {
 	qt.Check(t, qt.Equals(string(got), "newer"), qt.Commentf("a newer on-disk source must not be overwritten"))
 }
 
+func TestWriteFormattedReturnsEvalSymlinksError(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("Windows does not model POSIX path resolution errors consistently")
+	}
+	dir := t.TempDir()
+	blocker := filepath.Join(dir, "blocker")
+	qt.Assert(t, qt.IsNil(os.WriteFile(blocker, []byte("not a directory"), 0o644))) //nolint:gosec // test fixture
+
+	err := writeFormatted(filepath.Join(blocker, "target"), []byte("old"), []byte("new"), 0o644)
+
+	qt.Check(t, qt.IsNotNil(err))
+}
+
+func TestWriteFormattedReturnsCreateTempError(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("Windows does not model POSIX directory permissions")
+	}
+	dir := t.TempDir()
+	path := filepath.Join(dir, "f")
+	qt.Assert(t, qt.IsNil(os.WriteFile(path, []byte("old"), 0o644))) //nolint:gosec // test fixture
+	qt.Assert(t, qt.IsNil(os.Chmod(dir, 0o555)))
+	t.Cleanup(func() {
+		_ = os.Chmod(dir, 0o700)
+	})
+
+	err := writeFormatted(path, []byte("old"), []byte("new"), 0o644)
+
+	qt.Check(t, qt.IsNotNil(err))
+}
+
+func TestWriteFormattedReturnsReadFileErrorForDirectoryTarget(t *testing.T) {
+	dir := t.TempDir()
+	target := filepath.Join(dir, "target")
+	qt.Assert(t, qt.IsNil(os.Mkdir(target, 0o755)))
+
+	err := writeFormatted(target, []byte("old"), []byte("new"), 0o644)
+
+	qt.Check(t, qt.IsNotNil(err))
+	entries, readErr := os.ReadDir(dir)
+	qt.Assert(t, qt.IsNil(readErr))
+	qt.Check(t, qt.Equals(len(entries), 1), qt.Commentf("a failed read must remove the temporary file"))
+}
+
+func TestWriteFormattedIgnoresMissingTargetAfterFormatting(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "missing")
+
+	qt.Assert(t, qt.IsNil(writeFormatted(path, []byte("old"), []byte("new"), 0o644)))
+
+	_, err := os.Stat(path)
+	qt.Check(t, qt.IsTrue(os.IsNotExist(err)))
+}
+
+func TestWriteFormattedReturnsRenameErrorForDirectoryTarget(t *testing.T) {
+	dir := t.TempDir()
+	target := filepath.Join(dir, "target")
+	qt.Assert(t, qt.IsNil(os.Mkdir(target, 0o755)))
+
+	err := writeFormatted(target, nil, []byte("new"), 0o644)
+
+	qt.Check(t, qt.IsNotNil(err))
+	entries, readErr := os.ReadDir(dir)
+	qt.Assert(t, qt.IsNil(readErr))
+	qt.Check(t, qt.Equals(len(entries), 1), qt.Commentf("a failed rename must remove the temporary file"))
+}
+
 func TestShellFormatterPreservesExecutableBit(t *testing.T) {
 	if runtime.GOOS == "windows" {
 		t.Skip("Windows doesn't model POSIX executable bits")
