@@ -364,7 +364,7 @@ func TestUpgradeFreshInstallUsesExecutableMode(t *testing.T) {
 	server, _, _, _ := upgradeTestServer(t, binary, binary)
 	defer server.Close()
 
-	target := HookBinaryPath(t.TempDir())
+	target := HookBinaryPath(filepath.Join(t.TempDir(), "nested", "bin"))
 	err := upgradeWithConfig(Options{BinPath: target}, false, nil, upgradeConfig{
 		client:     server.Client(),
 		apiBaseURL: server.URL,
@@ -381,6 +381,13 @@ func TestUpgradeFreshInstallUsesExecutableMode(t *testing.T) {
 	if runtime.GOOS != "windows" {
 		if got, want := info.Mode().Perm(), os.FileMode(0o755); got != want {
 			t.Fatalf("fresh binary mode = %o, want %o", got, want)
+		}
+		parentInfo, err := os.Stat(filepath.Dir(target))
+		if err != nil {
+			t.Fatal(err)
+		}
+		if got, want := parentInfo.Mode().Perm(), os.FileMode(0o750); got != want {
+			t.Fatalf("fresh binary parent mode = %o, want %o", got, want)
 		}
 	}
 }
