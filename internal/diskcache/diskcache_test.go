@@ -211,9 +211,12 @@ func TestPruneKeepsEntryRefreshedBetweenExpirationChecks(t *testing.T) {
 
 	setDone := make(chan struct{})
 	go func() {
-		_, _ = writePipe.Write([]byte(strconv.FormatInt(time.Now().Add(-time.Hour).Unix(), 10) + "\nstale"))
-		_ = writePipe.Close()
+		stale := make([]byte, 1<<20)
+		copy(stale, []byte(strconv.FormatInt(time.Now().Add(-time.Hour).Unix(), 10)+"\n"))
+		_, _ = writePipe.Write(stale)
+		_ = os.Remove(path)
 		Set(dir, key, "fresh")
+		_ = writePipe.Close()
 		close(setDone)
 	}()
 
@@ -222,6 +225,9 @@ func TestPruneKeepsEntryRefreshedBetweenExpirationChecks(t *testing.T) {
 
 	_, err = os.Lstat(path)
 	qt.Check(t, qt.IsNil(err), qt.Commentf("a refreshed entry must not be removed by prune"))
+	value, ok := Get(dir, key, time.Minute)
+	qt.Check(t, qt.IsTrue(ok))
+	qt.Check(t, qt.Equals(value, "fresh"))
 }
 
 func TestRemoveDeletesEntry(t *testing.T) {
