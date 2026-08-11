@@ -86,6 +86,15 @@ assert gates + notebook POSIX-stub skip; dangling-symlink
 Local `go vet` / `go test -race` / `golangci-lint` green; remote badge
 still needs an operator push of ahead `main`.
 
+Wave 13 (2026-08-10) landed: coverage floors for
+`writeFormatted`/`writeIfMissing`, diskcache `prune`/`cacheEntryExpired`,
+installer `writeAtomic`/`parseSettings`/`applyChange`, and `--check`
+`wouldReformat`/`copyBeside`/`collectCheckTargets`. Audit fixup: drop
+unsafe Write + flaky Close descriptor races; chmod-denial fixtures probe
+effective writability before asserting; prune refresh asserts `Get`
+returns fresh. Quick CI (`go build`/`go vet`/`gofmt -l`) green; remote
+badge still needs an operator push of ahead `main`.
+
 ---
 
 ## Residual — Wave-11 / Wave-12 deferred
@@ -114,16 +123,17 @@ regressions become a concern.
 
 ## Residual — Ops
 
-### Confirm green CI after push of Wave-12 tip
+### Confirm green CI after push of Wave-13 tip
 
-Local `main` is ahead of `origin/main` with Wave-12 CI clears
-(`f3bbd23` tip at closeout). Push is not authorized from this session.
-After an operator push, confirm ubuntu lint + ubuntu/macOS/Windows test
-are green on the new tip (prior red was run `31445363724` on `36d7fe3`).
+Local `main` is ahead of `origin/main` with Wave-13 coverage + audit
+fixups (`12c0a32` tip at closeout). Push is not authorized from this
+session. After an operator push, confirm ubuntu lint +
+ubuntu/macOS/Windows test are green on the new tip (prior red was run
+`31445363724` on `36d7fe3`).
 
 **Acceptance**
 
-+ Remote CI green on the Wave-12 tip for lint + test matrix.
++ Remote CI green on the Wave-13 tip for lint + test matrix.
 
 ### Fleet re-survey (periodic)
 
@@ -137,30 +147,40 @@ dispatch registration + HUMANS row together. For `.nix`, pick one of
 
 ---
 
-## Residual — Coverage follow-ons (scout Wave-12 / Wave-13 candidates)
+## Residual — Wave-13 deferred (coverage / fixture optionals)
 
-Disjoint from CI clearance; land when chasing package cover, not mid-hotfix.
+Wave-13 closed the four coverage follow-ons. Remaining branches need a
+deterministic seam or stay acknowledged gaps — no descriptor races, no
+`unsafe`, no Abs/Rel production hooks.
 
-### `writeFormatted` / `writeIfMissing` I/O error branches
+### `writeAtomic` Write / Close error branches
 
-`writeFormatted` ~70%, `writeIfMissing` ~74%. Fixture-driven CreateTemp /
-unwritable-dir failures without Abs/Rel mocks. Owns:
-`internal/formatters/writefile_test.go`, `markdownconfig_test.go`.
+Dropped flaky unsafe Write and `/proc/self/fd` Close fixtures. Reopen
+only with a portable deterministic fault (e.g. RLIMIT_FSIZE-style Write
+or an injectable close seam). Owns: `internal/installer/installer_test.go`.
 
-### diskcache `prune` / `cacheEntryExpired` gaps
+### `writeAtomic` Chmod fault injection (optional)
 
-Both under ~90%. Malformed entries, empty namespace prefix, double-check
-refresh race. Owns: `internal/diskcache/diskcache_test.go`.
+`TestWriteAtomicChmodFailure` still races raw descriptors and may write
+large buffers. Prefer a deterministic chmod-error seam or keep as
+acknowledged optional coverage. Owns: `installer_test.go`.
 
-### Installer `writeAtomic` / settings pipeline errors
+### `copyBeside` `crypto/rand.Read` error
 
-`writeAtomic` ~62%; `parseSettings` / `applyChange` error paths thin.
-Owns: `internal/installer/installer_test.go` only (not upgrade/tools).
+Unreachable under Go stdlib (entropy failure aborts). Do not mock; leave
+below 90% unless a production seam appears. Owns:
+`cmd/format-dispatch/check_test.go`.
 
-### `--check` helpers (`wouldReformat` / `copyBeside` / `collectCheckTargets`)
+### Native write Chmod / Close fault seams
 
-Each mid-70s–mid-80s. Fake-formatter + cancel / walk / `.fmtcheck-*`
-exclusion. Owns: `cmd/format-dispatch/check_test.go`.
+`writeFormatted` Chmod/Close failures still need filesystem-specific or
+injected faults. Owns: `internal/formatters/writefile_test.go`.
+
+### `collectCheckTargets` WalkDir error on privileged runners
+
+`TestCollectCheckTargetsReportsWalkError` skips when mode-000 stays
+readable. Keep skip or add a controlled walk-error seam. Owns:
+`check_test.go`.
 
 ---
 
