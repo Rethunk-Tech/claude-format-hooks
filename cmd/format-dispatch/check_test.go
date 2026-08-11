@@ -3,6 +3,8 @@ package main
 import (
 	"bytes"
 	"context"
+	"errors"
+	"io/fs"
 	"os"
 	"path/filepath"
 	"runtime"
@@ -758,6 +760,23 @@ func TestCollectCheckTargetsReportsWalkError(t *testing.T) {
 	if err == nil {
 		t.Skip("test process can read mode-000 directories")
 	}
+}
+
+func TestCollectCheckTargetsReportsInjectedWalkError(t *testing.T) {
+	projectRoot := t.TempDir()
+	t.Setenv("CLAUDE_PROJECT_DIR", projectRoot)
+	walkErr := errors.New("injected walk failure")
+	originalWalkDir := checkWalkDir
+	t.Cleanup(func() {
+		checkWalkDir = originalWalkDir
+	})
+	checkWalkDir = func(_ string, _ fs.WalkDirFunc) error {
+		return walkErr
+	}
+
+	_, err := collectCheckTargets([]string{projectRoot})
+
+	qt.Check(t, qt.Equals(err, walkErr))
 }
 
 func TestCheckRejectsNoPaths(t *testing.T) {
