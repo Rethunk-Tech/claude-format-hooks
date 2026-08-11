@@ -95,6 +95,14 @@ effective writability before asserting; prune refresh asserts `Get`
 returns fresh. Quick CI (`go build`/`go vet`/`gofmt -l`) green; remote
 badge still needs an operator push of ahead `main`.
 
+Wave 14 (2026-08-10) landed: upgrade parent-dir `0o750` assert;
+`writeAtomic` + `writeFormatted` chmod/close seams with deterministic
+fault tests (installer Write via child-helper prlimit); `checkWalkDir`
+injection for `collectCheckTargets`; cwd-gone `Getwd` probe helper
+replacing darwin `GOOS` blanket. Audit fixup: route `writeAtomic`
+Write/Chmod error-path closes through `writeAtomicClose`. Quick CI
+green; remote badge still needs an operator push of ahead `main`.
+
 ---
 
 ## Residual — Wave-11 / Wave-12 deferred
@@ -106,34 +114,21 @@ stays uncovered. Wave contract excludes mock-based `Abs`/`Rel` failure
 tests; reopen only with a portable fixture that forces `Rel` to fail
 without production hooks.
 
-### Darwin cwd-gone skip is blanket `GOOS`
-
-Wave 12 skipped cwd-removal subtests on `darwin` rather than probing
-`Getwd` after `RemoveAll`. Correct for current macOS; coarser than a
-probe. Optional: shared helper + probe if darwin ever stops succeeding
-`Getwd` after unlink.
-
-### Upgrade parent-dir mode `0750` unasserted
-
-`upgrade.go` creates the binary parent with `0o750`; no test checks the
-directory mode after a fresh install. Low risk; add only if mode
-regressions become a concern.
-
 ---
 
 ## Residual — Ops
 
-### Confirm green CI after push of Wave-13 tip
+### Confirm green CI after push of Wave-14 tip
 
-Local `main` is ahead of `origin/main` with Wave-13 coverage + audit
-fixups (`7ca342c` tip at closeout). Push is not authorized from this
+Local `main` is ahead of `origin/main` with Wave-14 seams + audit
+fixup (`e0fa1d6` tip at closeout). Push is not authorized from this
 session. After an operator push, confirm ubuntu lint +
 ubuntu/macOS/Windows test are green on the new tip (prior red was run
 `31445363724` on `36d7fe3`).
 
 **Acceptance**
 
-+ Remote CI green on the Wave-13 tip for lint + test matrix.
++ Remote CI green on the Wave-14 tip for lint + test matrix.
 
 ### Fleet re-survey (periodic)
 
@@ -147,23 +142,7 @@ dispatch registration + HUMANS row together. For `.nix`, pick one of
 
 ---
 
-## Residual — Wave-13 deferred (coverage / fixture optionals)
-
-Wave-13 closed the four coverage follow-ons. Remaining branches need a
-deterministic seam or stay acknowledged gaps — no descriptor races, no
-`unsafe`, no Abs/Rel production hooks.
-
-### `writeAtomic` Write / Close error branches
-
-Dropped flaky unsafe Write and `/proc/self/fd` Close fixtures. Reopen
-only with a portable deterministic fault (e.g. RLIMIT_FSIZE-style Write
-or an injectable close seam). Owns: `internal/installer/installer_test.go`.
-
-### `writeAtomic` Chmod fault injection (optional)
-
-`TestWriteAtomicChmodFailure` still races raw descriptors and may write
-large buffers. Prefer a deterministic chmod-error seam or keep as
-acknowledged optional coverage. Owns: `installer_test.go`.
+## Residual — Wave-13 / Wave-14 deferred (optionals)
 
 ### `copyBeside` `crypto/rand.Read` error
 
@@ -171,16 +150,28 @@ Unreachable under Go stdlib (entropy failure aborts). Do not mock; leave
 below 90% unless a production seam appears. Owns:
 `cmd/format-dispatch/check_test.go`.
 
-### Native write Chmod / Close fault seams
+### `withFileSizeLimit` third-copy extract
 
-`writeFormatted` Chmod/Close failures still need filesystem-specific or
-injected faults. Owns: `internal/formatters/writefile_test.go`.
+Identical helper in `installer_test.go` and `writefile_test.go`. Below
+the three-site consolidation threshold; extract a shared test helper
+only when a third copy appears.
 
-### `collectCheckTargets` WalkDir error on privileged runners
+### Formatters prlimit isolation (optional)
 
-`TestCollectCheckTargetsReportsWalkError` skips when mode-000 stays
-readable. Keep skip or add a controlled walk-error seam. Owns:
-`check_test.go`.
+Installer Write-fault uses a child-process helper so race testlog stays
+writable; formatters still apply prlimit in-process. Align only if
+in-process prlimit starts failing the race harness.
+
+### Seam globals vs `t.Parallel`
+
+Package-level seam vars rely on `t.Cleanup` restore and no
+`t.Parallel()` today. If parallel subtests are added in these packages,
+gate seams with a mutex or per-test wiring.
+
+### Seam declaration style (cosmetic)
+
+Installer uses method values; formatters use func literals. Runtime
+defaults are equivalent — unify only if a third seam package appears.
 
 ---
 
