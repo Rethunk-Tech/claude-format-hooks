@@ -51,6 +51,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- gosec CI clears: `checkProjectRoot` stats the Abs root (G703), shebang
+  peek documents the intentional Open of the hook target (G304), and
+  `--upgrade` creates its binary parent directory as `0o750` (G301).
+- Portable CI tests: darwin skips non-portable cwd-removal cases; Windows
+  skips Unix permission asserts on upgrade and POSIX-shell notebook
+  fixtures.
 - `disabledFormatters` entries are trimmed before matching.
 - `--check` now resolves multi-dot registered suffixes and extensionless
   shell shebangs the same way the live hook does, so CI no longer skips

@@ -78,46 +78,52 @@ Terraform multi-dot external paths; `TestName` parity via shared
 `supportedExtensions`; `bunGlobalDir` HOME fallback. Audit fixup:
 `t.Setenv` missing-home isolation; optionals tracked below.
 
+Wave 12 (2026-08-10) landed: gosec G703/G304/G301 CI clears
+(`Stat(root)`, shebang nolint, upgrade `MkdirAll` `0o750`); darwin
+cwd-gone skips + nil paths for directory fallback; Windows upgrade mode
+assert gates + notebook POSIX-stub skip; dangling-symlink
+`Readlink`/`ReadFile` asserts. Audit fixup: `ReadFile(link)` not-exist.
+Local `go vet` / `go test -race` / `golangci-lint` green; remote badge
+still needs an operator push of ahead `main`.
+
 ---
 
-## Residual — Wave-11 audit optionals
+## Residual — Wave-11 / Wave-12 deferred
 
 ### `resolveTarget` Rel-error skip
 
 `filepath.Rel` failure still returns `skip: relative path error` and
-stays uncovered at 94.7% func cover. Wave contract excludes mock-based
-`Abs`/`Rel` failure tests; reopen only with a portable fixture that
-forces `Rel` to fail without production hooks.
+stays uncovered. Wave contract excludes mock-based `Abs`/`Rel` failure
+tests; reopen only with a portable fixture that forces `Rel` to fail
+without production hooks.
 
-### `checkProjectRoot` directory-fallback paths arg
+### Darwin cwd-gone skip is blanket `GOOS`
 
-The cwd-gone subtest passes a dummy `relative-target.json` that never
-participates in longest-root selection. Behavior is correct; clarify or
-pass `nil` paths if the case is revisited.
+Wave 12 skipped cwd-removal subtests on `darwin` rather than probing
+`Getwd` after `RemoveAll`. Correct for current macOS; coarser than a
+probe. Optional: shared helper + probe if darwin ever stops succeeding
+`Getwd` after unlink.
 
-### Dangling-symlink writeFormatted assertion
+### Upgrade parent-dir mode `0750` unasserted
 
-`TestWriteFormattedDanglingSymlinkNoOp` checks target absence + symlink
-mode but does not `Readlink`/`ReadFile` the link name. Production
-returns before any write; low mismatch risk.
+`upgrade.go` creates the binary parent with `0o750`; no test checks the
+directory mode after a fresh install. Low risk; add only if mode
+regressions become a concern.
 
 ---
 
 ## Residual — Ops
 
-### Diagnose and clear red CI on `origin/main`
+### Confirm green CI after push of Wave-12 tip
 
-Remote tip is still `2fd5ab2`, with failed CI workflow run
-`30131468133` (test×3 + lint); job logs remain **expired / unavailable**.
-Local `main` is ahead with green `go build`/`go vet`/scoped race tests.
-Clearing the badge still needs an explicit operator push of the ahead local
-`main` (not authorized). A later Dependabot `go_modules` run on the same SHA
-succeeded and does not clear the CI workflow failure.
+Local `main` is ahead of `origin/main` with Wave-12 CI clears
+(`f3bbd23` tip at closeout). Push is not authorized from this session.
+After an operator push, confirm ubuntu lint + ubuntu/macOS/Windows test
+are green on the new tip (prior red was run `31445363724` on `36d7fe3`).
 
 **Acceptance**
 
-+ Identified failing check and root cause recorded (logs gone — stale tip).
-+ A subsequent `main` push is green on ubuntu/macOS/Windows test + lint.
++ Remote CI green on the Wave-12 tip for lint + test matrix.
 
 ### Fleet re-survey (periodic)
 
@@ -128,6 +134,33 @@ zero; see `.orchestrate/fleet-survey-wave10.md`.
 Re-run when the fleet gains candidate sources; any go still needs
 dispatch registration + HUMANS row together. For `.nix`, pick one of
 `nixfmt`/`alejandra` by PATH dominance.
+
+---
+
+## Residual — Coverage follow-ons (scout Wave-12 / Wave-13 candidates)
+
+Disjoint from CI clearance; land when chasing package cover, not mid-hotfix.
+
+### `writeFormatted` / `writeIfMissing` I/O error branches
+
+`writeFormatted` ~70%, `writeIfMissing` ~74%. Fixture-driven CreateTemp /
+unwritable-dir failures without Abs/Rel mocks. Owns:
+`internal/formatters/writefile_test.go`, `markdownconfig_test.go`.
+
+### diskcache `prune` / `cacheEntryExpired` gaps
+
+Both under ~90%. Malformed entries, empty namespace prefix, double-check
+refresh race. Owns: `internal/diskcache/diskcache_test.go`.
+
+### Installer `writeAtomic` / settings pipeline errors
+
+`writeAtomic` ~62%; `parseSettings` / `applyChange` error paths thin.
+Owns: `internal/installer/installer_test.go` only (not upgrade/tools).
+
+### `--check` helpers (`wouldReformat` / `copyBeside` / `collectCheckTargets`)
+
+Each mid-70s–mid-80s. Fake-formatter + cancel / walk / `.fmtcheck-*`
+exclusion. Owns: `cmd/format-dispatch/check_test.go`.
 
 ---
 
