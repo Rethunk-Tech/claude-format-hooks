@@ -142,6 +142,45 @@ func TestWriteFormattedReturnsWriteError(t *testing.T) {
 	})
 }
 
+func TestWriteFormattedReturnsChmodError(t *testing.T) {
+	original := writeFormattedChmod
+	writeFormattedChmod = func(*os.File, os.FileMode) error {
+		return os.ErrPermission
+	}
+	t.Cleanup(func() {
+		writeFormattedChmod = original
+	})
+
+	dir := t.TempDir()
+	err := writeFormatted(filepath.Join(dir, "f"), nil, []byte("new"), 0o644)
+
+	qt.Check(t, qt.IsNotNil(err))
+	entries, readErr := os.ReadDir(dir)
+	qt.Assert(t, qt.IsNil(readErr))
+	qt.Check(t, qt.HasLen(entries, 0), qt.Commentf("failed chmod must remove the temporary file"))
+}
+
+func TestWriteFormattedReturnsCloseError(t *testing.T) {
+	original := writeFormattedClose
+	writeFormattedClose = func(file *os.File) error {
+		if err := original(file); err != nil {
+			return err
+		}
+		return os.ErrPermission
+	}
+	t.Cleanup(func() {
+		writeFormattedClose = original
+	})
+
+	dir := t.TempDir()
+	err := writeFormatted(filepath.Join(dir, "f"), nil, []byte("new"), 0o644)
+
+	qt.Check(t, qt.IsNotNil(err))
+	entries, readErr := os.ReadDir(dir)
+	qt.Assert(t, qt.IsNil(readErr))
+	qt.Check(t, qt.HasLen(entries, 0), qt.Commentf("failed close must remove the temporary file"))
+}
+
 func TestWriteFormattedReturnsReadFileErrorForDirectoryTarget(t *testing.T) {
 	dir := t.TempDir()
 	target := filepath.Join(dir, "target")
