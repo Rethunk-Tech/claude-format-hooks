@@ -3,10 +3,13 @@ package installer
 import (
 	"encoding/json"
 	"os"
+	"os/exec"
+	"os/signal"
 	"path/filepath"
 	"runtime"
 	"strconv"
 	"strings"
+	"syscall"
 	"testing"
 
 	"github.com/go-quicktest/qt"
@@ -666,72 +669,91 @@ func TestApplyChangeReportsSettingsWriteFailure(t *testing.T) {
 	qt.Check(t, qt.IsNotNil(err))
 }
 
-func TestWriteAtomicChmodFailure(t *testing.T) {
+func TestWriteAtomicWriteFailure(t *testing.T) {
 	if runtime.GOOS != "linux" {
-		t.Skip("Linux exposes process file descriptors for this fixture")
+		t.Skip("Linux prlimit is required to exercise a real write failure")
 	}
+	if os.Getenv("FORMAT_DISPATCH_WRITE_ATOMIC_WRITE_HELPER") == "1" {
+		withFileSizeLimit(t, func() {
+			err := writeAtomic(filepath.Join(t.TempDir(), "f.json"), []byte(`{"a":1}`), 0o600)
+
+			qt.Check(t, qt.IsNotNil(err))
+		})
+		return
+	}
+
+	cmd := exec.Command(os.Args[0], "-test.run=^TestWriteAtomicWriteFailure$")
+	cmd.Env = append(os.Environ(), "FORMAT_DISPATCH_WRITE_ATOMIC_WRITE_HELPER=1")
+	output, err := cmd.CombinedOutput()
+	qt.Assert(t, qt.IsNil(err), qt.Commentf("write-failure helper output: %s", output))
+}
+
+func TestWriteAtomicChmodFailure(t *testing.T) {
+	original := writeAtomicChmod
+	writeAtomicChmod = func(*os.File, os.FileMode) error {
+		return os.ErrPermission
+	}
+	t.Cleanup(func() {
+		writeAtomicChmod = original
+	})
 
 	dir := t.TempDir()
-	data := make([]byte, 64<<20)
-	for range 100 {
-		stop := make(chan struct{})
-		done := make(chan struct{})
-		go func() {
-			defer close(done)
-			for {
-				select {
-				case <-stop:
-					return
-				default:
-				}
+	err := writeAtomic(filepath.Join(dir, "f.json"), []byte(`{"a":1}`), 0o600)
 
-				entries, err := os.ReadDir("/proc/self/fd")
-				if err != nil {
-					continue
-				}
-				for _, entry := range entries {
-					fd, err := strconv.Atoi(entry.Name())
-					if err != nil {
-						continue
-					}
-					link, err := os.Readlink(filepath.Join("/proc/self/fd", entry.Name()))
-					if err != nil || filepath.Dir(link) != dir || !strings.HasSuffix(link, ".tmp") {
-						continue
-					}
+	qt.Check(t, qt.IsNotNil(err))
+	entries, readErr := os.ReadDir(dir)
+	qt.Assert(t, qt.IsNil(readErr))
+	qt.Check(t, qt.HasLen(entries, 0), qt.Commentf("failed chmod must remove the temporary file"))
+}
 
-					original := os.NewFile(uintptr(fd), link)
-					if err := original.Close(); err != nil {
-						continue
-					}
-					replacement, err := os.OpenFile("/dev/null", os.O_WRONLY, 0)
-					if err != nil {
-						continue
-					}
-					if replacement.Fd() != uintptr(fd) {
-						_ = replacement.Close()
-						continue
-					}
-					for {
-						select {
-						case <-stop:
-							_ = replacement.Close()
-							return
-						default:
-							runtime.Gosched()
-						}
-					}
-				}
-			}
-		}()
-
-		err := writeAtomic(filepath.Join(dir, "f.json"), data, 0o600)
-		close(stop)
-		<-done
-		if err != nil && strings.HasPrefix(err.Error(), "chmod ") {
-			return
-		}
+func TestWriteAtomicCloseFailure(t *testing.T) {
+	original := writeAtomicClose
+	writeAtomicClose = func(*os.File) error {
+		return os.ErrPermission
 	}
-	t.Fatal("did not induce writeAtomic chmod failure")
+	t.Cleanup(func() {
+		writeAtomicClose = original
+	})
+
+	dir := t.TempDir()
+	err := writeAtomic(filepath.Join(dir, "f.json"), []byte(`{"a":1}`), 0o600)
+
+	qt.Check(t, qt.IsNotNil(err))
+	entries, readErr := os.ReadDir(dir)
+	qt.Assert(t, qt.IsNil(readErr))
+	qt.Check(t, qt.HasLen(entries, 0), qt.Commentf("failed close must remove the temporary file"))
+}
+
+func withFileSizeLimit(t *testing.T, fn func()) {
+	t.Helper()
+	if runtime.GOOS != "linux" {
+		t.Skip("Linux prlimit is required to exercise a real write failure")
+	}
+
+	pid := strconv.Itoa(os.Getpid())
+	output, err := exec.Command("prlimit", "--pid", pid, "--fsize").Output()
+	if err != nil {
+		t.Skipf("prlimit is unavailable: %v", err)
+	}
+	fields := strings.Fields(string(output))
+	if len(fields) < 3 {
+		t.Fatalf("unexpected prlimit output: %q", output)
+	}
+	soft, hard := fields[len(fields)-3], fields[len(fields)-2]
+
+	sigxfsz := syscall.Signal(25)
+	signal.Ignore(sigxfsz)
+	defer signal.Reset(sigxfsz)
+	if err := exec.Command("prlimit", "--pid", pid, "--fsize=0:"+hard).Run(); err != nil {
+		t.Fatalf("set file-size limit: %v", err)
+	}
+	defer func() {
+		if err := exec.Command("prlimit", "--pid", pid, "--fsize="+soft+":"+hard).Run(); err != nil {
+			t.Errorf("restore file-size limit: %v", err)
+		}
+	}()
+
+	fn()
 }
 
 func readFile(t *testing.T, path string) []byte {
