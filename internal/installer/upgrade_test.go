@@ -56,8 +56,10 @@ func TestUpgradeHappyPathPreservesModeAndSettings(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if got, want := info.Mode().Perm(), os.FileMode(0o751); got != want {
-		t.Fatalf("upgraded mode = %o, want %o", got, want)
+	if runtime.GOOS != "windows" {
+		if got, want := info.Mode().Perm(), os.FileMode(0o751); got != want {
+			t.Fatalf("upgraded mode = %o, want %o", got, want)
+		}
 	}
 	gotSettings, err := os.ReadFile(settingsPath)
 	if err != nil {
@@ -161,8 +163,10 @@ func TestUpgradeChecksumMismatchLeavesBinaryUntouched(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if got, want := info.Mode().Perm(), os.FileMode(0o700); got != want {
-		t.Fatalf("binary mode = %o, want %o", got, want)
+	if runtime.GOOS != "windows" {
+		if got, want := info.Mode().Perm(), os.FileMode(0o700); got != want {
+			t.Fatalf("binary mode = %o, want %o", got, want)
+		}
 	}
 	if _, err := os.Stat(target + ".tmp"); !os.IsNotExist(err) {
 		t.Fatalf("temporary replacement file still exists: %v", err)
@@ -374,8 +378,10 @@ func TestUpgradeFreshInstallUsesExecutableMode(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if got, want := info.Mode().Perm(), os.FileMode(0o755); got != want {
-		t.Fatalf("fresh binary mode = %o, want %o", got, want)
+	if runtime.GOOS != "windows" {
+		if got, want := info.Mode().Perm(), os.FileMode(0o755); got != want {
+			t.Fatalf("fresh binary mode = %o, want %o", got, want)
+		}
 	}
 }
 
