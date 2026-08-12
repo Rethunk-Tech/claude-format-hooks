@@ -151,7 +151,8 @@ hanging on stdin — safe to run by hand while debugging.
 | `.ts`, `.tsx`, `.js`, `.jsx`, `.mjs`, `.cjs`, `.mts`, `.cts`, `.css`, `.jsonc` | `biome format --write` | no (PATH, else bunx) |
 | `.md`, `.mdx`, `.markdown` | `markdownlint-cli2 --fix` | no (PATH, else bunx) |
 | `.toml` | `taplo format` | no (PATH, else bunx) |
-| `.yaml`, `.yml`, `.html`, `.scss`, `.less`, `.graphql`, `.gql` | `prettier --write` | no (PATH, else bunx) |
+| `.yaml`, `.yml`, `.html`, `.scss`, `.less` | `prettier --write` | no (PATH, else bunx) |
+| `.graphql`, `.gql` | `biome format --write` when an upward `biome.json`/`biome.jsonc` is found and `biome` is available through `bunx`/`PATH`; otherwise `prettier --write` | conditional |
 | `.sql` | `sqlfluff fix` | no (system binary) |
 | `.py`, `.pyi` | `ruff format` (preferred) or `black` | no (system binary) |
 | `.ipynb` | `ruff format` (preferred) or `black` with notebook support | no (system binary) |

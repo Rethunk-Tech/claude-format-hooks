@@ -50,6 +50,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- `.graphql` and `.gql` use `biome format --write` when an upward
+  `biome.json`/`biome.jsonc` and a usable `biome` launcher are present;
+  otherwise they use `prettier --write`.
 - `--install` writes a PostToolUse matcher of
   `Write|Edit|MultiEdit|NotebookEdit`. Re-install replaces the previous
   format-dispatch entry.
