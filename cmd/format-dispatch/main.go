@@ -61,9 +61,9 @@ arguments, it reads a hook payload from stdin and formats the file it names.
 
 Usage:
   format-dispatch                    read a PostToolUse payload from stdin (normal hook invocation)
-  format-dispatch --install          wire this binary into ~/.claude/settings.json as a PostToolUse hook
-  format-dispatch --uninstall        remove it from ~/.claude/settings.json
-  format-dispatch --install --dry-run    preview the settings.json diff for either subcommand, without writing
+  format-dispatch --install          wire this binary into ~/.claude/settings.json (PostToolUse) and ~/.cursor/hooks.json (afterFileEdit)
+  format-dispatch --uninstall        remove it from ~/.claude/settings.json and ~/.cursor/hooks.json
+  format-dispatch --install --dry-run    preview the Claude and Cursor hook diffs, without writing
   format-dispatch --upgrade          download and replace this platform's latest release binary
   format-dispatch --upgrade --dry-run    preview the binary upgrade without writing
   format-dispatch --check PATH...    report files a formatter would change, without changing them (exit 1 if any)
