@@ -10,9 +10,10 @@ import (
 	"github.com/Rethunk-Tech/claude-format-hooks/internal/diskcache"
 )
 
-// biomeFormatter shells out to Biome's CLI for JS/TS/JSX/TSX/CSS/JSONC,
-// preferring a provisioned `biome` binary and falling back to bunx. Biome
-// (Rust) has no Go bindings, so this stays external.
+// biomeFormatter shells out to Biome's CLI for JS/TS/JSX/TSX/CSS/JSONC, plus
+// GraphQL and JSON when their project-aware routers select it, preferring a
+// provisioned `biome` binary and falling back to bunx. Biome (Rust) has no Go
+// bindings, so this stays external.
 //
 // It walks up from the file to the nearest biome.json/biome.jsonc and runs
 // from that directory, so monorepos with a nested config (e.g. a package
@@ -23,7 +24,8 @@ import (
 // project regardless of whether that project has opted into their config.
 type biomeFormatter struct{}
 
-// NewBiome returns the biomeFormatter for JS/TS/JSX/TSX/CSS/JSONC.
+// NewBiome returns the biomeFormatter for JS/TS/JSX/TSX/CSS/JSONC, GraphQL,
+// and JSON when selected by their project-aware routers.
 func NewBiome() Formatter { return biomeFormatter{} }
 
 func (biomeFormatter) Name() string { return "biome" }
