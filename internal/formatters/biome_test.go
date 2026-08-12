@@ -29,3 +29,25 @@ esac`)
 	qt.Assert(t, qt.IsNil(err))
 	qt.Check(t, qt.Equals(string(argv), "format\n--write\n--no-errors-on-unmatched\n--\n"+abs+"\n"))
 }
+
+func TestBiomeBunxUsesFormatSubcommand(t *testing.T) {
+	isolateDiskCache(t)
+	dir := t.TempDir()
+	abs := filepath.Join(dir, "f.ts")
+	argvPath := filepath.Join(t.TempDir(), "argv")
+	t.Setenv("BIOME_ARGV", argvPath)
+	writeFakeTool(t, "bunx", `for arg do
+	if [ "$arg" = check ]; then exit 1; fi
+done
+printf '%s\n' "$@" > "$BIOME_ARGV"
+exit 0`)
+
+	res := NewBiome().Format(t.Context(), dir, abs)
+	qt.Check(t, qt.IsNil(res.Err))
+	qt.Check(t, qt.Equals(res.Diagnostic, ""))
+	qt.Check(t, qt.IsFalse(res.Skipped))
+
+	argv, err := os.ReadFile(argvPath)
+	qt.Assert(t, qt.IsNil(err))
+	qt.Check(t, qt.Equals(string(argv), "@biomejs/biome\nformat\n--write\n--no-errors-on-unmatched\n--\n"+abs+"\n"))
+}
