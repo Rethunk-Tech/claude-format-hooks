@@ -38,6 +38,21 @@ func TestFilePathFallbackOrder(t *testing.T) {
 			want: "",
 		},
 		{
+			name: "falls back to top-level file_path from Cursor",
+			raw:  `{"file_path":"/cursor.go","edits":[{"old_string":"x","new_string":"y"}]}`,
+			want: "/cursor.go",
+		},
+		{
+			name: "Claude fields win over top-level file_path",
+			raw:  `{"file_path":"/cursor.go","tool_input":{"file_path":"/input.go"}}`,
+			want: "/input.go",
+		},
+		{
+			name: "ignores top-level camelCase filePath",
+			raw:  `{"filePath":"/camel.go"}`,
+			want: "",
+		},
+		{
 			name: "falls back to tool_input.file_path",
 			raw:  `{"tool_input":{"file_path":"/input.go","notebook_path":"/nb.ipynb"}}`,
 			want: "/input.go",
