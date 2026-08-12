@@ -113,6 +113,15 @@ snake_case `tool_result`, `tool_result` run smoke, and MultiEdit
 godoc closed in the same wave. Quick CI (`go build`/`go vet`/`gofmt -l`)
 green; remote badge still needs an operator push of ahead `main`.
 
+Wave 16 (2026-08-12) landed: Windows `TestWriteAtomicCloseFailure`
+closes the real temp handle before injecting the error; `.graphql`/
+`.gql` biome/prettier router (`Name()` stays `prettier`);
+`projectRebuildsJSONRegistry` covers those suffixes; HUMANS/CHANGELOG/
+AGENTS. Audit: 0 must-fix; Name() godoc, prettier-fallback and
+bunx-only tests, Windows `.cmd` fakes, rebuild-cache wording closed
+in the same wave. Quick CI (`go build`/`go vet`/`gofmt -l`) green;
+remote badge still needs an operator push of ahead `main`.
+
 ---
 
 ## Residual — Wave-11 / Wave-12 deferred
@@ -127,37 +136,6 @@ without production hooks.
 ---
 
 ## Residual — Ops
-
-### Unbreak Windows `TestWriteAtomicCloseFailure` (CI red)
-
-`origin/main` is at `b53285f` (markdownlint-defaults JSONC fix). Ubuntu
-lint + ubuntu/macOS test are not the remaining gap: run
-`31548185995` fails **test (windows-latest)** on
-`TestWriteAtomicCloseFailure` (`internal/installer/installer_test.go`).
-The close seam returns an error without closing the handle; Windows
-cannot `Remove` an open file, so the deferred temp cleanup leaves a
-`.tmp` and the "directory empty" assert fails. POSIX hides this because
-unlink-while-open works.
-
-This is the same class of Windows handle lifetime already skipped in
-`writefile_test.go` / upgrade mode asserts — the installer close-fault
-fixture was not gated.
-
-**Owns:** `internal/installer/installer.go` (`writeAtomic`,
-`writeAtomicClose`), `internal/installer/installer_test.go`.
-
-**Trap:** stubbing `Close` to fail *and* skip the real close leaks the
-handle on Windows. Either close the real `*os.File` then return the
-injected error, or skip the empty-dir assert on Windows the way
-chmod-denial fixtures already skip when still writable.
-
-**Acceptance**
-
-- `go test -race -run TestWriteAtomicCloseFailure ./internal/installer`
-  passes on Windows.
-- Remote `test (windows-latest)` green on the tip that lands the fix.
-- Failed close still returns an error and does not rename the temp over
-  the destination (POSIX and Windows).
 
 ### Fleet re-survey (periodic)
 
@@ -206,35 +184,32 @@ defaults are equivalent — unify only if a third seam package appears.
 
 ---
 
-## Wave 16 — leftover from Wave 15
+## Wave 16 — leftover / audit optionals
 
 Planning-only. shadcn/UX registry does not apply (no UI).
 
-### Route `.graphql`/`.gql` through Biome when Biome is the project formatter
+### `writeAtomicClose` stub via saved `original`
 
-Biome's GraphQL formatter is stable and enabled by default
-(v1.9+; disable via `graphql.formatter.enabled`). Dispatch currently
-sends both suffixes to prettier (`internal/dispatch/dispatch.go`) with
-a comment that GraphQL has no dedicated tool. That comment is stale.
+`TestWriteAtomicCloseFailure` calls `f.Close()` then injects the error.
+`TestWriteFormattedReturnsCloseError` routes through the saved method
+value and propagates its error. Equivalent for default `Close`; switch
+the installer stub only if the seam is wrapped.
 
-**Owns:** `internal/dispatch/dispatch.go`, a router or biome registration
-alongside prettier fallback, HUMANS table, CHANGELOG.
+### Unify `writeGraphQLTools` with `writeFakeTool`
 
-**Trap:** prettier-plugin-graphql / `.prettierrc` GraphQL options will
-diverge from Biome output. Do not steal files from a repo that has no
-`biome.json`/`biome.jsonc` — mirror the `.json` router: Biome only when
-an upward config exists and a launcher is available; otherwise keep
-prettier. `disabledFormatters: ["biome"]` must leave prettier in
-place. Fleet `.vue`/`.svelte`/`.astro` remain no-go (Wave-6–10); this
-is a routing change for an already-supported extension.
+`writeGraphQLTools` is a local POSIX/`.cmd` helper. Extract only if a
+third fake-tool helper appears (`writeFakeTool` still skips Windows).
 
-**Acceptance**
+### `--check` cache reuse for GraphQL
 
-- Project with `biome.json` + biome on PATH formats `.graphql`/`.gql`
-  via biome.
-- Project with neither biome config nor biome binary still uses
-  prettier (or skips if prettier/bunx absent).
-- Disabling `biome` does not disable prettier for those suffixes.
+`TestCheckReusesProjectDisabledBiomeRegistryForMultipleJSONFiles`
+covers `.json` only. Add `.graphql`/`.gql` under the same
+`projectRoot` cache key only if a regression appears.
+
+### Rename `projectRebuildsJSONRegistry`
+
+Name still says JSON; the predicate also matches `.graphql`/`.gql`.
+Rename only with a dedicated comment/test sweep — behavior is correct.
 
 ### Vendored-dir additions (evidence-gated)
 
