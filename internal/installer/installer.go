@@ -54,8 +54,9 @@ type PostToolUseEntry struct {
 
 // Options controls where Install/Uninstall read and write.
 type Options struct {
-	BinPath      string
-	SettingsPath string
+	BinPath         string
+	SettingsPath    string
+	CursorHooksPath string
 }
 
 // DefaultOptions resolves the binary and settings paths the same way
@@ -68,9 +69,11 @@ func DefaultOptions() (Options, error) {
 	}
 	binDir := cmp.Or(os.Getenv("CLAUDE_HOOKS_BIN_DIR"), filepath.Join(home, ".claude", "hooks"))
 	settingsPath := cmp.Or(os.Getenv("CLAUDE_SETTINGS_FILE"), filepath.Join(home, ".claude", "settings.json"))
+	cursorHooksPath := cmp.Or(os.Getenv("CURSOR_HOOKS_FILE"), filepath.Join(home, ".cursor", "hooks.json"))
 	return Options{
-		BinPath:      HookBinaryPath(binDir),
-		SettingsPath: settingsPath,
+		BinPath:         HookBinaryPath(binDir),
+		SettingsPath:    settingsPath,
+		CursorHooksPath: cursorHooksPath,
 	}, nil
 }
 
@@ -220,7 +223,24 @@ func Install(opts Options, dryRun bool, out io.Writer) error {
 	if err != nil {
 		return err
 	}
-	return applyChange(opts, before, after, dryRun, out, "Wired PostToolUse hook into")
+	var cursorBefore, cursorAfter []byte
+	if opts.CursorHooksPath != "" {
+		cursorBefore, cursorAfter, err = WireCursor(opts.CursorHooksPath, opts.BinPath)
+		if err != nil {
+			return err
+		}
+	}
+	if err := applyChange(opts, before, after, dryRun, out, "Wired PostToolUse hook into"); err != nil {
+		return err
+	}
+	if opts.CursorHooksPath != "" {
+		cursorOpts := opts
+		cursorOpts.SettingsPath = opts.CursorHooksPath
+		if err := applyChange(cursorOpts, cursorBefore, cursorAfter, dryRun, out, "Wired afterFileEdit hook into"); err != nil {
+			return err
+		}
+	}
+	return nil
 }
 
 // Uninstall removes the PostToolUse hook from opts.SettingsPath. If
@@ -231,17 +251,34 @@ func Uninstall(opts Options, dryRun bool, out io.Writer) error {
 	if err != nil {
 		return err
 	}
-	return applyChange(opts, before, after, dryRun, out, "Removed PostToolUse hook from")
+	var cursorBefore, cursorAfter []byte
+	if opts.CursorHooksPath != "" {
+		cursorBefore, cursorAfter, err = UnwireCursor(opts.CursorHooksPath, opts.BinPath)
+		if err != nil {
+			return err
+		}
+	}
+	if err := applyChange(opts, before, after, dryRun, out, "Removed PostToolUse hook from"); err != nil {
+		return err
+	}
+	if opts.CursorHooksPath != "" {
+		cursorOpts := opts
+		cursorOpts.SettingsPath = opts.CursorHooksPath
+		if err := applyChange(cursorOpts, cursorBefore, cursorAfter, dryRun, out, "Removed afterFileEdit hook from"); err != nil {
+			return err
+		}
+	}
+	return nil
 }
 
-// applyChange previews or writes a settings.json mutation. verb is the
+// applyChange previews or writes a hooks file mutation. verb is the
 // past-tense description printed on a real write, e.g. "Wired ... into".
 // Before a real write, the settings file's current on-disk content (if any)
 // is copied to a sibling ".bak" file, overwriting any previous backup —
 // one rolling backup of the last-known-good state, not a write history.
 func applyChange(opts Options, before, after []byte, dryRun bool, out io.Writer, verb string) error {
 	if dryRun {
-		_, _ = fmt.Fprintln(out, "==> --dry-run: settings.json diff (not written):")
+		_, _ = fmt.Fprintf(out, "==> --dry-run: %s diff (not written):\n", opts.SettingsPath)
 		if bytes.Equal(before, after) {
 			_, _ = fmt.Fprintln(out, "(no changes)")
 			return nil
