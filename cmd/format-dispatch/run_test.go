@@ -472,6 +472,19 @@ func TestRunDispatchesToJSONFormatter(t *testing.T) {
 	qt.Check(t, qt.Equals(readFile(t, abs), "{\n  \"b\": 1,\n  \"a\": 2\n}\n"))
 }
 
+func TestRunDispatchesJSONFromToolResult(t *testing.T) {
+	projectRoot := t.TempDir()
+	abs := filepath.Join(projectRoot, "f.json")
+	writeFile(t, abs, `{"b":1,"a":2}`)
+	encoded, err := json.Marshal(abs)
+	qt.Assert(t, qt.IsNil(err))
+
+	t.Setenv("CLAUDE_PROJECT_DIR", projectRoot)
+	raw := `{"tool_result":{"filePath":` + string(encoded) + `}}`
+	qt.Check(t, qt.Equals(run(strings.NewReader(raw)), 0))
+	qt.Check(t, qt.Equals(readFile(t, abs), "{\n  \"b\": 1,\n  \"a\": 2\n}\n"))
+}
+
 func TestRunProjectConfigDisablesFormatter(t *testing.T) {
 	projectRoot := t.TempDir()
 	abs := filepath.Join(projectRoot, "f.json")
