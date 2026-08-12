@@ -54,6 +54,7 @@ func TestExternalFormatterNames(t *testing.T) {
 		want string
 	}{
 		{NewJSONRouter(config.Default()), "json"},
+		{NewGraphQLRouter(config.Default()), "prettier"},
 		{NewShell(config.Default()), "shfmt"},
 		{NewGo(), "gofmt"},
 		{NewProto(), "buf"},
