@@ -71,6 +71,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Portable CI tests: darwin skips non-portable cwd-removal cases; Windows
   skips Unix permission asserts on upgrade and POSIX-shell notebook
   fixtures.
+- The Windows `writeAtomic` close-failure test now closes its real temporary
+  handle before injecting the error, so CI can remove the temporary file and
+  verify that the destination is not renamed.
+- Project-level Biome opt-outs rebuild the router registry for `.graphql` and
+  `.gql`, keeping those files on Prettier when Biome is disabled.
 - `disabledFormatters` entries are trimmed before matching.
 - `--check` now resolves multi-dot registered suffixes and extensionless
   shell shebangs the same way the live hook does, so CI no longer skips
