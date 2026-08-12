@@ -144,6 +144,7 @@ func TestWireMissingSettingsFile(t *testing.T) {
 
 	entries := settingsPostToolUse(t, after)
 	qt.Assert(t, qt.HasLen(entries, 1))
+	qt.Check(t, qt.Equals(entries[0].Matcher, "Write|Edit|MultiEdit|NotebookEdit"))
 	qt.Check(t, qt.Equals(entries[0].Hooks[0].Command, binPath))
 }
 
