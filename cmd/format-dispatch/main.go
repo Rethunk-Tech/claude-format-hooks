@@ -1,5 +1,5 @@
 // Command format-dispatch is a Claude Code PostToolUse hook for
-// Write/Edit/NotebookEdit. It formats/lints the file that was just written,
+// Write/Edit/MultiEdit/NotebookEdit. It formats/lints the file that was just written,
 // natively in-process where a formatting-fidelity-safe Go implementation
 // exists (JSON, shell, Go), and via each ecosystem's own tool otherwise
 // (biome, markdownlint-cli2, taplo, prettier, sqlfluff, ruff/black,
@@ -10,7 +10,7 @@
 //   - On failure, print a truncated (<=10 lines / 500 chars) diagnostic to
 //     stderr so a broken fixer is still debuggable.
 //   - Always exit 0. A PostToolUse hook runs after the tool already
-//     succeeded; it must never be the reason a Write/Edit/NotebookEdit
+//     succeeded; it must never be the reason a Write/Edit/MultiEdit/NotebookEdit
 //     call reports failure.
 //   - An unsupported extension is an instant no-op: one ResolveExtension
 //     call and one map lookup, nothing else — no stat, no exec.LookPath, no
