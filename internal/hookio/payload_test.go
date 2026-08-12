@@ -33,6 +33,11 @@ func TestFilePathFallbackOrder(t *testing.T) {
 			want: "/result.go",
 		},
 		{
+			name: "ignores snake_case tool_result.file_path",
+			raw:  `{"tool_result":{"file_path":"/snake.go"}}`,
+			want: "",
+		},
+		{
 			name: "falls back to tool_input.file_path",
 			raw:  `{"tool_input":{"file_path":"/input.go","notebook_path":"/nb.ipynb"}}`,
 			want: "/input.go",
