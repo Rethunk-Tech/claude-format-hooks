@@ -377,12 +377,13 @@ func projectDisables(projectRoot, ext, formatterName string) (disabled bool, cfg
 	return cfg.IsDisabled(ext) || cfg.IsFormatterDisabled(formatterName), cfg, nil
 }
 
-// projectRebuildsJSONRegistry is true when project config forces a NewRegistry
-// rebuild for .json, .graphql, or .gql — the json router Names itself "json"
-// and the graphql router "prettier" while biome may run underneath, so a
-// project-level "biome" disable is invisible to extension filtering alone.
+// projectRebuildsRouterRegistry is true when project config forces a
+// NewRegistry rebuild for the json and graphql/gql routers. The json router
+// Names itself "json" and the graphql router "prettier" while biome may run
+// underneath, so a project-level "biome" disable is invisible to extension
+// filtering alone.
 // Keep --check's cache guard on this same predicate.
-func projectRebuildsJSONRegistry(ext string, projectCfg config.Config) bool {
+func projectRebuildsRouterRegistry(ext string, projectCfg config.Config) bool {
 	if !strings.EqualFold(ext, ".json") &&
 		!strings.EqualFold(ext, ".graphql") &&
 		!strings.EqualFold(ext, ".gql") {
@@ -399,7 +400,7 @@ func projectRebuildsJSONRegistry(ext string, projectCfg config.Config) bool {
 // registry name filtering alone. Any future router that delegates to another
 // formatter name has the same requirement.
 func registryWithProjectConfig(registry *dispatch.Registry, userCfg config.Config, ext string, projectCfg config.Config) *dispatch.Registry {
-	if !projectRebuildsJSONRegistry(ext, projectCfg) {
+	if !projectRebuildsRouterRegistry(ext, projectCfg) {
 		return registry
 	}
 	merged := userCfg

@@ -119,13 +119,13 @@ func runCheck(args []string, out, errOut io.Writer) int {
 }
 
 // registryForCheck returns the per-file registry for --check, caching the
-// project-biome-disabled router (.json, .graphql, or .gql) NewRegistry rebuild
-// by projectRoot so a large tree does not rebuild once per file. The cache
-// guard must use projectRebuildsJSONRegistry — the same predicate
+// project-biome-disabled json and graphql/gql router NewRegistry rebuild by
+// projectRoot so a large tree does not rebuild once per file. The cache guard
+// must use projectRebuildsRouterRegistry — the same predicate
 // registryWithProjectConfig uses — so a future rebuild trigger cannot leave
 // --check serving a stale map.
 func registryForCheck(registry *dispatch.Registry, userCfg config.Config, ext string, projectCfg config.Config, projectRoot string, cache map[string]*dispatch.Registry) *dispatch.Registry {
-	if !projectRebuildsJSONRegistry(ext, projectCfg) {
+	if !projectRebuildsRouterRegistry(ext, projectCfg) {
 		return registryWithProjectConfig(registry, userCfg, ext, projectCfg)
 	}
 	if cached, ok := cache[projectRoot]; ok {

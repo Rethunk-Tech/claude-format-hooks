@@ -175,7 +175,7 @@ func TestConfigPath(t *testing.T) {
 	})
 }
 
-func TestProjectRebuildsJSONRegistry(t *testing.T) {
+func TestProjectRebuildsRouterRegistry(t *testing.T) {
 	cases := []struct {
 		name        string
 		ext         string
@@ -195,7 +195,7 @@ func TestProjectRebuildsJSONRegistry(t *testing.T) {
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
 			cfg := config.Config{DisabledFormatters: tc.disabled}
-			qt.Check(t, qt.Equals(projectRebuildsJSONRegistry(tc.ext, cfg), tc.wantRebuild))
+			qt.Check(t, qt.Equals(projectRebuildsRouterRegistry(tc.ext, cfg), tc.wantRebuild))
 		})
 	}
 }
