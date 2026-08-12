@@ -186,8 +186,11 @@ func TestProjectRebuildsJSONRegistry(t *testing.T) {
 		{"json with trimmed biome disabled", ".json", []string{" biome "}, true},
 		{"json with no disabled formatters", ".json", nil, false},
 		{"uppercase json with biome disabled", ".JSON", []string{"biome"}, true},
+		{"graphql with biome disabled", ".graphql", []string{"biome"}, true},
+		{"gql with biome disabled", ".gql", []string{"biome"}, true},
 		{"typescript with biome disabled", ".ts", []string{"biome"}, false},
 		{"json with another formatter disabled", ".json", []string{"prettier"}, false},
+		{"graphql with prettier disabled", ".graphql", []string{"prettier"}, false},
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
