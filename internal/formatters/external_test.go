@@ -284,6 +284,7 @@ func TestTerraformFormatterSkipsWhenMissing(t *testing.T) {
 	abs := filepath.Join(t.TempDir(), "f.tf")
 	res := NewTerraform().Format(t.Context(), t.TempDir(), abs)
 	qt.Check(t, qt.IsTrue(res.Skipped))
+	qt.Check(t, qt.Equals(res.Diagnostic, ""))
 }
 
 func TestTerraformFormatterSuccessAndFailure(t *testing.T) {
@@ -313,6 +314,36 @@ func TestTerraformFormatterSuccessAndFailure(t *testing.T) {
 			qt.Check(t, qt.Not(qt.Equals(res.Diagnostic, "")), qt.Commentf("path=%q", abs))
 		}
 	})
+}
+
+func TestTerraformFormatterFallsBackToTofu(t *testing.T) {
+	isolateDiskCache(t)
+	dir := t.TempDir()
+	abs := filepath.Join(dir, "f.tf")
+
+	writeFakeTool(t, "tofu", "exit 0")
+	res := NewTerraform().Format(t.Context(), dir, abs)
+
+	qt.Check(t, qt.IsFalse(res.Skipped))
+	qt.Check(t, qt.IsNil(res.Err))
+	qt.Check(t, qt.Equals(res.Diagnostic, ""))
+}
+
+func TestTerraformFormatterPrefersTerraformOverTofu(t *testing.T) {
+	isolateDiskCache(t)
+	dir := t.TempDir()
+	abs := filepath.Join(dir, "f.tf")
+
+	writeFakeTool(t, "terraform", "exit 0")
+	terraformDir := os.Getenv("PATH")
+	tofu := filepath.Join(terraformDir, "tofu")
+	qt.Assert(t, qt.IsNil(os.WriteFile(tofu, []byte("#!/bin/sh\nexit 1\n"), 0o755))) //nolint:gosec // test fixture
+
+	res := NewTerraform().Format(t.Context(), dir, abs)
+
+	qt.Check(t, qt.IsFalse(res.Skipped))
+	qt.Check(t, qt.IsNil(res.Err))
+	qt.Check(t, qt.Equals(res.Diagnostic, ""))
 }
 
 func TestCachedFindUpwardMatchesFindUpward(t *testing.T) {
