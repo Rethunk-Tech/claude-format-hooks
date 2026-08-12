@@ -38,8 +38,8 @@ func (biomeFormatter) Format(ctx context.Context, projectRoot, abs string) Resul
 		ctx,
 		cfgDir,
 		"biome",
-		[]string{"check", "--write", "--no-errors-on-unmatched", "--", abs},
-		[]string{"@biomejs/biome", "check", "--write", "--no-errors-on-unmatched", "--", abs},
+		[]string{"format", "--write", "--no-errors-on-unmatched", "--", abs},
+		[]string{"@biomejs/biome", "format", "--write", "--no-errors-on-unmatched", "--", abs},
 	)
 }
 

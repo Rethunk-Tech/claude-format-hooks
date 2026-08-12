@@ -34,8 +34,8 @@ func NewJSON(cfg config.Config) Formatter { return jsonFormatter{cfg: cfg} }
 // and `expand`, which decides whether an object collapses onto one line. The
 // native formatter cannot read any of that: json.Indent always expands every
 // object. Formatting a project's own biome.json with it therefore produces a
-// file that project's `biome check` rejects, so the config that opted in is the
-// config that gets violated. Projects without biome keep the native formatter,
+// file that project's biome formatting rejects, so the config that opted in is
+// the config that gets violated. Projects without biome keep the native formatter,
 // which needs no bunx and no config of its own.
 type jsonRouter struct {
 	biome         Formatter
