@@ -118,17 +118,36 @@ without production hooks.
 
 ## Residual — Ops
 
-### Confirm green CI after push of Wave-14 tip
+### Unbreak Windows `TestWriteAtomicCloseFailure` (CI red)
 
-Local `main` is ahead of `origin/main` with Wave-14 seams + audit
-fixup (`e0fa1d6` tip at closeout). Push is not authorized from this
-session. After an operator push, confirm ubuntu lint +
-ubuntu/macOS/Windows test are green on the new tip (prior red was run
-`31445363724` on `36d7fe3`).
+`origin/main` is at `b53285f` (markdownlint-defaults JSONC fix). Ubuntu
+lint + ubuntu/macOS test are not the remaining gap: run
+`31548185995` fails **test (windows-latest)** on
+`TestWriteAtomicCloseFailure` (`internal/installer/installer_test.go`).
+The close seam returns an error without closing the handle; Windows
+cannot `Remove` an open file, so the deferred temp cleanup leaves a
+`.tmp` and the "directory empty" assert fails. POSIX hides this because
+unlink-while-open works.
+
+This is the same class of Windows handle lifetime already skipped in
+`writefile_test.go` / upgrade mode asserts — the installer close-fault
+fixture was not gated.
+
+**Owns:** `internal/installer/installer.go` (`writeAtomic`,
+`writeAtomicClose`), `internal/installer/installer_test.go`.
+
+**Trap:** stubbing `Close` to fail *and* skip the real close leaks the
+handle on Windows. Either close the real `*os.File` then return the
+injected error, or skip the empty-dir assert on Windows the way
+chmod-denial fixtures already skip when still writable.
 
 **Acceptance**
 
-- Remote CI green on the Wave-14 tip for lint + test matrix.
+- `go test -race -run TestWriteAtomicCloseFailure ./internal/installer`
+  passes on Windows.
+- Remote `test (windows-latest)` green on the tip that lands the fix.
+- Failed close still returns an error and does not rename the temp over
+  the destination (POSIX and Windows).
 
 ### Fleet re-survey (periodic)
 
@@ -172,6 +191,200 @@ gate seams with a mutex or per-test wiring.
 
 Installer uses method values; formatters use func literals. Runtime
 defaults are equivalent — unify only if a third seam package appears.
+
+---
+
+## Wave 15 — 2026-08-12 planning
+
+Planning-only. Do not implement from this section without picking a
+unit. shadcn/UX registry does not apply (no UI). Context7: Claude Code
+hook matcher now includes `MultiEdit` and documents `tool_result`;
+Biome GraphQL formatter is on by default; Ruff formats `.ipynb` by
+default (already how `notebook.go` invokes `ruff format`).
+
+### Round 1 — Hook envelope
+
+#### Match `MultiEdit` on install
+
+Claude Code's current PostToolUse matcher used by first-party hooks is
+`Edit|Write|MultiEdit|NotebookEdit`. Installer still writes
+`Write|Edit|NotebookEdit` (`matcherAll` in
+`internal/installer/installer.go`). MultiEdit writes never invoke this
+hook, so those files stay unformatted until a later Write/Edit.
+
+**Owns:** `internal/installer/installer.go` (`matcherAll`, `keepEntry`,
+`matcherOld`), `internal/installer/installer_test.go`, HUMANS/README
+matcher prose, CHANGELOG.
+
+**Trap:** `keepEntry` already replaces the binary's own entry on
+`--install`, so existing operators pick this up only after re-install
+(or a settings rewrite). Do not treat `matcherOld` (`Write|Edit`) as
+the MultiEdit-less current matcher — that string is reserved for the
+legacy inline biome hook. MultiEdit's `tool_input` still uses
+`file_path` (same as Edit); do not invent a multi-path loop unless a
+captured payload shows an `edits` array of distinct paths.
+
+**Acceptance**
+
+- Fresh `--install` writes a matcher that includes `MultiEdit`.
+- Re-`--install` replaces the previous format-dispatch matcher (no
+  duplicate PostToolUse entries).
+- A stdin payload with `tool_name` MultiEdit and `tool_input.file_path`
+  formats that file the same as Edit.
+
+#### Accept `tool_result` as well as `tool_response`
+
+`internal/hookio/payload.go` reads `tool_response.filePath` first.
+Current Claude Code hook docs name the sibling field `tool_result`. If
+the runtime stopped emitting `tool_response`, the hook still works via
+`tool_input.file_path` — unless a future tool only puts the resolved
+path on `tool_result`. Cheap to accept both; do not drop
+`tool_response` until a captured payload proves it is gone.
+
+**Owns:** `internal/hookio/payload.go`, `internal/hookio/payload_test.go`.
+
+**Trap:** field names differ (`filePath` camelCase on the response
+object vs `file_path` on input). Decode both objects; keep the existing
+fallback order, inserting `tool_result` next to `tool_response`.
+
+**Acceptance**
+
+- Payload with only `tool_result.filePath` resolves.
+- Payload with both `tool_response` and `tool_result` is deterministic
+  (document which wins).
+- Malformed JSON still yields an empty path (exit-0 no-op).
+
+### Round 2 — Formatter routing
+
+#### `biome format --write` instead of `biome check --write`
+
+`internal/formatters/biome.go` runs `biome check --write
+--no-errors-on-unmatched`. `--no-errors-on-unmatched` only covers
+unknown paths. Lint findings still fail the process, so a file that
+formatted cleanly can still emit a truncated diagnostic on every write
+— the same class of noise sqlfluff and markdownlint already special-case.
+Biome's GraphQL/HTML/CSS docs and the formatter guide apply formatting
+via `biome format --write`.
+
+**Owns:** `internal/formatters/biome.go`, `internal/formatters/json.go`
+(router still delegates to NewBiome), HUMANS supported-extensions
+table, installer `oldBiomeMark` (legacy detection string must keep
+matching old settings entries).
+
+**Trap:** `oldBiomeMark = "biome check --write"` is how Wire recognizes
+the pre-Go-installer biome-only hook. Changing the *live* argv must not
+stop replacing that legacy command. Projects that relied on the hook as
+a stealth linter would lose that; the invariant is format-on-write, not
+lint-on-write (`HUMANS.md` `--check` already says CI checks formatting
+not lint conformance).
+
+**Acceptance**
+
+- Biome-backed extensions invoke `format --write` (PATH and bunx argv).
+- A file with lint-only findings and a successful format does not print
+  a fixer-failed diagnostic.
+- Legacy settings entries containing `biome check --write` are still
+  replaced on `--install`.
+
+#### Route `.graphql`/`.gql` through Biome when Biome is the project formatter
+
+Biome's GraphQL formatter is stable and enabled by default
+(v1.9+; disable via `graphql.formatter.enabled`). Dispatch currently
+sends both suffixes to prettier (`internal/dispatch/dispatch.go`) with
+a comment that GraphQL has no dedicated tool. That comment is stale.
+
+**Owns:** `internal/dispatch/dispatch.go`, a router or biome registration
+alongside prettier fallback, HUMANS table, CHANGELOG.
+
+**Trap:** prettier-plugin-graphql / `.prettierrc` GraphQL options will
+diverge from Biome output. Do not steal files from a repo that has no
+`biome.json`/`biome.jsonc` — mirror the `.json` router: Biome only when
+an upward config exists and a launcher is available; otherwise keep
+prettier. `disabledFormatters: ["biome"]` must leave prettier in
+place. Fleet `.vue`/`.svelte`/`.astro` remain no-go (Wave-6–10); this
+is a routing change for an already-supported extension.
+
+**Acceptance**
+
+- Project with `biome.json` + biome on PATH formats `.graphql`/`.gql`
+  via biome.
+- Project with neither biome config nor biome binary still uses
+  prettier (or skips if prettier/bunx absent).
+- Disabling `biome` does not disable prettier for those suffixes.
+
+#### `tofu fmt` when `terraform` is missing
+
+OpenTofu's `tofu fmt` is the same canonical formatter for `.tf` /
+`.tfvars` / the registered multi-dot HCL suffixes. `terraform.go`
+LookPaths only `terraform` and skips otherwise.
+
+**Owns:** `internal/formatters/terraform.go`, HUMANS prerequisites +
+table, `disabledFormatters` name (keep `terraform` unless a distinct
+name is required — prefer one name so opt-out covers both binaries).
+
+**Trap:** both binaries on PATH — pick one (terraform first, matching
+today) and do not run both. `tofu fmt` argv is `fmt <path>`, same as
+terraform. Do not register bare `.hcl` / `.tf.json` / `.tfvars.json`
+(explicitly out of scope below).
+
+**Acceptance**
+
+- `terraform` present → unchanged.
+- Only `tofu` present → those extensions format.
+- Neither present → skip, no diagnostic.
+- `disabledFormatters: ["terraform"]` skips both binaries.
+
+### Round 3 — Skip list / dual harness
+
+#### Vendored-dir additions (evidence-gated)
+
+`dispatch.vendoredDirs` / AGENTS.md invariants omit common toolchain
+output that is not `node_modules`/`dist`/`build`: `.turbo`,
+`.svelte-kit`, `.nuxt`, `.output` (Nitro), `.parcel-cache`, `.nox`.
+Formatting generated files there is wasted budget and noisy diffs.
+
+**Owns:** `internal/dispatch/dispatch.go` (`vendoredDirs`),
+`internal/dispatch/dispatch_test.go`, AGENTS.md invariants list,
+HUMANS pointer.
+
+**Trap:** do not add bare `target/` (Rust/Java/CMake all use it; too
+many false positives). Do not add `.vue`/`.svelte`/`.astro` *formatters*
+here — that is still the Wave-6 fleet no-go. Re-run the fleet survey
+under `/usr/local/src/com.github/Rethunk-Tech/` and only add a segment
+that actually appears as generated output.
+
+**Acceptance**
+
+- Each added segment is skipped by `InVendoredDir` anywhere in the
+  relative path (same as existing entries).
+- HUMANS/AGENTS lists stay in lockstep with the map.
+- No new formatter registrations in this unit.
+
+#### Optional: wire Cursor `hooks.json` as well as Claude `settings.json`
+
+This binary is Claude Code–shaped (`CLAUDE_PROJECT_DIR`,
+`~/.claude/settings.json`). Cursor sessions inherit skills/MCP from
+`~/.claude/` but keep a separate hooks file. Operators in Cursor never
+get PostToolUse formatting unless they duplicate the entry by hand.
+
+**Owns:** `internal/installer` (second settings path or a Cursor-shaped
+writer), HUMANS install/uninstall, env override sibling to
+`CLAUDE_SETTINGS_FILE`.
+
+**Trap:** Cursor hook JSON is not guaranteed to be the Claude
+`hooks.PostToolUse[]` document — do not assume `Wire` can append
+blindly. Matcher tool names also differ (Cursor Write/StrReplace vs
+Claude Write/Edit/MultiEdit). If the schemas diverge, ship a distinct
+writer or drop this item rather than corrupting `~/.cursor/hooks.json`.
+shadcn/component registries are irrelevant to this path.
+
+**Acceptance**
+
+- Documented, tested round-trip against a captured Cursor hooks file
+  (or explicit no-go in HUMANS if the schema cannot be reused).
+- Claude `settings.json` behavior unchanged.
+- Uninstall removes only the format-dispatch entry from whichever file
+  was wired.
 
 ---
 
