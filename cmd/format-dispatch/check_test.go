@@ -293,6 +293,41 @@ func TestCheckHonorsProjectConfigDisablesBiomeForJSONRouter(t *testing.T) {
 		qt.Commentf("project-disabled biome must still check native JSON formatting"))
 }
 
+func TestCheckHonorsProjectConfigDisablesBiomeForGraphQLRouter(t *testing.T) {
+	if filepath.Separator == '\\' {
+		t.Skip("fake formatter scripts are POSIX-shell only")
+	}
+
+	toolDir := t.TempDir()
+	marker := filepath.Join(t.TempDir(), "formatter")
+	biome := "#!/bin/sh\nprintf 'biome' > \"$FORMATTER_MARKER\"\nexit 0\n"
+	prettier := "#!/bin/sh\nprintf 'prettier' > \"$FORMATTER_MARKER\"\nexit 0\n"
+	for name, script := range map[string]string{"biome": biome, "bunx": prettier} {
+		qt.Assert(t, qt.IsNil(os.WriteFile(filepath.Join(toolDir, name), []byte(script), 0o755))) //nolint:gosec // test fixture
+	}
+
+	projectRoot := t.TempDir()
+	writeCheckFile(t, projectRoot, "biome.json", "{}\n")
+	writeCheckFile(t, projectRoot, projectConfigFile, `{"disabledFormatters":["biome"]}`)
+	configPath := filepath.Join(t.TempDir(), "claude-format-hooks.json")
+	writeFile(t, configPath, `{}`)
+	t.Setenv("CLAUDE_PROJECT_DIR", projectRoot)
+	t.Setenv("CLAUDE_FORMAT_HOOKS_CONFIG", configPath)
+	t.Setenv("CLAUDE_FORMAT_HOOKS_CACHE", filepath.Join(t.TempDir(), "cache"))
+	t.Setenv("FORMATTER_MARKER", marker)
+	t.Setenv("PATH", toolDir)
+
+	for _, ext := range []string{".graphql", ".gql"} {
+		t.Run(ext, func(t *testing.T) {
+			path := writeCheckFile(t, projectRoot, "bad"+ext, "query { user { id } }\n")
+			var out, errOut bytes.Buffer
+			qt.Check(t, qt.Equals(runCheck([]string{path}, &out, &errOut), 0))
+			qt.Check(t, qt.Equals(readFile(t, marker), "prettier"),
+				qt.Commentf("project-disabled biome must route %s through prettier", ext))
+		})
+	}
+}
+
 func TestCheckReusesProjectDisabledBiomeRegistryForMultipleJSONFiles(t *testing.T) {
 	projectRoot := t.TempDir()
 	firstPath := writeCheckFile(t, projectRoot, "first.json", unformattedJSON)
