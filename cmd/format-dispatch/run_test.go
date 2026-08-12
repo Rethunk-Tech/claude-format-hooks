@@ -123,6 +123,7 @@ func TestDispatchArgsRoutesInstallAndUninstall(t *testing.T) {
 		t.Setenv("CLAUDE_HOOKS_BIN_DIR", filepath.Join(dir, "bin"))
 		settingsPath := filepath.Join(dir, "settings.json")
 		t.Setenv("CLAUDE_SETTINGS_FILE", settingsPath)
+		t.Setenv("CURSOR_HOOKS_FILE", filepath.Join(dir, "hooks.json"))
 
 		qt.Check(t, qt.Equals(dispatchArgs([]string{"--install", "--dry-run"}), 0))
 		_, err := os.Stat(settingsPath)
@@ -134,6 +135,7 @@ func TestDispatchArgsRoutesInstallAndUninstall(t *testing.T) {
 		t.Setenv("CLAUDE_HOOKS_BIN_DIR", filepath.Join(dir, "bin"))
 		settingsPath := filepath.Join(dir, "settings.json")
 		t.Setenv("CLAUDE_SETTINGS_FILE", settingsPath)
+		t.Setenv("CURSOR_HOOKS_FILE", filepath.Join(dir, "hooks.json"))
 
 		qt.Check(t, qt.Equals(dispatchArgs([]string{"--install"}), 0))
 		qt.Check(t, qt.Equals(dispatchArgs([]string{"--uninstall"}), 0))
@@ -175,6 +177,7 @@ func TestRunInstallWiresAndUninstallsSettings(t *testing.T) {
 	t.Setenv("CLAUDE_HOOKS_BIN_DIR", filepath.Join(dir, "bin"))
 	settingsPath := filepath.Join(dir, "settings.json")
 	t.Setenv("CLAUDE_SETTINGS_FILE", settingsPath)
+	t.Setenv("CURSOR_HOOKS_FILE", filepath.Join(dir, "hooks.json"))
 
 	qt.Check(t, qt.Equals(runInstall(nil, false), 0))
 	qt.Check(t, qt.StringContains(readFile(t, settingsPath), "format-dispatch"))
@@ -188,6 +191,7 @@ func TestRunInstallDryRunDoesNotWrite(t *testing.T) {
 	t.Setenv("CLAUDE_HOOKS_BIN_DIR", filepath.Join(dir, "bin"))
 	settingsPath := filepath.Join(dir, "settings.json")
 	t.Setenv("CLAUDE_SETTINGS_FILE", settingsPath)
+	t.Setenv("CURSOR_HOOKS_FILE", filepath.Join(dir, "hooks.json"))
 
 	qt.Check(t, qt.Equals(runInstall([]string{"--dry-run"}, false), 0))
 	_, err := os.Stat(settingsPath)
@@ -210,6 +214,7 @@ func TestRunInstallRejectsUnrecognizedArgs(t *testing.T) {
 			t.Setenv("CLAUDE_HOOKS_BIN_DIR", filepath.Join(dir, "bin"))
 			settingsPath := filepath.Join(dir, "settings.json")
 			t.Setenv("CLAUDE_SETTINGS_FILE", settingsPath)
+			t.Setenv("CURSOR_HOOKS_FILE", filepath.Join(dir, "hooks.json"))
 
 			var code int
 			stderr := captureStderr(t, func() { code = runInstall(tc.args, false) })
@@ -349,6 +354,7 @@ func TestRunInstallReportsActionError(t *testing.T) {
 	// installer's read -- forcing Install/Uninstall to return an error
 	// runInstall must propagate, not swallow.
 	t.Setenv("CLAUDE_SETTINGS_FILE", dir)
+	t.Setenv("CURSOR_HOOKS_FILE", filepath.Join(dir, "hooks.json"))
 
 	var code int
 	stderr := captureStderr(t, func() { code = runInstall(nil, false) })
