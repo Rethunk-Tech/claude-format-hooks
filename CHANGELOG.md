@@ -45,8 +45,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   happens inside the per-file budget.
 - `disabledFormatters` provides case-insensitive formatter-name opt-outs in
   user and project config. Disabling `biome` covers all Biome-owned
-  extensions while `.json` falls back to native formatting; `--check`
-  applies the same opt-outs as the live hook.
+  extensions while `.json` falls back to native formatting and `.graphql`/
+  `.gql` stay on prettier; `--check` applies the same opt-outs as the live
+  hook.
 
 ### Changed
 
@@ -61,7 +62,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   Legacy settings entries that contain `biome check --write` are still
   replaced on `--install`.
 - `--check` reuses the project-biome-disabled registry per project root,
-  avoiding a `NewRegistry` rebuild for each `.json` file.
+  avoiding a `NewRegistry` rebuild for each project-biome-disabled router
+  file (`.json`, `.graphql`, or `.gql`).
 
 ### Fixed
 
