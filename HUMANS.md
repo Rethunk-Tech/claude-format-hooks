@@ -6,7 +6,7 @@ For **developer/architecture context**, see [AGENTS.md](AGENTS.md).
 ## What it does
 
 A [Claude Code](https://claude.com/claude-code) `PostToolUse` hook that
-formats/lints a file right after Write/Edit/NotebookEdit writes it — a
+formats/lints a file right after Write/Edit/MultiEdit/NotebookEdit writes it — a
 single global Go binary (`format-dispatch`), with no per-repo setup
 required.
 
@@ -28,8 +28,9 @@ required.
 - Optional: [`rustfmt`](https://github.com/rust-lang/rustfmt) (installed
   with the Rust toolchain via `rustup component add rustfmt`) for `.rs`
   formatting.
-- Optional: [`terraform`](https://developer.hashicorp.com/terraform)
-  (system binary) for `.tf` formatting.
+- Optional: [`terraform`](https://developer.hashicorp.com/terraform) or
+  [`tofu`](https://opentofu.org/) (system binary) for `.tf` formatting;
+  `terraform` is used when both are on `PATH`.
 - Optional: [`buf`](https://buf.build/) (system binary) for `.proto`
   formatting.
 
@@ -48,7 +49,7 @@ The installer builds `format-dispatch` to `~/.claude/hooks/format-dispatch`
 on POSIX systems, or `format-dispatch.exe` to
 `~/.claude/hooks/format-dispatch.exe` on Windows, and adds (or replaces an
 existing narrower biome-only hook with) a `PostToolUse` entry for
-`Write|Edit|NotebookEdit`, invoked via the hook schema's exec form
+`Write|Edit|MultiEdit|NotebookEdit`, invoked via the hook schema's exec form
 (`command` + `args: []`) — no shell spawned to launch
 it, just the binary directly.
 
@@ -142,21 +143,21 @@ hanging on stdin — safe to run by hand while debugging.
 
 ## Supported extensions
 
-| Extension                                                                      | Formatter                                                                                                                                                 | Native?              |
+| Extension | Formatter | Native? |
 | ------------------------------------------------------------------------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------- |
-| `.json`                                                                        | `biome check --write` when an upward `biome.json`/`biome.jsonc` is found and `biome` is available through `bunx`/`PATH`; otherwise `encoding/json.Indent` | conditional          |
-| `.sh`, `.bash`                                                                 | `mvdan.cc/sh/v3`                                                                                                                                          | yes                  |
-| `.go`                                                                          | `go/format.Source`                                                                                                                                        | yes                  |
-| `.ts`, `.tsx`, `.js`, `.jsx`, `.mjs`, `.cjs`, `.mts`, `.cts`, `.css`, `.jsonc` | `biome check --write`                                                                                                                                     | no (PATH, else bunx) |
-| `.md`, `.mdx`, `.markdown`                                                     | `markdownlint-cli2 --fix`                                                                                                                                 | no (PATH, else bunx) |
-| `.toml`                                                                        | `taplo format`                                                                                                                                            | no (PATH, else bunx) |
-| `.yaml`, `.yml`, `.html`, `.scss`, `.less`, `.graphql`, `.gql`                 | `prettier --write`                                                                                                                                        | no (PATH, else bunx) |
-| `.sql`                                                                         | `sqlfluff fix`                                                                                                                                            | no (system binary)   |
-| `.py`, `.pyi`                                                                  | `ruff format` (preferred) or `black`                                                                                                                      | no (system binary)   |
-| `.ipynb`                                                                       | `ruff format` (preferred) or `black` with notebook support                                                                                                | no (system binary)   |
-| `.rs`                                                                          | `rustfmt`                                                                                                                                                 | no (system binary)   |
-| `.tf`, `.tfvars`, `.tftest.hcl`, `.tfmock.hcl`, `.tfquery.hcl`                 | `terraform fmt`                                                                                                                                           | no (system binary)   |
-| `.proto`                                                                       | `buf format -w`                                                                                                                                           | no (system binary)   |
+| `.json` | `biome format --write` when an upward `biome.json`/`biome.jsonc` is found and `biome` is available through `bunx`/`PATH`; otherwise `encoding/json.Indent` | conditional |
+| `.sh`, `.bash` | `mvdan.cc/sh/v3` | yes |
+| `.go` | `go/format.Source` | yes |
+| `.ts`, `.tsx`, `.js`, `.jsx`, `.mjs`, `.cjs`, `.mts`, `.cts`, `.css`, `.jsonc` | `biome format --write` | no (PATH, else bunx) |
+| `.md`, `.mdx`, `.markdown` | `markdownlint-cli2 --fix` | no (PATH, else bunx) |
+| `.toml` | `taplo format` | no (PATH, else bunx) |
+| `.yaml`, `.yml`, `.html`, `.scss`, `.less`, `.graphql`, `.gql` | `prettier --write` | no (PATH, else bunx) |
+| `.sql` | `sqlfluff fix` | no (system binary) |
+| `.py`, `.pyi` | `ruff format` (preferred) or `black` | no (system binary) |
+| `.ipynb` | `ruff format` (preferred) or `black` with notebook support | no (system binary) |
+| `.rs` | `rustfmt` | no (system binary) |
+| `.tf`, `.tfvars`, `.tftest.hcl`, `.tfmock.hcl`, `.tfquery.hcl` | `terraform fmt` (or `tofu fmt` if `terraform` is absent) | no (system binary) |
+| `.proto` | `buf format -w` | no (system binary) |
 
 Extensionless paths beginning with a `bash`, `sh`, `zsh`, or `dash` shebang
 use the same native shell formatter as `.sh`. Multi-dot Terraform suffixes
@@ -184,7 +185,7 @@ format-dispatch --check src docs/a.md  # specific paths
 Extensionless files with a `bash`, `sh`, `zsh`, or `dash` shebang are checked
 with the native shell formatter. Terraform test, mock, and query files
 (`.tftest.hcl`, `.tfmock.hcl`, and `.tfquery.hcl`) are checked through
-`terraform fmt` as well.
+`terraform fmt` (or `tofu fmt`) as well.
 
 Exit codes are `0` (all formatted), `1` (some files need formatting), and
 `2` (bad invocation, e.g. no paths or a path that does not exist) — so a
@@ -237,7 +238,7 @@ Canonical formatter names for `disabledFormatters` are:
 and `buf`. `ruff/black` does not cover notebooks; use
 `ruff/black-notebook` separately for `.ipynb`.
 
-3. **The target project's `.editorconfig`** — if a section covers the
+1. **The target project's `.editorconfig`** — if a section covers the
    file being formatted, its `indent_style`/`indent_size` win over your
    personal config, the same way every editor and formatter that honors
    EditorConfig behaves. A missing or malformed config file never blocks

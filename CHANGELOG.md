@@ -9,6 +9,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- PostToolUse stdin accepts `tool_result.filePath` as well as
+  `tool_response.filePath`; when both are set, `tool_response` wins.
+- Terraform-owned suffixes use `tofu fmt` when `terraform` is not on
+  `PATH`. `disabledFormatters: ["terraform"]` still skips both binaries.
 - Route `.tftest.hcl`, `.tfmock.hcl`, and `.tfquery.hcl` through Terraform
   formatting; bare `.hcl`, `.tf.json`, and `.tfvars.json` are not registered
   Terraform extensions.
@@ -46,6 +50,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- `--install` writes a PostToolUse matcher of
+  `Write|Edit|MultiEdit|NotebookEdit`. Re-install replaces the previous
+  format-dispatch entry.
+- Biome-backed extensions run `biome format --write` instead of
+  `biome check --write`, so lint-only findings no longer fail the hook.
+  Legacy settings entries that contain `biome check --write` are still
+  replaced on `--install`.
 - `--check` reuses the project-biome-disabled registry per project root,
   avoiding a `NewRegistry` rebuild for each `.json` file.
 

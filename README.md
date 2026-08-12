@@ -7,7 +7,7 @@
 [![CI](https://github.com/Rethunk-Tech/claude-format-hooks/actions/workflows/ci.yml/badge.svg)](https://github.com/Rethunk-Tech/claude-format-hooks/actions/workflows/ci.yml)
 
 A [Claude Code](https://claude.com/claude-code) `PostToolUse` hook that
-formats/lints a file right after Write/Edit/NotebookEdit writes it
+formats/lints a file right after Write/Edit/MultiEdit/NotebookEdit writes it
 
 </div>
 
@@ -18,7 +18,7 @@ with no per-repo setup required. Three formatters (JSON, shell, Go) run
 natively in-process; everything else routes to the real,
 project-config-aware tool: biome, prettier, taplo, and markdownlint-cli2
 from `PATH` first, then via `bunx`; `sqlfluff`, `ruff`/`black`, `rustfmt`,
-`terraform fmt`, and `buf format` as system binaries.
+`terraform fmt` (or `tofu fmt`), and `buf format` as system binaries.
 
 ## Quick start
 
@@ -42,27 +42,27 @@ Full install steps, prerequisites, and configuration: [HUMANS.md](HUMANS.md).
 - **Everything else routed to the real tool** — biome, markdownlint-cli2,
   taplo, and prettier from `PATH` first, then via `bunx`; `sqlfluff`,
   `ruff`/`black`, `rustfmt`,
-  `terraform fmt`, and `buf format` as system binaries — so project config
+  `terraform fmt` (or `tofu fmt`), and `buf format` as system binaries — so project config
   files are
   honored automatically, with no config-presence gate: every supported
   extension formats in every project.
 - **Silent on success, exits 0 always** — a `PostToolUse` hook must never
-  be the reason a Write/Edit/NotebookEdit call reports failure; failures
+  be the reason a Write/Edit/MultiEdit/NotebookEdit call reports failure; failures
   surface as a truncated stderr diagnostic instead.
 - **One `./install.sh`, no per-repo setup** — builds the binary and wires
   it into `~/.claude/settings.json` globally.
 
 ## Documentation
 
-| Document                              | Purpose                                                       |
+| Document | Purpose |
 | ------------------------------------- | ------------------------------------------------------------- |
-| [Humans guide](HUMANS.md)             | Install, configuration, supported extensions, troubleshooting |
-| [Agents guide](AGENTS.md)             | Architecture, design rationale, package layout, invariants    |
-| [Contributing](CONTRIBUTING.md)       | Build, test, and pull request workflow                        |
-| [Security](SECURITY.md)               | Vulnerability reporting                                       |
-| [Changelog](CHANGELOG.md)             | Release history (Keep a Changelog style)                      |
-| [Code of conduct](CODE_OF_CONDUCT.md) | Community standards and enforcement                           |
-| [License](LICENSE)                    | MIT License                                                   |
+| [Humans guide](HUMANS.md) | Install, configuration, supported extensions, troubleshooting |
+| [Agents guide](AGENTS.md) | Architecture, design rationale, package layout, invariants |
+| [Contributing](CONTRIBUTING.md) | Build, test, and pull request workflow |
+| [Security](SECURITY.md) | Vulnerability reporting |
+| [Changelog](CHANGELOG.md) | Release history (Keep a Changelog style) |
+| [Code of conduct](CODE_OF_CONDUCT.md) | Community standards and enforcement |
+| [License](LICENSE) | MIT License |
 
 ## License
 

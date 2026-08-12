@@ -33,15 +33,15 @@ This project follows semantic versioning. Only the latest minor version
 receives security fixes. Older versions should be upgraded to receive
 patches.
 
-| Version  | Supported          |
+| Version | Supported |
 | -------- | ------------------ |
-| latest   | :white_check_mark: |
-| < latest | :x:                |
+| latest | :white_check_mark: |
+| < latest | :x: |
 
 ## Scope
 
 claude-format-hooks is a local developer tool: a `PostToolUse` hook binary
-that runs on every Write/Edit/NotebookEdit call in a Claude Code session,
+that runs on every Write/Edit/MultiEdit/NotebookEdit call in a Claude Code session,
 reads the file just written, and (for supported extensions) reformats it
 in place — either in-process or by shelling out to a project-local or
 `bunx`-resolved formatter. In scope:
@@ -51,7 +51,7 @@ in place — either in-process or by shelling out to a project-local or
   was invoked on or the formatter it dispatches to.
 - Command injection via the arguments passed to external formatters
   (`biome`, `prettier`, `taplo`, `markdownlint-cli2`, `sqlfluff`, `ruff`,
-  `black`, `rustfmt`, `terraform`, `buf`).
+  `black`, `rustfmt`, `terraform`, `tofu`, `buf`).
 - Path traversal past the `$CLAUDE_PROJECT_DIR` boundary check in
   `cmd/format-dispatch/main.go`.
 
