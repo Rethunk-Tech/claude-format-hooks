@@ -16,7 +16,7 @@ import (
 )
 
 const (
-	matcherAll   = "Write|Edit|NotebookEdit"
+	matcherAll   = "Write|Edit|MultiEdit|NotebookEdit"
 	matcherOld   = "Write|Edit"
 	oldBiomeMark = "biome check --write"
 	statusMsg    = "format-dispatch..."

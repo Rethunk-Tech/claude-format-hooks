@@ -104,7 +104,7 @@ func TestWireFreshInstall(t *testing.T) {
 
 	entries := settingsPostToolUse(t, after)
 	qt.Assert(t, qt.HasLen(entries, 1))
-	qt.Check(t, qt.Equals(entries[0].Matcher, "Write|Edit|NotebookEdit"))
+	qt.Check(t, qt.Equals(entries[0].Matcher, "Write|Edit|MultiEdit|NotebookEdit"))
 	qt.Assert(t, qt.HasLen(entries[0].Hooks, 1))
 	qt.Check(t, qt.Equals(entries[0].Hooks[0].Command, binPath))
 	qt.Check(t, qt.Equals(entries[0].Hooks[0].Timeout, hookTimeout))
@@ -171,7 +171,7 @@ func TestWireReplacesLegacyBareBasename(t *testing.T) {
 	existing := `{
 		"hooks": {
 			"PostToolUse": [
-				{"matcher": "Write|Edit|NotebookEdit", "hooks": [{"type": "command", "command": "` + binPath + `"}]}
+				{"matcher": "Write|Edit|MultiEdit|NotebookEdit", "hooks": [{"type": "command", "command": "` + binPath + `"}]}
 			]
 		}
 	}`
@@ -192,7 +192,7 @@ func TestUnwireExeRemovesLegacyBareBasename(t *testing.T) {
 	existing := `{
 		"hooks": {
 			"PostToolUse": [
-				{"matcher": "Write|Edit|NotebookEdit", "hooks": [{"type": "command", "command": "` + binPath + `"}]}
+				{"matcher": "Write|Edit|MultiEdit|NotebookEdit", "hooks": [{"type": "command", "command": "` + binPath + `"}]}
 			]
 		}
 	}`
@@ -225,7 +225,7 @@ func TestWireReplacesOldBiomeOnlyHook(t *testing.T) {
 
 	entries := settingsPostToolUse(t, after)
 	qt.Assert(t, qt.HasLen(entries, 1))
-	qt.Check(t, qt.Equals(entries[0].Matcher, "Write|Edit|NotebookEdit"))
+	qt.Check(t, qt.Equals(entries[0].Matcher, "Write|Edit|MultiEdit|NotebookEdit"))
 	qt.Check(t, qt.Equals(entries[0].Hooks[0].Command, binPath))
 }
 
@@ -328,7 +328,7 @@ func TestUnwirePreservesOtherEntries(t *testing.T) {
 		"hooks": {
 			"PostToolUse": [
 				{"matcher": "Bash", "hooks": [{"type": "command", "command": "log.sh"}]},
-				{"matcher": "Write|Edit|NotebookEdit", "hooks": [{"type": "command", "command": "` + binPath + `"}]}
+				{"matcher": "Write|Edit|MultiEdit|NotebookEdit", "hooks": [{"type": "command", "command": "` + binPath + `"}]}
 			]
 		}
 	}`
