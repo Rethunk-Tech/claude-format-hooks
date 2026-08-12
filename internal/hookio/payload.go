@@ -16,16 +16,20 @@ type Payload struct {
 	ToolResponse struct {
 		FilePath string `json:"filePath"`
 	} `json:"tool_response"`
+	ToolResult struct {
+		FilePath string `json:"filePath"`
+	} `json:"tool_result"`
 }
 
 // FilePath returns the file that was written or edited, matching the same
-// field-fallback order the original hand-written hooks used: the tool
-// response's resolved path first, then tool_input.file_path, then
-// tool_input.notebook_path for NotebookEdit calls.
+// field-fallback order: tool_response.filePath, tool_result.filePath,
+// tool_input.file_path, then tool_input.notebook_path.
 func (p Payload) FilePath() string {
 	switch {
 	case p.ToolResponse.FilePath != "":
 		return p.ToolResponse.FilePath
+	case p.ToolResult.FilePath != "":
+		return p.ToolResult.FilePath
 	case p.ToolInput.FilePath != "":
 		return p.ToolInput.FilePath
 	default:

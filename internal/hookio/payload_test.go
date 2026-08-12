@@ -18,6 +18,21 @@ func TestFilePathFallbackOrder(t *testing.T) {
 			want: "/resolved.go",
 		},
 		{
+			name: "tool_result.filePath resolves when response is absent",
+			raw:  `{"tool_result":{"filePath":"/result.go"}}`,
+			want: "/result.go",
+		},
+		{
+			name: "tool_response.filePath wins over tool_result.filePath",
+			raw:  `{"tool_response":{"filePath":"/resolved.go"},"tool_result":{"filePath":"/result.go"}}`,
+			want: "/resolved.go",
+		},
+		{
+			name: "tool_result.filePath wins over tool_input.file_path",
+			raw:  `{"tool_result":{"filePath":"/result.go"},"tool_input":{"file_path":"/input.go","notebook_path":"/nb.ipynb"}}`,
+			want: "/result.go",
+		},
+		{
 			name: "falls back to tool_input.file_path",
 			raw:  `{"tool_input":{"file_path":"/input.go","notebook_path":"/nb.ipynb"}}`,
 			want: "/input.go",
