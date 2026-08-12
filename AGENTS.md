@@ -83,6 +83,11 @@ native alternatives rather than assuming:
   against hand-authored custom-element markup — a native Go attempt would
   not improve on it. Stays on `prettier`.
 - **TS/TSX/JS/JSX/CSS/JSONC** — `biome` is Rust with no Go bindings.
+- **GraphQL (`.graphql`/`.gql`)** — Biome when an upward `biome.json`/
+  `biome.jsonc` exists and a `biome`/`bunx` launcher is available;
+  otherwise prettier. Same router pattern as `.json` (Biome only with
+  project config); `disabledFormatters: ["biome"]` leaves prettier in
+  place. `graphqlRouter.Name()` stays `"prettier"`.
 - **SQL** — `sqlfluff` is Python; no Go equivalent exists.
 - **Python** — `ruff format` (preferred) or `black` as a fallback; both
   are Python tools, no Go equivalent exists. Whichever is on `PATH` runs;
@@ -125,7 +130,7 @@ tool. Two exceptions needed a config story of their own (see
 | [`internal/diskcache/`](internal/diskcache/) | Small disk-backed key/value cache with TTL-based expiry, shared by `internal/config` and `internal/formatters` (neither may import the other in the direction this package would require) — every result that's expensive to recompute on every invocation but rarely changes mid-session goes through here |
 | [`internal/config/`](internal/config/) | Resolves per-file indent settings: built-in defaults -> user config -> `.editorconfig`; the `.editorconfig` resolution itself is cached via `internal/diskcache` |
 | [`internal/dispatch/`](internal/dispatch/) | Extension -> `Formatter` registry, vendored-dir list, disabled-extension filtering |
-| [`internal/formatters/`](internal/formatters/) | One `Formatter` implementation per file type (native: `json.go`, `shell.go`, `golang.go`; external: `biome.go`, `bunxtool.go`, `sqlfluff.go`, `python.go`, `rust.go`, `terraform.go`, `proto.go`); `exec.go` holds the shared subprocess-run + diagnostic-truncation helper; `binpath.go` holds the shared, cached `lookPath` every external formatter uses instead of calling `exec.LookPath` directly; `writefile.go` holds the shared mode-preserving write every native formatter uses instead of its own stat-then-write; `markdownconfig.go` + `markdownlint-defaults.jsonc` supply markdownlint-cli2's missing user-level config layer |
+| [`internal/formatters/`](internal/formatters/) | One `Formatter` implementation per file type (native: `json.go`, `shell.go`, `golang.go`; routers: `json.go` `jsonRouter`, `graphql.go`; external: `biome.go`, `bunxtool.go`, `sqlfluff.go`, `python.go`, `rust.go`, `terraform.go`, `proto.go`); `exec.go` holds the shared subprocess-run + diagnostic-truncation helper; `binpath.go` holds the shared, cached `lookPath` every external formatter uses instead of calling `exec.LookPath` directly; `writefile.go` holds the shared mode-preserving write every native formatter uses instead of its own stat-then-write; `markdownconfig.go` + `markdownlint-defaults.jsonc` supply markdownlint-cli2's missing user-level config layer |
 | [`internal/installer/`](internal/installer/) | Wires/unwires format-dispatch's `PostToolUse` hook in `~/.claude/settings.json` (`format-dispatch --install`/`--uninstall`), replacing `install.sh`'s old `jq` filter; `upgrade.go` downloads and verifies the latest platform release binary (`format-dispatch --upgrade`), supports `--upgrade --dry-run`, and atomically replaces the installed binary without rewriting `settings.json`; `tools.go` globally provisions the bunx-dispatched formatters at install time (and pins transitive deps carrying an unpatched advisory) so no registry fetch happens inside the per-file budget; `orderedmap.go` preserves the file's existing key order across the rewrite and a `.bak` backup is written before any real change; both settings and binary writes go through `writeAtomic` (unique same-dir temp + rename) so a kill mid-write can never truncate the operator's live files |
 
 ## Invariants
