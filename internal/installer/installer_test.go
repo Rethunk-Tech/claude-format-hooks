@@ -709,7 +709,8 @@ func TestWriteAtomicChmodFailure(t *testing.T) {
 
 func TestWriteAtomicCloseFailure(t *testing.T) {
 	original := writeAtomicClose
-	writeAtomicClose = func(*os.File) error {
+	writeAtomicClose = func(f *os.File) error {
+		_ = f.Close()
 		return os.ErrPermission
 	}
 	t.Cleanup(func() {
@@ -717,9 +718,12 @@ func TestWriteAtomicCloseFailure(t *testing.T) {
 	})
 
 	dir := t.TempDir()
-	err := writeAtomic(filepath.Join(dir, "f.json"), []byte(`{"a":1}`), 0o600)
+	path := filepath.Join(dir, "f.json")
+	err := writeAtomic(path, []byte(`{"a":1}`), 0o600)
 
 	qt.Check(t, qt.IsNotNil(err))
+	_, statErr := os.Stat(path)
+	qt.Check(t, qt.IsTrue(os.IsNotExist(statErr)), qt.Commentf("failed close must not create the destination"))
 	entries, readErr := os.ReadDir(dir)
 	qt.Assert(t, qt.IsNil(readErr))
 	qt.Check(t, qt.HasLen(entries, 0), qt.Commentf("failed close must remove the temporary file"))
