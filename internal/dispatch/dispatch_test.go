@@ -48,6 +48,9 @@ func TestSupportedRespectsDisabledFormatters(t *testing.T) {
 	for _, ext := range []string{".ts", ".tsx", ".js", ".jsx", ".jsonc"} {
 		qt.Check(t, qt.IsFalse(r.Supported(ext)), qt.Commentf("biome ext=%q", ext))
 	}
+	for _, ext := range []string{".graphql", ".gql"} {
+		qt.Check(t, qt.IsTrue(r.Supported(ext)), qt.Commentf("graphql fallback ext=%q", ext))
+	}
 	qt.Check(t, qt.IsTrue(r.Supported(".json")), qt.Commentf("json router falls back to native"))
 	qt.Check(t, qt.IsTrue(KnownExtension(".ts")), qt.Commentf("known extensions stay unfiltered"))
 
@@ -55,6 +58,12 @@ func TestSupportedRespectsDisabledFormatters(t *testing.T) {
 	r = NewRegistry(cfg)
 	qt.Check(t, qt.IsFalse(r.Supported(".json")))
 	qt.Check(t, qt.IsTrue(r.Supported(".ts")), qt.Commentf("unrelated formatter stays enabled"))
+
+	cfg.DisabledFormatters = []string{"PRETTIER"}
+	r = NewRegistry(cfg)
+	for _, ext := range []string{".graphql", ".gql"} {
+		qt.Check(t, qt.IsFalse(r.Supported(ext)), qt.Commentf("prettier ext=%q", ext))
+	}
 }
 
 func TestKnownExtension(t *testing.T) {

@@ -31,6 +31,7 @@ func NewRegistry(cfg config.Config) *Registry {
 	markdown := formatters.NewMarkdown()
 	toml := formatters.NewTOML()
 	prettier := formatters.NewPrettier()
+	graphql := formatters.NewGraphQLRouter(cfg)
 	sql := formatters.NewSQLFluff()
 	python := formatters.NewPython()
 	notebook := formatters.NewNotebook()
@@ -73,12 +74,10 @@ func NewRegistry(cfg config.Config) *Registry {
 		".html": prettier,
 		// biome's CSS parser doesn't support the SCSS/Less supersets;
 		// prettier does natively.
-		".scss": prettier,
-		".less": prettier,
-		// GraphQL has no dedicated tool integrated here; prettier supports
-		// it natively at no extra cost.
-		".graphql": prettier,
-		".gql":     prettier,
+		".scss":    prettier,
+		".less":    prettier,
+		".graphql": graphql,
+		".gql":     graphql,
 
 		".sql": sql,
 
