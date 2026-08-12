@@ -9,7 +9,8 @@ import "encoding/json"
 
 // Payload is the subset of the PostToolUse JSON envelope this package reads.
 type Payload struct {
-	ToolInput struct {
+	CursorFilePath string `json:"file_path"`
+	ToolInput      struct {
 		FilePath     string `json:"file_path"`
 		NotebookPath string `json:"notebook_path"`
 	} `json:"tool_input"`
@@ -23,7 +24,7 @@ type Payload struct {
 
 // FilePath returns the file that was written or edited, matching the same
 // field-fallback order: tool_response.filePath, tool_result.filePath,
-// tool_input.file_path, then tool_input.notebook_path.
+// tool_input.file_path, tool_input.notebook_path, then top-level file_path.
 func (p Payload) FilePath() string {
 	switch {
 	case p.ToolResponse.FilePath != "":
@@ -32,8 +33,10 @@ func (p Payload) FilePath() string {
 		return p.ToolResult.FilePath
 	case p.ToolInput.FilePath != "":
 		return p.ToolInput.FilePath
-	default:
+	case p.ToolInput.NotebookPath != "":
 		return p.ToolInput.NotebookPath
+	default:
+		return p.CursorFilePath
 	}
 }
 
