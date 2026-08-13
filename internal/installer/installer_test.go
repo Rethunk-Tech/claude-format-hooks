@@ -382,6 +382,7 @@ func TestUninstallDryRunDoesNotWrite(t *testing.T) {
 	qt.Assert(t, qt.IsNil(err))
 	qt.Check(t, qt.DeepEquals(cursorRaw, cursorWired))
 	qt.Check(t, qt.StringContains(out.String(), "dry-run"))
+	qt.Check(t, qt.StringContains(out.String(), cursorPath))
 }
 
 func TestUninstallWritesSettings(t *testing.T) {
@@ -486,6 +487,7 @@ func TestInstallDryRunDoesNotWrite(t *testing.T) {
 	qt.Assert(t, qt.IsNil(err))
 	qt.Check(t, qt.DeepEquals(cursorRaw, cursorBefore))
 	qt.Check(t, qt.StringContains(out.String(), "dry-run"))
+	qt.Check(t, qt.StringContains(out.String(), cursorPath))
 }
 
 func TestInstallWritesSettings(t *testing.T) {
