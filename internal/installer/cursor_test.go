@@ -99,9 +99,35 @@ func TestInstallAndUninstallWithCursorHooks(t *testing.T) {
 	qt.Check(t, qt.Equals(entries[0].Hooks[0].Command, binPath))
 
 	qt.Assert(t, qt.IsNil(Uninstall(opts, false, &out)))
-	assertCursorHasOnlyOurHook(t, cursorPath, false)
+	assertCursorEventEmpty(t, cursorPath)
 	entries = settingsPostToolUse(t, readFile(t, settingsPath))
 	qt.Check(t, qt.HasLen(entries, 0))
+}
+
+func TestUninstallMissingCursorLeavesFileMissing(t *testing.T) {
+	dir := t.TempDir()
+	settingsPath := filepath.Join(dir, "settings.json")
+	cursorPath := filepath.Join(dir, "hooks.json")
+	_, wired, err := Wire(settingsPath, binPath)
+	qt.Assert(t, qt.IsNil(err))
+	qt.Assert(t, qt.IsNil(os.WriteFile(settingsPath, wired, 0o600)))
+
+	var out strings.Builder
+	opts := Options{BinPath: binPath, SettingsPath: settingsPath, CursorHooksPath: cursorPath}
+	qt.Assert(t, qt.IsNil(Uninstall(opts, false, &out)))
+	_, err = os.Stat(cursorPath)
+	qt.Check(t, qt.IsTrue(os.IsNotExist(err)))
+}
+
+func TestUnwireCursorWithoutEventOmitsEventKey(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "hooks.json")
+	existing := `{"version":1,"hooks":{"sessionStart":[{"command":"session-start","timeout":5}]}}`
+	qt.Assert(t, qt.IsNil(os.WriteFile(path, []byte(existing), 0o600)))
+
+	_, after, err := UnwireCursor(path, binPath)
+	qt.Assert(t, qt.IsNil(err))
+	qt.Assert(t, qt.IsNil(os.WriteFile(path, after, 0o600)))
+	assertCursorHasOnlyOurHook(t, path, false)
 }
 
 func TestInstallWithoutCursorPathDoesNotTouchCursor(t *testing.T) {
@@ -125,12 +151,24 @@ func assertCursorHasOnlyOurHook(t *testing.T, path string, installed bool) {
 	var sessionStart []cursorHookCommand
 	qt.Assert(t, qt.IsNil(json.Unmarshal(hooks["sessionStart"], &sessionStart)))
 	qt.Check(t, qt.HasLen(sessionStart, 1))
-	var afterFileEdit []cursorHookCommand
-	qt.Assert(t, qt.IsNil(json.Unmarshal(hooks[cursorEvent], &afterFileEdit)))
 	if installed {
+		var afterFileEdit []cursorHookCommand
+		qt.Assert(t, qt.IsNil(json.Unmarshal(hooks[cursorEvent], &afterFileEdit)))
 		qt.Assert(t, qt.HasLen(afterFileEdit, 1))
 		qt.Check(t, qt.Equals(afterFileEdit[0].Command, binPath))
 	} else {
-		qt.Check(t, qt.HasLen(afterFileEdit, 0))
+		_, ok := hooks[cursorEvent]
+		qt.Check(t, qt.IsFalse(ok))
 	}
+}
+
+func assertCursorEventEmpty(t *testing.T, path string) {
+	t.Helper()
+	var top map[string]json.RawMessage
+	qt.Assert(t, qt.IsNil(json.Unmarshal(readFile(t, path), &top)))
+	var hooks map[string]json.RawMessage
+	qt.Assert(t, qt.IsNil(json.Unmarshal(top["hooks"], &hooks)))
+	raw, ok := hooks[cursorEvent]
+	qt.Assert(t, qt.IsTrue(ok))
+	qt.Check(t, qt.Equals(string(raw), "[]"))
 }
