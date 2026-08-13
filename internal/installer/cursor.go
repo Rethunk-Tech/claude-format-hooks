@@ -54,11 +54,15 @@ func renderCursorHooks(top, hooks *orderedMap, entries []json.RawMessage) ([]byt
 		hooks.Delete(cursorEvent)
 	}
 
-	hooksRaw, err := json.Marshal(hooks)
-	if err != nil {
-		return nil, err
+	if len(hooks.keys) == 0 {
+		top.Delete("hooks")
+	} else {
+		hooksRaw, err := json.Marshal(hooks)
+		if err != nil {
+			return nil, err
+		}
+		top.Set("hooks", hooksRaw)
 	}
-	top.Set("hooks", hooksRaw)
 
 	after, err := json.MarshalIndent(top, "", "  ")
 	if err != nil {
