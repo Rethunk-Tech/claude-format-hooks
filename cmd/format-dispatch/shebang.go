@@ -20,7 +20,7 @@ func shellShebangExt(path string) (string, bool) {
 	if err != nil {
 		return "", false
 	}
-	line := strings.SplitN(string(buf[:n]), "\n", 2)[0]
+	line, _, _ := strings.Cut(string(buf[:n]), "\n")
 	line = strings.TrimRight(line, "\r")
 	if !strings.HasPrefix(line, "#!") {
 		return "", false

@@ -202,7 +202,7 @@ func verifyReleaseChecksum(checksumFile []byte, assetName string, binary []byte)
 }
 
 func parseReleaseChecksum(checksumFile []byte, assetName string) ([]byte, error) {
-	for _, line := range strings.Split(string(checksumFile), "\n") {
+	for line := range strings.SplitSeq(string(checksumFile), "\n") {
 		fields := strings.Fields(line)
 		if len(fields) == 0 {
 			continue
