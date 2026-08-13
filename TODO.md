@@ -18,12 +18,6 @@ Unreachable under Go stdlib (entropy failure aborts). Do not mock; leave
 below 90% unless a production seam appears. Owns:
 `cmd/format-dispatch/check_test.go`.
 
-### `--check` cache reuse for GraphQL
-
-`TestCheckReusesProjectDisabledBiomeRegistryForMultipleJSONFiles`
-covers `.json` only. Add `.graphql`/`.gql` under the same
-`projectRoot` cache key only if a regression appears.
-
 ## Extract / unify (threshold-gated)
 
 ### `withFileSizeLimit` third-copy extract
@@ -60,34 +54,6 @@ gate seams with a mutex or per-test wiring.
 
 Installer uses method values; formatters use func literals. Runtime
 defaults are equivalent — unify only if a third seam package appears.
-
-## Cursor installer leftovers
-
-### Installer dry-run with `CursorHooksPath`
-
-Package tests pass `Options` without `CursorHooksPath`; CLI dry-run
-covers both files. Extend installer dry-run tests only if a regression
-appears.
-
-### Pre-existing empty `afterFileEdit` array
-
-`renderCursorHooks` deletes the key when `kept` is empty, including a
-file that already had `"afterFileEdit": []`. No fixture covers that
-input. Add one only if a regression appears. Owns:
-`internal/installer/cursor_test.go`.
-
-### Unwire when `afterFileEdit` is the only hooks child
-
-Uninstall then leaves `"hooks": {}`. HUMANS documents omitting the
-event key, not collapsing an empty `hooks` object. Collapse only if
-operators report the empty object as noise. Owns:
-`internal/installer/cursor.go`.
-
-### CHANGELOG omit-empty `afterFileEdit`
-
-Unreleased Added already covers Cursor wiring. Record that the last
-`afterFileEdit` entry omits the key (not `[]`) on the next changelog
-pass. Owns: `CHANGELOG.md`.
 
 ## Ops
 
