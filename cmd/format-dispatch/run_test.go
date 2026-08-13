@@ -186,16 +186,39 @@ func TestRunInstallWiresAndUninstallsSettings(t *testing.T) {
 	qt.Check(t, qt.Equals(runInstall(nil, false), 0))
 	qt.Check(t, qt.StringContains(readFile(t, settingsPath), "format-dispatch"))
 	cursorHooks := readFile(t, cursorHooksPath)
-	binJSON, err := json.Marshal(filepath.Join(dir, "bin", "format-dispatch"))
-	qt.Assert(t, qt.IsNil(err))
-	qt.Check(t, qt.StringContains(cursorHooks, string(binJSON)))
-	qt.Check(t, qt.StringContains(cursorHooks, "session-start"))
+	var cursorDoc struct {
+		Hooks map[string]json.RawMessage `json:"hooks"`
+	}
+	qt.Assert(t, qt.IsNil(json.Unmarshal([]byte(cursorHooks), &cursorDoc)))
+	var afterFileEdit []struct {
+		Command string `json:"command"`
+		Timeout int    `json:"timeout"`
+	}
+	qt.Assert(t, qt.IsNil(json.Unmarshal(cursorDoc.Hooks["afterFileEdit"], &afterFileEdit)))
+	qt.Check(t, qt.Equals(len(afterFileEdit), 1))
+	qt.Check(t, qt.Equals(afterFileEdit[0].Command, installer.HookBinaryPath(filepath.Join(dir, "bin"))))
+	qt.Check(t, qt.Equals(afterFileEdit[0].Timeout, 5))
+	var sessionStart []struct {
+		Command string `json:"command"`
+	}
+	qt.Assert(t, qt.IsNil(json.Unmarshal(cursorDoc.Hooks["sessionStart"], &sessionStart)))
+	qt.Check(t, qt.Equals(len(sessionStart), 1))
+	qt.Check(t, qt.Equals(sessionStart[0].Command, "session-start"))
 
 	qt.Check(t, qt.Equals(runInstall(nil, true), 0))
 	qt.Check(t, qt.IsFalse(strings.Contains(readFile(t, settingsPath), filepath.Join(dir, "bin", "format-dispatch"))))
 	cursorHooks = readFile(t, cursorHooksPath)
-	qt.Check(t, qt.IsFalse(strings.Contains(cursorHooks, string(binJSON))))
-	qt.Check(t, qt.StringContains(cursorHooks, "session-start"))
+	qt.Assert(t, qt.IsNil(json.Unmarshal([]byte(cursorHooks), &cursorDoc)))
+	afterFileEdit = nil
+	if raw, ok := cursorDoc.Hooks["afterFileEdit"]; ok {
+		qt.Assert(t, qt.IsNil(json.Unmarshal(raw, &afterFileEdit)))
+	}
+	for _, hook := range afterFileEdit {
+		qt.Check(t, qt.IsFalse(strings.Contains(filepath.Base(hook.Command), "format-dispatch")))
+	}
+	qt.Assert(t, qt.IsNil(json.Unmarshal(cursorDoc.Hooks["sessionStart"], &sessionStart)))
+	qt.Check(t, qt.Equals(len(sessionStart), 1))
+	qt.Check(t, qt.Equals(sessionStart[0].Command, "session-start"))
 }
 
 func TestRunInstallDryRunDoesNotWrite(t *testing.T) {
