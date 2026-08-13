@@ -366,13 +366,21 @@ func TestUninstallDryRunDoesNotWrite(t *testing.T) {
 	_, wired, err := Wire(settingsPath, binPath)
 	qt.Assert(t, qt.IsNil(err))
 	qt.Assert(t, qt.IsNil(os.WriteFile(settingsPath, wired, 0o600)))
+	cursorPath := filepath.Join(dir, "hooks.json")
+	_, cursorWired, err := WireCursor(cursorPath, binPath)
+	qt.Assert(t, qt.IsNil(err))
+	qt.Assert(t, qt.IsNil(os.WriteFile(cursorPath, cursorWired, 0o600)))
 
 	var out strings.Builder
-	qt.Assert(t, qt.IsNil(Uninstall(Options{BinPath: binPath, SettingsPath: settingsPath}, true, &out)))
+	opts := Options{BinPath: binPath, SettingsPath: settingsPath, CursorHooksPath: cursorPath}
+	qt.Assert(t, qt.IsNil(Uninstall(opts, true, &out)))
 
 	raw, err := os.ReadFile(settingsPath)
 	qt.Assert(t, qt.IsNil(err))
 	qt.Check(t, qt.DeepEquals(raw, wired))
+	cursorRaw, err := os.ReadFile(cursorPath)
+	qt.Assert(t, qt.IsNil(err))
+	qt.Check(t, qt.DeepEquals(cursorRaw, cursorWired))
 	qt.Check(t, qt.StringContains(out.String(), "dry-run"))
 }
 
@@ -462,14 +470,21 @@ func TestInstallDryRunDoesNotWrite(t *testing.T) {
 	dir := t.TempDir()
 	settingsPath := filepath.Join(dir, "settings.json")
 	qt.Assert(t, qt.IsNil(os.WriteFile(settingsPath, []byte(`{}`), 0o600)))
+	cursorPath := filepath.Join(dir, "hooks.json")
+	cursorBefore := []byte(`{"version":1,"hooks":{"sessionStart":[{"command":"session-start","timeout":5}]}}`)
+	qt.Assert(t, qt.IsNil(os.WriteFile(cursorPath, cursorBefore, 0o600)))
 
 	var out strings.Builder
-	err := Install(Options{BinPath: binPath, SettingsPath: settingsPath}, true, &out)
+	opts := Options{BinPath: binPath, SettingsPath: settingsPath, CursorHooksPath: cursorPath}
+	err := Install(opts, true, &out)
 	qt.Assert(t, qt.IsNil(err))
 
 	raw, err := os.ReadFile(settingsPath)
 	qt.Assert(t, qt.IsNil(err))
 	qt.Check(t, qt.Equals(string(raw), "{}"))
+	cursorRaw, err := os.ReadFile(cursorPath)
+	qt.Assert(t, qt.IsNil(err))
+	qt.Check(t, qt.DeepEquals(cursorRaw, cursorBefore))
 	qt.Check(t, qt.StringContains(out.String(), "dry-run"))
 }
 
