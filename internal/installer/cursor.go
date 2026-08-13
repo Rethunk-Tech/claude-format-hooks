@@ -44,6 +44,7 @@ func parseCursorHooks(path string) (before []byte, top, hooks *orderedMap, entri
 }
 
 func renderCursorHooks(top, hooks *orderedMap, entries []json.RawMessage) ([]byte, error) {
+	eventDeleted := false
 	if len(entries) > 0 {
 		eventRaw, err := json.Marshal(entries)
 		if err != nil {
@@ -51,10 +52,11 @@ func renderCursorHooks(top, hooks *orderedMap, entries []json.RawMessage) ([]byt
 		}
 		hooks.Set(cursorEvent, eventRaw)
 	} else {
+		_, eventDeleted = hooks.Get(cursorEvent)
 		hooks.Delete(cursorEvent)
 	}
 
-	if len(hooks.keys) == 0 {
+	if eventDeleted && len(hooks.keys) == 0 {
 		top.Delete("hooks")
 	} else {
 		hooksRaw, err := json.Marshal(hooks)
