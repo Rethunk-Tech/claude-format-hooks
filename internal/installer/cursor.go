@@ -50,7 +50,7 @@ func renderCursorHooks(top, hooks *orderedMap, entries []json.RawMessage) ([]byt
 			return nil, err
 		}
 		hooks.Set(cursorEvent, eventRaw)
-	} else if _, ok := hooks.Get(cursorEvent); ok {
+	} else {
 		hooks.Delete(cursorEvent)
 	}
 
