@@ -45,13 +45,16 @@ func TestDefaultOptionsUsesEnvOverrides(t *testing.T) {
 	// DefaultOptions itself joins with the OS-native separator.
 	binDir := filepath.Join(t.TempDir(), "custom", "bin")
 	settingsFile := filepath.Join(t.TempDir(), "custom", "settings.json")
+	cursorHooksFile := filepath.Join(t.TempDir(), "custom", "hooks.json")
 	t.Setenv("CLAUDE_HOOKS_BIN_DIR", binDir)
 	t.Setenv("CLAUDE_SETTINGS_FILE", settingsFile)
+	t.Setenv("CURSOR_HOOKS_FILE", cursorHooksFile)
 
 	opts, err := DefaultOptions()
 	qt.Assert(t, qt.IsNil(err))
 	qt.Check(t, qt.Equals(opts.BinPath, HookBinaryPath(binDir)))
 	qt.Check(t, qt.Equals(opts.SettingsPath, settingsFile))
+	qt.Check(t, qt.Equals(opts.CursorHooksPath, cursorHooksFile))
 }
 
 func TestDefaultOptionsReportsUserHomeDirError(t *testing.T) {
@@ -66,6 +69,7 @@ func TestDefaultOptionsReportsUserHomeDirError(t *testing.T) {
 func TestDefaultOptionsFallsBackUnderHome(t *testing.T) {
 	t.Setenv("CLAUDE_HOOKS_BIN_DIR", "")
 	t.Setenv("CLAUDE_SETTINGS_FILE", "")
+	t.Setenv("CURSOR_HOOKS_FILE", "")
 	home := t.TempDir()
 	t.Setenv("HOME", home)
 	// os.UserHomeDir() reads USERPROFILE on Windows, not HOME.
@@ -75,6 +79,7 @@ func TestDefaultOptionsFallsBackUnderHome(t *testing.T) {
 	qt.Assert(t, qt.IsNil(err))
 	qt.Check(t, qt.Equals(opts.BinPath, HookBinaryPath(filepath.Join(home, ".claude", "hooks"))))
 	qt.Check(t, qt.Equals(opts.SettingsPath, filepath.Join(home, ".claude", "settings.json")))
+	qt.Check(t, qt.Equals(opts.CursorHooksPath, filepath.Join(home, ".cursor", "hooks.json")))
 }
 
 func settingsPostToolUse(t *testing.T, raw []byte) []PostToolUseEntry {

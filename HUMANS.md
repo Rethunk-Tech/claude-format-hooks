@@ -39,8 +39,8 @@ required.
 ```bash
 git clone git@github.com:Rethunk-Tech/claude-format-hooks.git
 cd claude-format-hooks
-./install.sh              # builds the binary, wires ~/.claude/settings.json
-./install.sh --dry-run    # preview the settings.json diff, write nothing
+./install.sh              # builds the binary, wires Claude and Cursor hooks
+./install.sh --dry-run    # preview both hook-file diffs, write nothing
 ./install.sh --upgrade    # rebuild, then upgrade to the latest release
 ./install.sh --upgrade --dry-run # rebuild, then preview the release upgrade
 ```
@@ -52,6 +52,12 @@ existing narrower biome-only hook with) a `PostToolUse` entry for
 `Write|Edit|MultiEdit|NotebookEdit`, invoked via the hook schema's exec form
 (`command` + `args: []`) — no shell spawned to launch
 it, just the binary directly.
+
+Running `--install` also wires the same binary into Cursor's
+`~/.cursor/hooks.json` as an `afterFileEdit` hook. Cursor's other hook events
+are preserved. Claude's `PostToolUse` configuration is unchanged by the
+Cursor entry. Run `--install` after installing or updating the binary to pick
+up the Cursor hook.
 
 If `bun` is on `PATH`, `--install` also installs biome, prettier, taplo, and
 markdownlint-cli2 globally (`bun add -g`), putting their binaries on `PATH`
@@ -89,7 +95,8 @@ settings file when the session started.
 
 Env overrides (mainly for testing): `CLAUDE_HOOKS_BIN_DIR` (default
 `~/.claude/hooks`), `CLAUDE_SETTINGS_FILE` (default
-`~/.claude/settings.json`), and `CLAUDE_FORMAT_HOOKS_RELEASE_API` (default
+`~/.claude/settings.json`), `CURSOR_HOOKS_FILE` (default
+`~/.cursor/hooks.json`), and `CLAUDE_FORMAT_HOOKS_RELEASE_API` (default
 `https://api.github.com`) to override the GitHub Releases API base URL for
 `--upgrade`. This is intended for tests and mirrors; the configured host is
 fully trusted for release metadata and asset URLs.
@@ -110,6 +117,10 @@ at `~/.claude/hooks/format-dispatch` on POSIX or
 `~/.claude/hooks/format-dispatch.exe` on Windows (or
 `$CLAUDE_HOOKS_BIN_DIR`'s binary); every other key and hook entry is left
 exactly as it was. A settings.json with no such entry is a no-op.
+
+It also removes only this binary's `afterFileEdit` entries from
+`~/.cursor/hooks.json`; unrelated Cursor events and `afterFileEdit` entries
+remain. Use `CURSOR_HOOKS_FILE` when the Cursor hooks file is elsewhere.
 
 ### Upgrade
 
