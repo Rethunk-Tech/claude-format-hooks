@@ -359,9 +359,13 @@ func TestRegistryForCheckMemoizesPerProjectRoot(t *testing.T) {
 
 	first := registryForCheck(registry, userCfg, ".json", projectCfg, projectRoot, cache)
 	second := registryForCheck(registry, userCfg, ".json", projectCfg, projectRoot, cache)
+	graphql := registryForCheck(registry, userCfg, ".graphql", projectCfg, projectRoot, cache)
+	gql := registryForCheck(registry, userCfg, ".gql", projectCfg, projectRoot, cache)
 
 	qt.Check(t, qt.IsTrue(first != registry))
 	qt.Check(t, qt.IsTrue(first == second))
+	qt.Check(t, qt.IsTrue(first == graphql))
+	qt.Check(t, qt.IsTrue(first == gql))
 	qt.Check(t, qt.IsTrue(cache[projectRoot] == first))
 	qt.Check(t, qt.Equals(len(cache), 1))
 
