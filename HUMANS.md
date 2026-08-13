@@ -127,8 +127,9 @@ exactly as it was. A settings.json with no such entry is a no-op.
 It also removes only this binary's `afterFileEdit` entries from
 `~/.cursor/hooks.json`; unrelated Cursor events and entries remain, and if this
 binary was the last `afterFileEdit` entry, that key is omitted; if it was the
-only child under `hooks`, the `hooks` object is omitted too. Use
-`CURSOR_HOOKS_FILE` when the Cursor hooks file is elsewhere.
+only child under `hooks`, the `hooks` object is omitted too. A pre-existing
+empty `"afterFileEdit": []` is treated as no entries and receives the same
+cleanup. Use `CURSOR_HOOKS_FILE` when the Cursor hooks file is elsewhere.
 
 ### Upgrade
 
