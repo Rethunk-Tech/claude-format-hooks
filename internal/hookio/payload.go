@@ -1,13 +1,15 @@
-// Package hookio parses the PostToolUse JSON envelope Claude Code sends on
-// stdin. The payload is tiny (a handful of string fields, well under 1KB) —
-// standard library encoding/json is already far faster than the ~1-3ms
-// process startup cost it's measured against, so there is no case for a
-// third-party JSON library here.
+// Package hookio parses the Claude Code PostToolUse JSON envelope and the
+// Cursor afterFileEdit envelope, which carries its path in top-level
+// file_path. The payload is tiny (a handful of string fields, well under
+// 1KB) — standard library encoding/json is already far faster than the
+// ~1-3ms process startup cost it's measured against, so there is no case for
+// a third-party JSON library here.
 package hookio
 
 import "encoding/json"
 
-// Payload is the subset of the PostToolUse JSON envelope this package reads.
+// Payload is the subset of Claude PostToolUse and Cursor afterFileEdit JSON
+// this package reads.
 type Payload struct {
 	CursorFilePath string `json:"file_path"`
 	ToolInput      struct {
@@ -24,7 +26,8 @@ type Payload struct {
 
 // FilePath returns the file that was written or edited, matching the same
 // field-fallback order: tool_response.filePath, tool_result.filePath,
-// tool_input.file_path, tool_input.notebook_path, then top-level file_path.
+// tool_input.file_path, tool_input.notebook_path, then Cursor afterFileEdit's
+// top-level file_path.
 func (p Payload) FilePath() string {
 	switch {
 	case p.ToolResponse.FilePath != "":
