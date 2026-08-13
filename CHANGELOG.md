@@ -70,6 +70,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `--check` reuses the project-biome-disabled registry per project root,
   avoiding a `NewRegistry` rebuild for each project-biome-disabled router
   file (`.json`, `.graphql`, or `.gql`).
+- `--uninstall` omits Cursor `afterFileEdit` when this binary was the last
+  entry (the key is dropped, not left as `[]`). If that event was the only
+  `hooks` child, `hooks` is omitted too. A pre-existing empty `"hooks": {}`
+  placeholder is left in place.
 
 ### Fixed
 
