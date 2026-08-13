@@ -48,6 +48,17 @@ func TestOrderedMapSetNewKeyAppendsAtEnd(t *testing.T) {
 	qt.Check(t, qt.Equals(string(out), `{"a":1,"z":2}`))
 }
 
+func TestOrderedMapDeleteMiddleKeyPreservesOrder(t *testing.T) {
+	m := newOrderedMap()
+	qt.Assert(t, qt.IsNil(json.Unmarshal([]byte(`{"a":1,"b":2,"c":3}`), m)))
+
+	m.Delete("b")
+
+	out, err := json.Marshal(m)
+	qt.Assert(t, qt.IsNil(err))
+	qt.Check(t, qt.Equals(string(out), `{"a":1,"c":3}`))
+}
+
 func TestOrderedMapGetMissingKey(t *testing.T) {
 	m := newOrderedMap()
 	qt.Assert(t, qt.IsNil(json.Unmarshal([]byte(`{"a":1}`), m)))

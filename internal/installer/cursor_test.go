@@ -132,7 +132,7 @@ func TestInstallAndUninstallWithCursorHooks(t *testing.T) {
 	qt.Check(t, qt.Equals(entries[0].Hooks[0].Command, binPath))
 
 	qt.Assert(t, qt.IsNil(Uninstall(opts, false, &out)))
-	assertCursorEventEmpty(t, cursorPath)
+	assertCursorHasOnlyOurHook(t, cursorPath, false)
 	entries = settingsPostToolUse(t, readFile(t, settingsPath))
 	qt.Check(t, qt.HasLen(entries, 0))
 }
@@ -225,17 +225,6 @@ func assertCursorHasOnlyOurHook(t *testing.T, path string, installed bool) {
 		_, ok := hooks[cursorEvent]
 		qt.Check(t, qt.IsFalse(ok))
 	}
-}
-
-func assertCursorEventEmpty(t *testing.T, path string) {
-	t.Helper()
-	var top map[string]json.RawMessage
-	qt.Assert(t, qt.IsNil(json.Unmarshal(readFile(t, path), &top)))
-	var hooks map[string]json.RawMessage
-	qt.Assert(t, qt.IsNil(json.Unmarshal(top["hooks"], &hooks)))
-	raw, ok := hooks[cursorEvent]
-	qt.Assert(t, qt.IsTrue(ok))
-	qt.Check(t, qt.Equals(string(raw), "[]"))
 }
 
 func assertCursorHasNoVersion(t *testing.T, raw []byte) {

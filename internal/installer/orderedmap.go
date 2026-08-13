@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
+	"slices"
 )
 
 // orderedMap is a JSON object that preserves the source's key order across
@@ -36,6 +37,16 @@ func (m *orderedMap) Set(key string, val json.RawMessage) {
 		m.keys = append(m.keys, key)
 	}
 	m.vals[key] = val
+}
+
+func (m *orderedMap) Delete(key string) {
+	if _, ok := m.vals[key]; !ok {
+		return
+	}
+	delete(m.vals, key)
+	m.keys = slices.DeleteFunc(m.keys, func(existing string) bool {
+		return existing == key
+	})
 }
 
 // UnmarshalJSON records each top-level key the first time it's seen, then

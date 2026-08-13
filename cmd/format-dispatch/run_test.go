@@ -208,11 +208,16 @@ func TestRunInstallWiresAndUninstallsSettings(t *testing.T) {
 	qt.Check(t, qt.Equals(runInstall(nil, true), 0))
 	qt.Check(t, qt.IsFalse(strings.Contains(readFile(t, settingsPath), filepath.Join(dir, "bin", "format-dispatch"))))
 	cursorHooks = readFile(t, cursorHooksPath)
+	cursorDoc = struct {
+		Hooks map[string]json.RawMessage `json:"hooks"`
+	}{}
 	qt.Assert(t, qt.IsNil(json.Unmarshal([]byte(cursorHooks), &cursorDoc)))
 	afterFileEdit = nil
 	if raw, ok := cursorDoc.Hooks["afterFileEdit"]; ok {
 		qt.Assert(t, qt.IsNil(json.Unmarshal(raw, &afterFileEdit)))
 	}
+	_, ok := cursorDoc.Hooks["afterFileEdit"]
+	qt.Check(t, qt.IsFalse(ok))
 	for _, hook := range afterFileEdit {
 		qt.Check(t, qt.IsFalse(strings.Contains(filepath.Base(hook.Command), "format-dispatch")))
 	}
