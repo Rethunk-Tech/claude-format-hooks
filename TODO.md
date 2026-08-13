@@ -122,6 +122,16 @@ bunx-only tests, Windows `.cmd` fakes, rebuild-cache wording closed
 in the same wave. Quick CI (`go build`/`go vet`/`gofmt -l`) green;
 remote badge still needs an operator push of ahead `main`.
 
+Wave 17 (2026-08-12) landed: Cursor `afterFileEdit` installer
+(`cursor.go`, `CURSOR_HOOKS_FILE`) plus hookio top-level `file_path`;
+`projectRebuildsRouterRegistry` rename; fleet survey still all zero.
+Audit fixup: missing-file uninstall no-op, omit `afterFileEdit` when
+the event was never present, version inject only on create, Claude
+`hasBin` identity for Cursor hooks, Claude rollback if Cursor write
+fails. Quick CI (`go build`/`go vet`/`gofmt -l`) green; remote badge
+still needs an operator push of ahead `main`. Operators need
+`--install` to pick up the Cursor hook.
+
 ---
 
 ## Residual — Wave-11 / Wave-12 deferred
@@ -142,9 +152,10 @@ without production hooks.
 Wave-6 survey across `/usr/local/src/com.github/Rethunk-Tech/` found
 **zero** hand-authored `.vue`/`.svelte`/`.astro`/`.nix`/`.zig` under
 vendored-dir exclusions — all **no-go**. Waves 7–10 resurveys reconfirmed
-zero; see `.orchestrate/fleet-survey-wave10.md`. Wave 15 (2026-08-12)
-also found **zero** `.turbo` / `.svelte-kit` / `.nuxt` / `.output` /
-`.parcel-cache` / `.nox` directories — do not add those segments until
+zero; see `.orchestrate/fleet-survey-wave10.md`. Wave 17 (2026-08-12)
+reconfirmed **zero** `.vue`/`.svelte`/`.astro`/`.nix`/`.zig` and **zero**
+`.turbo` / `.svelte-kit` / `.nuxt` / `.output` / `.parcel-cache` /
+`.nox` directories — do not add those segments until
 one appears as generated output. Re-run when the fleet gains candidate
 sources; any go still needs dispatch registration + HUMANS row together.
 For `.nix`, pick one of `nixfmt`/`alejandra` by PATH dominance.
@@ -184,9 +195,32 @@ defaults are equivalent — unify only if a third seam package appears.
 
 ---
 
-## Wave 16 — leftover / audit optionals
+## Wave 17 — leftover / audit optionals
 
 Planning-only. shadcn/UX registry does not apply (no UI).
+
+### Omit empty Cursor `afterFileEdit` after last unwire
+
+Uninstall after a successful install leaves `"afterFileEdit": []`
+because the key existed. Omit the key when `kept` is empty (same as
+never-installed). Owns: `internal/installer/cursor.go`
+`renderCursorHooks`, `assertCursorEventEmpty`, CLI install test.
+
+### Dead nil-slice guard in `renderCursorHooks`
+
+`if len(entries) > 0 { if entries == nil { ... } }` is unreachable.
+Delete the inner branch when touching that function.
+
+### Installer dry-run with `CursorHooksPath`
+
+Package tests pass `Options` without `CursorHooksPath`; CLI dry-run
+covers both files. Extend installer dry-run tests only if a regression
+appears.
+
+### hookio package godoc
+
+Still describes Claude PostToolUse only; `FilePath()` also reads
+Cursor top-level `file_path`. Update when next editing `payload.go`.
 
 ### `writeAtomicClose` stub via saved `original`
 
@@ -206,44 +240,14 @@ third fake-tool helper appears (`writeFakeTool` still skips Windows).
 covers `.json` only. Add `.graphql`/`.gql` under the same
 `projectRoot` cache key only if a regression appears.
 
-### Rename `projectRebuildsJSONRegistry`
-
-Name still says JSON; the predicate also matches `.graphql`/`.gql`.
-Rename only with a dedicated comment/test sweep — behavior is correct.
-
 ### Vendored-dir additions (evidence-gated)
 
-Deferred: 2026-08-12 fleet survey found none of `.turbo`, `.svelte-kit`,
+Deferred: wave-17 fleet survey found none of `.turbo`, `.svelte-kit`,
 `.nuxt`, `.output`, `.parcel-cache`, `.nox`. Re-open only when a
 segment appears as generated output. Do not add bare `target/`. If
 adding, also update `cmd/format-dispatch/check_test.go`
 `TestCollectCheckTargetsSkipsNewVendoredCacheDirectories` (duplicate
 segment list).
-
-### Optional: wire Cursor `hooks.json` as well as Claude `settings.json`
-
-This binary is Claude Code–shaped (`CLAUDE_PROJECT_DIR`,
-`~/.claude/settings.json`). Cursor sessions inherit skills/MCP from
-`~/.claude/` but keep a separate hooks file. Operators in Cursor never
-get PostToolUse formatting unless they duplicate the entry by hand.
-
-**Owns:** `internal/installer` (second settings path or a Cursor-shaped
-writer), HUMANS install/uninstall, env override sibling to
-`CLAUDE_SETTINGS_FILE`.
-
-**Trap:** Cursor hook JSON is not guaranteed to be the Claude
-`hooks.PostToolUse[]` document — do not assume `Wire` can append
-blindly. Matcher tool names also differ (Cursor Write/StrReplace vs
-Claude Write/Edit/MultiEdit). If the schemas diverge, ship a distinct
-writer or drop this item rather than corrupting `~/.cursor/hooks.json`.
-
-**Acceptance**
-
-- Documented, tested round-trip against a captured Cursor hooks file
-  (or explicit no-go in HUMANS if the schema cannot be reused).
-- Claude `settings.json` behavior unchanged.
-- Uninstall removes only the format-dispatch entry from whichever file
-  was wired.
 
 ---
 

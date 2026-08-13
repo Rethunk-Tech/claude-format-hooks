@@ -9,6 +9,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- `--install` / `--uninstall` also wire Cursor `~/.cursor/hooks.json` as
+  an `afterFileEdit` hook (distinct document from Claude
+  `hooks.PostToolUse`). Override the path with `CURSOR_HOOKS_FILE`.
+  Stdin accepts Cursor's top-level `file_path` after the Claude
+  PostToolUse fallbacks. A missing Cursor file is a no-op on uninstall;
+  a failed Cursor write rolls back the Claude settings change.
 - PostToolUse stdin accepts `tool_result.filePath` as well as
   `tool_response.filePath`; when both are set, `tool_response` wins.
 - Terraform-owned suffixes use `tofu fmt` when `terraform` is not on
