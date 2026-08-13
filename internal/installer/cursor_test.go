@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"os"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"testing"
 
@@ -149,6 +150,38 @@ func TestUninstallMissingCursorLeavesFileMissing(t *testing.T) {
 	qt.Assert(t, qt.IsNil(Uninstall(opts, false, &out)))
 	_, err = os.Stat(cursorPath)
 	qt.Check(t, qt.IsTrue(os.IsNotExist(err)))
+}
+
+func TestInstallRollsBackClaudeWhenCursorWriteFails(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("Windows does not enforce directory mode bits")
+	}
+
+	dir := t.TempDir()
+	settingsPath := filepath.Join(dir, "settings.json")
+	cursorDir := filepath.Join(dir, "cursor")
+	cursorPath := filepath.Join(cursorDir, "hooks.json")
+	qt.Assert(t, qt.IsNil(os.Mkdir(cursorDir, 0o700)))
+	qt.Assert(t, qt.IsNil(os.WriteFile(cursorPath, []byte(`{"version":1,"hooks":{"sessionStart":[]}}`), 0o600)))
+	qt.Assert(t, qt.IsNil(os.Chmod(cursorDir, 0o500)))
+	t.Cleanup(func() {
+		_ = os.Chmod(cursorDir, 0o700)
+	})
+	probe := filepath.Join(cursorDir, "permission-probe")
+	if err := os.WriteFile(probe, []byte("probe"), 0o600); err == nil {
+		_ = os.Remove(probe)
+		t.Skip("directory remains writable after chmod")
+	}
+
+	var out strings.Builder
+	err := Install(Options{
+		BinPath:         binPath,
+		SettingsPath:    settingsPath,
+		CursorHooksPath: cursorPath,
+	}, false, &out)
+	qt.Assert(t, qt.IsNotNil(err))
+	entries := settingsPostToolUse(t, readFile(t, settingsPath))
+	qt.Check(t, qt.HasLen(entries, 0))
 }
 
 func TestUnwireCursorWithoutEventOmitsEventKey(t *testing.T) {

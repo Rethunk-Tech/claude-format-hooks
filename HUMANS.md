@@ -89,6 +89,12 @@ backup of the last-known-good state, overwritten on each subsequent write,
 not a history. Re-running with no actual change to make (e.g. installing
 when already installed) skips the write, and the backup, entirely.
 
+Cursor writes use the same rolling-backup behavior with
+`~/.cursor/hooks.json.bak`. A missing Cursor hooks file is a no-op for
+`--uninstall`, so uninstall never creates `hooks.json`. If a Cursor write
+fails after Claude's settings were written, the installer rolls Claude's
+PostToolUse change back and returns the Cursor error.
+
 If Claude Code is already running, open `/hooks` once (or restart) to pick
 up the change — the settings watcher only watches directories that had a
 settings file when the session started.

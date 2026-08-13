@@ -223,6 +223,7 @@ func Install(opts Options, dryRun bool, out io.Writer) error {
 	if err != nil {
 		return err
 	}
+	claudeChanged := !bytes.Equal(before, after)
 	var cursorBefore, cursorAfter []byte
 	if opts.CursorHooksPath != "" {
 		cursorBefore, cursorAfter, err = WireCursor(opts.CursorHooksPath, opts.BinPath)
@@ -237,6 +238,15 @@ func Install(opts Options, dryRun bool, out io.Writer) error {
 		cursorOpts := opts
 		cursorOpts.SettingsPath = opts.CursorHooksPath
 		if err := applyChange(cursorOpts, cursorBefore, cursorAfter, dryRun, out, "Wired afterFileEdit hook into"); err != nil {
+			if !dryRun && claudeChanged {
+				rollbackBefore, rollbackAfter, rollbackErr := Unwire(opts.SettingsPath, opts.BinPath)
+				if rollbackErr == nil {
+					rollbackErr = applyChange(opts, rollbackBefore, rollbackAfter, false, io.Discard, "Rolled back PostToolUse hook in")
+				}
+				if rollbackErr != nil {
+					return fmt.Errorf("Cursor hook write failed: %w; Claude rollback failed: %v", err, rollbackErr)
+				}
+			}
 			return err
 		}
 	}
