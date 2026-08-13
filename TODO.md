@@ -63,28 +63,31 @@ defaults are equivalent — unify only if a third seam package appears.
 
 ## Cursor installer leftovers
 
-### Omit empty `afterFileEdit` after last unwire
-
-Uninstall after a successful install leaves `"afterFileEdit": []`
-because the key existed. Omit the key when `kept` is empty (same as
-never-installed). Owns: `internal/installer/cursor.go`
-`renderCursorHooks`, `assertCursorEventEmpty`, CLI install test.
-
-### Dead nil-slice guard in `renderCursorHooks`
-
-`if len(entries) > 0 { if entries == nil { ... } }` is unreachable.
-Delete the inner branch when touching that function.
-
 ### Installer dry-run with `CursorHooksPath`
 
 Package tests pass `Options` without `CursorHooksPath`; CLI dry-run
 covers both files. Extend installer dry-run tests only if a regression
 appears.
 
-### hookio package godoc
+### Pre-existing empty `afterFileEdit` array
 
-Still describes Claude PostToolUse only; `FilePath()` also reads
-Cursor top-level `file_path`. Update when next editing `payload.go`.
+`renderCursorHooks` deletes the key when `kept` is empty, including a
+file that already had `"afterFileEdit": []`. No fixture covers that
+input. Add one only if a regression appears. Owns:
+`internal/installer/cursor_test.go`.
+
+### Unwire when `afterFileEdit` is the only hooks child
+
+Uninstall then leaves `"hooks": {}`. HUMANS documents omitting the
+event key, not collapsing an empty `hooks` object. Collapse only if
+operators report the empty object as noise. Owns:
+`internal/installer/cursor.go`.
+
+### CHANGELOG omit-empty `afterFileEdit`
+
+Unreleased Added already covers Cursor wiring. Record that the last
+`afterFileEdit` entry omits the key (not `[]`) on the next changelog
+pass. Owns: `CHANGELOG.md`.
 
 ## Ops
 
