@@ -52,6 +52,21 @@ func TestWireCursorMissingFileCreatesVersionOne(t *testing.T) {
 	qt.Check(t, qt.Equals(version, 1))
 }
 
+func TestVersionlessCursorFileStaysVersionless(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "hooks.json")
+	existing := `{"hooks":{"sessionStart":[{"command":"session-start","timeout":5}]}}`
+	qt.Assert(t, qt.IsNil(os.WriteFile(path, []byte(existing), 0o600)))
+
+	_, wired, err := WireCursor(path, binPath)
+	qt.Assert(t, qt.IsNil(err))
+	assertCursorHasNoVersion(t, wired)
+	qt.Assert(t, qt.IsNil(os.WriteFile(path, wired, 0o600)))
+
+	_, unwired, err := UnwireCursor(path, binPath)
+	qt.Assert(t, qt.IsNil(err))
+	assertCursorHasNoVersion(t, unwired)
+}
+
 func TestUnwireCursorRemovesOnlyFormatDispatch(t *testing.T) {
 	path := filepath.Join(t.TempDir(), "hooks.json")
 	existing := `{
@@ -81,6 +96,23 @@ func TestUnwireCursorRemovesOnlyFormatDispatch(t *testing.T) {
 	qt.Assert(t, qt.IsNil(json.Unmarshal(hooks[cursorEvent], &afterFileEdit)))
 	qt.Assert(t, qt.HasLen(afterFileEdit, 1))
 	qt.Check(t, qt.Equals(afterFileEdit[0].Command, "format-docs"))
+}
+
+func TestUnwireCursorDoesNotMatchBinBasenameAlone(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "hooks.json")
+	existing := `{"hooks":{"afterFileEdit":[{"command":"/tmp/custom-hook","timeout":5}]}}`
+	qt.Assert(t, qt.IsNil(os.WriteFile(path, []byte(existing), 0o600)))
+
+	_, after, err := UnwireCursor(path, "/opt/custom-hook")
+	qt.Assert(t, qt.IsNil(err))
+	var top map[string]json.RawMessage
+	qt.Assert(t, qt.IsNil(json.Unmarshal(after, &top)))
+	var hooks map[string]json.RawMessage
+	qt.Assert(t, qt.IsNil(json.Unmarshal(top["hooks"], &hooks)))
+	var entries []cursorHookCommand
+	qt.Assert(t, qt.IsNil(json.Unmarshal(hooks[cursorEvent], &entries)))
+	qt.Assert(t, qt.HasLen(entries, 1))
+	qt.Check(t, qt.Equals(entries[0].Command, "/tmp/custom-hook"))
 }
 
 func TestInstallAndUninstallWithCursorHooks(t *testing.T) {
@@ -171,4 +203,12 @@ func assertCursorEventEmpty(t *testing.T, path string) {
 	raw, ok := hooks[cursorEvent]
 	qt.Assert(t, qt.IsTrue(ok))
 	qt.Check(t, qt.Equals(string(raw), "[]"))
+}
+
+func assertCursorHasNoVersion(t *testing.T, raw []byte) {
+	t.Helper()
+	var top map[string]json.RawMessage
+	qt.Assert(t, qt.IsNil(json.Unmarshal(raw, &top)))
+	_, ok := top["version"]
+	qt.Check(t, qt.IsFalse(ok))
 }

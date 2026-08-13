@@ -4,7 +4,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"os"
-	"path/filepath"
 	"slices"
 )
 
@@ -30,10 +29,6 @@ func parseCursorHooks(path string) (before []byte, top, hooks *orderedMap, entri
 	if err := json.Unmarshal(before, top); err != nil {
 		return nil, nil, nil, nil, false, fmt.Errorf("parse %s: %w", path, err)
 	}
-	if _, ok := top.Get("version"); !ok {
-		top.Set("version", json.RawMessage("1"))
-	}
-
 	hooks = newOrderedMap()
 	if raw, ok := top.Get("hooks"); ok {
 		if err := json.Unmarshal(raw, hooks); err != nil {
@@ -82,9 +77,12 @@ func renderCursorHooks(top, hooks *orderedMap, entries []json.RawMessage) ([]byt
 // WireCursor adds the format-dispatch afterFileEdit hook while preserving
 // unrelated Cursor hooks and their source order.
 func WireCursor(path, binPath string) (before, after []byte, err error) {
-	before, top, hooks, entries, _, err := parseCursorHooks(path)
+	before, top, hooks, entries, exists, err := parseCursorHooks(path)
 	if err != nil {
 		return nil, nil, err
+	}
+	if !exists {
+		top.Set("version", json.RawMessage("1"))
 	}
 
 	kept := slices.DeleteFunc(entries, func(entry json.RawMessage) bool {
@@ -128,6 +126,5 @@ func cursorHookHasBin(raw json.RawMessage, binPath string) bool {
 	if err := json.Unmarshal(raw, &hook); err != nil {
 		return false
 	}
-	return hook.Command == binPath || isHookBinaryCommand(hook.Command) ||
-		filepath.Base(hook.Command) == filepath.Base(binPath)
+	return hook.Command == binPath || isHookBinaryCommand(hook.Command)
 }
