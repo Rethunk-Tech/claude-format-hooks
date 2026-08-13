@@ -128,6 +128,8 @@ func TestDispatchArgsRoutesInstallAndUninstall(t *testing.T) {
 		qt.Check(t, qt.Equals(dispatchArgs([]string{"--install", "--dry-run"}), 0))
 		_, err := os.Stat(settingsPath)
 		qt.Check(t, qt.IsTrue(os.IsNotExist(err)), qt.Commentf("--dry-run must not write settings.json"))
+		_, err = os.Stat(filepath.Join(dir, "hooks.json"))
+		qt.Check(t, qt.IsTrue(os.IsNotExist(err)), qt.Commentf("--dry-run must not write hooks.json"))
 	})
 
 	t.Run("--uninstall", func(t *testing.T) {
@@ -177,13 +179,23 @@ func TestRunInstallWiresAndUninstallsSettings(t *testing.T) {
 	t.Setenv("CLAUDE_HOOKS_BIN_DIR", filepath.Join(dir, "bin"))
 	settingsPath := filepath.Join(dir, "settings.json")
 	t.Setenv("CLAUDE_SETTINGS_FILE", settingsPath)
-	t.Setenv("CURSOR_HOOKS_FILE", filepath.Join(dir, "hooks.json"))
+	cursorHooksPath := filepath.Join(dir, "hooks.json")
+	t.Setenv("CURSOR_HOOKS_FILE", cursorHooksPath)
+	writeFile(t, cursorHooksPath, `{"version":1,"hooks":{"sessionStart":[{"command":"session-start","timeout":5}]}}`)
 
 	qt.Check(t, qt.Equals(runInstall(nil, false), 0))
 	qt.Check(t, qt.StringContains(readFile(t, settingsPath), "format-dispatch"))
+	cursorHooks := readFile(t, cursorHooksPath)
+	binJSON, err := json.Marshal(filepath.Join(dir, "bin", "format-dispatch"))
+	qt.Assert(t, qt.IsNil(err))
+	qt.Check(t, qt.StringContains(cursorHooks, string(binJSON)))
+	qt.Check(t, qt.StringContains(cursorHooks, "session-start"))
 
 	qt.Check(t, qt.Equals(runInstall(nil, true), 0))
 	qt.Check(t, qt.IsFalse(strings.Contains(readFile(t, settingsPath), filepath.Join(dir, "bin", "format-dispatch"))))
+	cursorHooks = readFile(t, cursorHooksPath)
+	qt.Check(t, qt.IsFalse(strings.Contains(cursorHooks, string(binJSON))))
+	qt.Check(t, qt.StringContains(cursorHooks, "session-start"))
 }
 
 func TestRunInstallDryRunDoesNotWrite(t *testing.T) {
@@ -196,6 +208,8 @@ func TestRunInstallDryRunDoesNotWrite(t *testing.T) {
 	qt.Check(t, qt.Equals(runInstall([]string{"--dry-run"}, false), 0))
 	_, err := os.Stat(settingsPath)
 	qt.Check(t, qt.IsTrue(os.IsNotExist(err)), qt.Commentf("--dry-run must not write settings.json"))
+	_, err = os.Stat(filepath.Join(dir, "hooks.json"))
+	qt.Check(t, qt.IsTrue(os.IsNotExist(err)), qt.Commentf("--dry-run must not write hooks.json"))
 }
 
 func TestRunInstallRejectsUnrecognizedArgs(t *testing.T) {
