@@ -212,15 +212,8 @@ func TestRunInstallWiresAndUninstallsSettings(t *testing.T) {
 		Hooks map[string]json.RawMessage `json:"hooks"`
 	}{}
 	qt.Assert(t, qt.IsNil(json.Unmarshal([]byte(cursorHooks), &cursorDoc)))
-	afterFileEdit = nil
-	if raw, ok := cursorDoc.Hooks["afterFileEdit"]; ok {
-		qt.Assert(t, qt.IsNil(json.Unmarshal(raw, &afterFileEdit)))
-	}
 	_, ok := cursorDoc.Hooks["afterFileEdit"]
 	qt.Check(t, qt.IsFalse(ok))
-	for _, hook := range afterFileEdit {
-		qt.Check(t, qt.IsFalse(strings.Contains(filepath.Base(hook.Command), "format-dispatch")))
-	}
 	qt.Assert(t, qt.IsNil(json.Unmarshal(cursorDoc.Hooks["sessionStart"], &sessionStart)))
 	qt.Check(t, qt.Equals(len(sessionStart), 1))
 	qt.Check(t, qt.Equals(sessionStart[0].Command, "session-start"))
