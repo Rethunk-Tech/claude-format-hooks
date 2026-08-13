@@ -195,6 +195,44 @@ func TestUnwireCursorWithoutEventOmitsEventKey(t *testing.T) {
 	assertCursorHasOnlyOurHook(t, path, false)
 }
 
+func TestUnwireCursorDropsPreexistingEmptyAfterFileEditArray(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "hooks.json")
+	existing := `{"version":1,"hooks":{"afterFileEdit":[]}}`
+	qt.Assert(t, qt.IsNil(os.WriteFile(path, []byte(existing), 0o600)))
+
+	_, after, err := UnwireCursor(path, binPath)
+	qt.Assert(t, qt.IsNil(err))
+
+	var top map[string]json.RawMessage
+	qt.Assert(t, qt.IsNil(json.Unmarshal(after, &top)))
+	_, ok := top[cursorEvent]
+	qt.Check(t, qt.IsFalse(ok))
+	_, ok = top["hooks"]
+	qt.Check(t, qt.IsFalse(ok))
+	var version int
+	qt.Assert(t, qt.IsNil(json.Unmarshal(top["version"], &version)))
+	qt.Check(t, qt.Equals(version, 1))
+}
+
+func TestUnwireCursorOmitsHooksWhenAfterFileEditWasOnlyChild(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "hooks.json")
+	existing := `{"version":1,"hooks":{"afterFileEdit":[{"command":"` + binPath + `","timeout":5}]}}`
+	qt.Assert(t, qt.IsNil(os.WriteFile(path, []byte(existing), 0o600)))
+
+	_, after, err := UnwireCursor(path, binPath)
+	qt.Assert(t, qt.IsNil(err))
+
+	var top map[string]json.RawMessage
+	qt.Assert(t, qt.IsNil(json.Unmarshal(after, &top)))
+	_, ok := top[cursorEvent]
+	qt.Check(t, qt.IsFalse(ok))
+	_, ok = top["hooks"]
+	qt.Check(t, qt.IsFalse(ok))
+	var version int
+	qt.Assert(t, qt.IsNil(json.Unmarshal(top["version"], &version)))
+	qt.Check(t, qt.Equals(version, 1))
+}
+
 func TestInstallWithoutCursorPathDoesNotTouchCursor(t *testing.T) {
 	dir := t.TempDir()
 	settingsPath := filepath.Join(dir, "settings.json")
