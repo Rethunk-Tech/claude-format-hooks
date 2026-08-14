@@ -244,7 +244,7 @@ func Install(opts Options, dryRun bool, out io.Writer) error {
 					rollbackErr = applyChange(opts, rollbackBefore, rollbackAfter, false, io.Discard, "Rolled back PostToolUse hook in")
 				}
 				if rollbackErr != nil {
-					return fmt.Errorf("Cursor hook write failed: %w; Claude rollback failed: %v", err, rollbackErr)
+					return fmt.Errorf("cursor hook write failed: %w; Claude rollback failed: %w", err, rollbackErr)
 				}
 			}
 			return err
