@@ -2,8 +2,8 @@
 
 What does this PR change, and why?
 
-- [ ] Operator-facing behavior or documentation (see [HUMANS.md](HUMANS.md))
-- [ ] Internal / developer-only change (see [AGENTS.md](AGENTS.md))
+- [ ] Operator-facing behavior or documentation (see [HUMANS.md](../HUMANS.md))
+- [ ] Internal / developer-only change (see [AGENTS.md](../AGENTS.md))
 
 ## How tested
 
@@ -16,8 +16,8 @@ sample file, specific extensions/formatters exercised).
 - [ ] `go build ./...`, `go vet ./...`, `gofmt -l .`, `golangci-lint run ./...` pass
 - [ ] No unrelated refactors or scope creep
 - [ ] If the supported-extensions table, config schema, or install
-      behavior changed, [HUMANS.md](HUMANS.md) and/or
-      [AGENTS.md](AGENTS.md) are updated
+      behavior changed, [HUMANS.md](../HUMANS.md) and/or
+      [AGENTS.md](../AGENTS.md) are updated
 - [ ] `CHANGELOG.md` updated under `[Unreleased]`
 
 ## Notes

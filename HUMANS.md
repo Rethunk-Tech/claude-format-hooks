@@ -156,7 +156,7 @@ format-dispatch --version    # print version and build info (for bug reports)
 format-dispatch --help       # usage
 ```
 
-For CI formatting checks, see [`--check PATH...`](#checking-formatting-in-ci).
+For CI formatting checks, see [`--check PATH...`](#checking-formatting-in-ci---check).
 
 An unrecognized flag prints usage to stderr and exits 1, rather than
 hanging on stdin — safe to run by hand while debugging.
