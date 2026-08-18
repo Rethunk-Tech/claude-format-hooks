@@ -1,6 +1,6 @@
 // Package installer wires format-dispatch into ~/.claude/settings.json as
-// a PostToolUse hook, natively in Go — the same settings.json mutation
-// install.sh used to perform via jq, without the external jq dependency.
+// a PostToolUse hook, natively in Go — the settings.json mutation without
+// an external jq dependency.
 package installer
 
 import (
