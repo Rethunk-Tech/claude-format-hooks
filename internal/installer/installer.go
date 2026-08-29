@@ -135,7 +135,7 @@ func renderSettings(top, hooks *orderedMap, entries []PostToolUseEntry) ([]byte,
 
 // Wire reads the settings JSON at settingsPath and returns the document
 // before and after wiring in our PostToolUse hook. Idempotent: a prior
-// entry pointing at binPath, or the old narrow inline biome-only hook
+// entry pointing at binPath, or the legacy inline biome-only hook
 // (matcher "Write|Edit" running a "biome check --write" command), is
 // removed before the new entry is appended. Every other top-level key,
 // every other hooks.* event, and every other PostToolUse entry is
@@ -203,8 +203,7 @@ func isHookBinaryCommand(command string) bool {
 
 // keepEntry reports whether an existing PostToolUse entry should survive
 // Wire's rewrite: it must not already be a stale copy of our own binary,
-// and it must not be the old narrow biome-only hook this installer
-// replaces.
+// and it must not be the legacy inline biome-only hook Wire replaces.
 func keepEntry(e PostToolUseEntry, binPath string) bool {
 	if hasBin(e, binPath) {
 		return false

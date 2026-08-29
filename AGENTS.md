@@ -170,8 +170,7 @@ Unchanged from the hand-written per-project hooks this replaces:
   defaults, the same way a `.md` file with no `.markdownlint.json` gets
   formatted against the user-level base config
   (`internal/formatters/markdownconfig.go`). Do not reintroduce a
-  config-presence gate on any formatter (biome had one; it was removed —
-  see `CHANGELOG.md`).
+  config-presence gate on any formatter.
 - Files under `node_modules/`, `.next/`, `.yarn/`, `.git/`, `.agents/`,
   `dist/`, `build/`, `coverage/`, `test-results/`, `vendor/`, `.venv/`,
   `.terraform/`, `__pycache__/`, `.ruff_cache/`, `.mypy_cache/`,
@@ -190,7 +189,7 @@ Unchanged from the hand-written per-project hooks this replaces:
   assume a Go library is formatting-fidelity-safe without checking.
 - Commit conventions, PR checklist: [CONTRIBUTING.md](CONTRIBUTING.md).
 
-## No CLI framework (decided v0.2.0, 2026-07-19)
+## No CLI framework
 
 `cmd/format-dispatch/main.go` keeps its hand-rolled `dispatchArgs` switch. Cobra (+pflag), urfave/cli v3, alecthomas/kong, and peterbourgon/ff/ffcli were all researched and rejected.
 

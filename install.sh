@@ -51,10 +51,9 @@ mkdir -p "$BIN_DIR"
 chmod +x "$BIN_PATH"
 echo "==> Built: $BIN_PATH"
 
-# Provisioning the bunx-dispatched formatters moved into `--install` below,
-# where it can also pin their transitive dependencies -- see
-# internal/installer/tools.go. It replaces the cache pre-warm that used to
-# live here, which left the tools resolvable but not on PATH.
+# Provisioning the bunx-dispatched formatters runs in `--install` below,
+# where it also pins their transitive dependencies -- see
+# internal/installer/tools.go.
 
 if [ "$ACTION" = "--upgrade" ]; then
   case "$DRY_RUN" in
