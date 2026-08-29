@@ -13,12 +13,10 @@ formats/lints a file right after Write/Edit/MultiEdit/NotebookEdit writes it
 
 ---
 
-`claude-format-hooks` is a single global Go binary (`format-dispatch`),
-with no per-repo setup required. Three formatters (JSON, shell, Go) run
-natively in-process; everything else routes to the real,
-project-config-aware tool: biome, prettier, taplo, and markdownlint-cli2
-from `PATH` first, then via `bunx`; `sqlfluff`, `ruff`/`black`, `rustfmt`,
-`terraform fmt` (or `tofu fmt`), and `buf format` as system binaries.
+Single global Go binary (`format-dispatch`), no per-repo setup. Native
+in-process formatters for JSON, shell, and Go; everything else routes to
+biome, prettier, taplo, markdownlint-cli2, sqlfluff, ruff/black, rustfmt,
+`terraform fmt` (or `tofu fmt`), and buf.
 
 ## Quick start
 
@@ -26,45 +24,31 @@ from `PATH` first, then via `bunx`; `sqlfluff`, `ruff`/`black`, `rustfmt`,
 git clone git@github.com:Rethunk-Tech/claude-format-hooks.git
 cd claude-format-hooks
 ./install.sh
-./install.sh --upgrade
 ```
 
-Full install steps, prerequisites, and configuration: [HUMANS.md](HUMANS.md).
+Install, prerequisites, config, and uninstall: [HUMANS.md](HUMANS.md).
 
 ## Highlights
 
-- **Native, in-process formatting for JSON, shell, and Go** — no
-  subprocess, and (for JSON) source key order is preserved exactly instead
-  of alphabetized by a naive Unmarshal+Marshal round-trip.
-- **CI formatting checks with `--check`** — reports files a formatter would
-  change without mutating them, with distinct exit codes for clean, changed,
-  and invalid invocations.
-- **Everything else routed to the real tool** — biome, markdownlint-cli2,
-  taplo, and prettier from `PATH` first, then via `bunx`; `sqlfluff`,
-  `ruff`/`black`, `rustfmt`,
-  `terraform fmt` (or `tofu fmt`), and `buf format` as system binaries — so project config
-  files are
-  honored automatically, with no config-presence gate: every supported
-  extension formats in every project.
-- **Silent on success, exits 0 always** — a `PostToolUse` hook must never
-  be the reason a Write/Edit/MultiEdit/NotebookEdit call reports failure; failures
-  surface as a truncated stderr diagnostic instead.
-- **One `./install.sh`, no per-repo setup** — builds the binary and wires
-  it into `~/.claude/settings.json` globally.
+- **Native JSON, shell, Go** — in-process; JSON preserves key order.
+- **`--check` for CI** — reports files needing format; distinct exit codes.
+- **Real tools for everything else** — honors project config; no config-presence gate.
+- **Silent on success, always exits 0** — formatter failures go to stderr only.
+- **One `./install.sh`** — wires Claude and Cursor hooks globally.
 
 ## Documentation
 
 | Document | Purpose |
-| ------------------------------------- | ------------------------------------------------------------- |
-| [Humans guide](HUMANS.md) | Install, configuration, supported extensions, troubleshooting |
-| [Agents guide](AGENTS.md) | Architecture, design rationale, package layout, invariants |
+| -------- | ------- |
+| [Humans guide](HUMANS.md) | Install, configuration, troubleshooting |
+| [Agents guide](AGENTS.md) | Architecture, layout, invariants |
 | [Contributing](CONTRIBUTING.md) | Build, test, and pull request workflow |
 | [Security](SECURITY.md) | Vulnerability reporting |
-| [Changelog](CHANGELOG.md) | Release history (Keep a Changelog style) |
-| [Code of conduct](CODE_OF_CONDUCT.md) | Community standards and enforcement |
+| [Changelog](CHANGELOG.md) | Release history |
+| [Code of conduct](CODE_OF_CONDUCT.md) | Community standards |
 | [License](LICENSE) | MIT License |
 
 ## License
 
 Copyright (c) 2026 Rethunk Tech. Licensed under the MIT License — see
-[LICENSE](LICENSE) for details.
+[LICENSE](LICENSE).
