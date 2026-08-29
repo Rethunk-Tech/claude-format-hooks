@@ -2,7 +2,7 @@ module github.com/Rethunk-Tech/claude-format-hooks
 
 go 1.26.6
 
-require mvdan.cc/sh/v3 v3.13.1
+require mvdan.cc/sh/v3 v3.14.0
 
 require (
 	github.com/go-quicktest/qt v1.102.0
