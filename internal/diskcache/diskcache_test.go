@@ -108,6 +108,27 @@ func TestGetPrunesExpiredEntriesInTheSameNamespace(t *testing.T) {
 	qt.Check(t, qt.IsNil(err), qt.Commentf("pruning must not cross namespace boundaries"))
 }
 
+func TestGetSweepsANamespaceOnlyOncePerProcess(t *testing.T) {
+	dir := t.TempDir()
+	freshKey := Key("sweeponce", "fresh")
+	stale := strconv.FormatInt(time.Now().Add(-time.Hour).Unix(), 10) + "\nvalue"
+
+	Set(dir, freshKey, "fresh")
+	_, ok := Get(dir, freshKey, time.Minute)
+	qt.Assert(t, qt.IsTrue(ok))
+
+	// The namespace is swept now, so an entry that expires later in this
+	// process is left for the next invocation rather than costing every
+	// subsequent read an os.ReadDir of the whole cache directory.
+	lateKey := Key("sweeponce", "late")
+	qt.Assert(t, qt.IsNil(os.WriteFile(filepath.Join(dir, lateKey), []byte(stale), 0o600))) //nolint:gosec // test fixture
+	_, ok = Get(dir, freshKey, time.Minute)
+	qt.Assert(t, qt.IsTrue(ok))
+
+	_, err := os.Stat(filepath.Join(dir, lateKey))
+	qt.Check(t, qt.IsNil(err), qt.Commentf("a namespace already swept this process should not be re-scanned"))
+}
+
 func TestGetPrunesHyphenatedBinaryNamesAsOneNamespace(t *testing.T) {
 	dir := t.TempDir()
 	freshKey := "missing-current-binary"

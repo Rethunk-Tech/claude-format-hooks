@@ -16,8 +16,17 @@ import (
 	"path/filepath"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
 )
+
+// prunedNamespaces records the namespaces this process has already swept.
+// prune costs an os.ReadDir of the whole cache directory, and that directory
+// grows one entry per file formatted, so sweeping on every Get made a read
+// scale with the session's history: measured at 206us against a 2.8us
+// exec.LookPath once ~2000 entries had accumulated. One sweep per namespace
+// per process keeps the collection without putting it on the read path.
+var prunedNamespaces sync.Map
 
 // Dir resolves the directory cache entries are stored under:
 // $CLAUDE_FORMAT_HOOKS_CACHE if set, else the OS's own cache directory
@@ -53,7 +62,7 @@ func Key(namespace string, parts ...string) string {
 // Get reads the value cached under key within dir, if a cache entry
 // exists and is still within maxAge.
 func Get(dir, key string, maxAge time.Duration) (value string, ok bool) {
-	prune(dir, cacheNamespacePrefix(key), maxAge)
+	pruneOnce(dir, cacheNamespacePrefix(key), maxAge)
 
 	path := filepath.Join(dir, key)
 	raw, err := os.ReadFile(path) //nolint:gosec // dir/key are our own fixed cache location, never user input
@@ -93,6 +102,19 @@ func cacheNamespacePrefix(key string) string {
 		return ""
 	}
 	return key[:i+1]
+}
+
+// pruneOnce sweeps a namespace the first time this process reads from it.
+// format-dispatch is a fresh process per file write, so "once per process"
+// is still frequent enough to collect expired entries.
+func pruneOnce(dir, namespacePrefix string, maxAge time.Duration) {
+	if namespacePrefix == "" {
+		return
+	}
+	if _, swept := prunedNamespaces.LoadOrStore(dir+"\x00"+namespacePrefix, struct{}{}); swept {
+		return
+	}
+	prune(dir, namespacePrefix, maxAge)
 }
 
 // prune removes expired entries in key's namespace. Cache cleanup is best
