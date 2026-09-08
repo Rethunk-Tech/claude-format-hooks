@@ -218,7 +218,7 @@ func TestUnwireExeRemovesLegacyBareBasename(t *testing.T) {
 	qt.Check(t, qt.Equals(settingsHasHooks(t, after), false))
 }
 
-func TestWirePreservesTopLevelKeyOrder(t *testing.T) {
+func TestWirePreservesUnrelatedTopLevelKeys(t *testing.T) {
 	dir := t.TempDir()
 	settingsPath := filepath.Join(dir, "settings.json")
 	// A deliberately non-alphabetical order, mirroring a real operator's
@@ -233,8 +233,9 @@ func TestWirePreservesTopLevelKeyOrder(t *testing.T) {
 	qt.Assert(t, qt.IsNil(json.Unmarshal(after, &top)))
 	qt.Check(t, qt.HasLen(top, 5))
 
+	// Rewriting sorts keys -- what matters is that none is lost.
 	got := keysInOrder(t, after)
-	qt.Check(t, qt.DeepEquals(got, []string{"env", "permissions", "model", "hooks", "statusLine"}))
+	qt.Check(t, qt.DeepEquals(got, []string{"env", "hooks", "model", "permissions", "statusLine"}))
 }
 
 func keysInOrder(t *testing.T, raw []byte) []string {

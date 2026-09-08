@@ -26,6 +26,9 @@ place at `~/.claude/hooks/format-dispatch` (`chmod +x`), run `--install`.
 provisions biome/prettier/taplo/markdownlint-cli2 globally. Restart Claude
 Code or open `/hooks` after install.
 
+Rewriting either file sorts its top-level keys alphabetically. Values and
+unrelated keys are preserved exactly; only their order changes, once.
+
 ## Env
 
 `CLAUDE_HOOKS_BIN_DIR`, `CLAUDE_SETTINGS_FILE`, `CURSOR_HOOKS_FILE`,

@@ -74,11 +74,15 @@ func DefaultOptions() (Options, error) {
 	}, nil
 }
 
+// jsonObject is a decoded JSON object whose values stay as raw blobs, so a
+// key this package never inspects survives a round-trip byte-for-byte.
+// Rewriting sorts keys, which is encoding/json's behaviour for a map.
+type jsonObject map[string]json.RawMessage
+
 // parseSettings reads settingsPath (a missing file is treated as `{}`) and
-// decodes it down to its hooks.PostToolUse entries, preserving top-level
-// and hooks.* key order via orderedMap so an unrelated key survives a
-// round-trip untouched.
-func parseSettings(settingsPath string) (before []byte, top, hooks *orderedMap, entries []PostToolUseEntry, err error) {
+// decodes it down to its hooks.PostToolUse entries, leaving every key it
+// does not touch untouched.
+func parseSettings(settingsPath string) (before []byte, top, hooks jsonObject, entries []PostToolUseEntry, err error) {
 	before, err = os.ReadFile(settingsPath) //nolint:gosec // caller-controlled settings location (env override or fixed default)
 	if err != nil {
 		if !os.IsNotExist(err) {
@@ -87,19 +91,19 @@ func parseSettings(settingsPath string) (before []byte, top, hooks *orderedMap, 
 		before = []byte("{}")
 	}
 
-	top = newOrderedMap()
-	if err := json.Unmarshal(before, top); err != nil {
+	top = jsonObject{}
+	if err := json.Unmarshal(before, &top); err != nil {
 		return nil, nil, nil, nil, fmt.Errorf("parse %s: %w", settingsPath, err)
 	}
 
-	hooks = newOrderedMap()
-	if raw, ok := top.Get("hooks"); ok {
-		if err := json.Unmarshal(raw, hooks); err != nil {
+	hooks = jsonObject{}
+	if raw, ok := top["hooks"]; ok {
+		if err := json.Unmarshal(raw, &hooks); err != nil {
 			return nil, nil, nil, nil, fmt.Errorf("parse %s: hooks: %w", settingsPath, err)
 		}
 	}
 
-	if raw, ok := hooks.Get(postToolUseEvent); ok {
+	if raw, ok := hooks[postToolUseEvent]; ok {
 		if err := json.Unmarshal(raw, &entries); err != nil {
 			return nil, nil, nil, nil, fmt.Errorf("parse %s: hooks.PostToolUse: %w", settingsPath, err)
 		}
@@ -110,34 +114,33 @@ func parseSettings(settingsPath string) (before []byte, top, hooks *orderedMap, 
 const postToolUseEvent = "PostToolUse"
 
 // renderHooks re-embeds entries as hooks.<event> into top/hooks and
-// serializes the result, indented, with every untouched key in its
-// original position. An event left with no entries is removed rather than
+// serializes the result, indented. An event left with no entries is removed rather than
 // written as an empty array, and a hooks object emptied that way is removed
 // too, so uninstalling restores the document it started from.
-func renderHooks[T any](top, hooks *orderedMap, event string, entries []T) ([]byte, error) {
-	_, hooksExisted := top.Get("hooks")
+func renderHooks[T any](top, hooks jsonObject, event string, entries []T) ([]byte, error) {
+	_, hooksExisted := top["hooks"]
 	eventDeleted := false
 	if len(entries) > 0 {
 		eventRaw, err := json.Marshal(entries)
 		if err != nil {
 			return nil, err
 		}
-		hooks.Set(event, eventRaw)
+		hooks[event] = eventRaw
 	} else {
-		_, eventDeleted = hooks.Get(event)
-		hooks.Delete(event)
+		_, eventDeleted = hooks[event]
+		delete(hooks, event)
 	}
 
 	// Drop an emptied hooks object, but leave a pre-existing empty one that
 	// this call never touched: it is the operator's, not ours to tidy.
-	if len(hooks.keys) == 0 && (eventDeleted || !hooksExisted) {
-		top.Delete("hooks")
+	if len(hooks) == 0 && (eventDeleted || !hooksExisted) {
+		delete(top, "hooks")
 	} else {
 		hooksRaw, err := json.Marshal(hooks)
 		if err != nil {
 			return nil, err
 		}
-		top.Set("hooks", hooksRaw)
+		top["hooks"] = hooksRaw
 	}
 
 	after, err := json.MarshalIndent(top, "", "  ")

@@ -14,7 +14,7 @@ type cursorHookCommand struct {
 	Timeout int    `json:"timeout"`
 }
 
-func parseCursorHooks(path string) (before []byte, top, hooks *orderedMap, entries []json.RawMessage, exists bool, err error) {
+func parseCursorHooks(path string) (before []byte, top, hooks jsonObject, entries []json.RawMessage, exists bool, err error) {
 	before, err = os.ReadFile(path) //nolint:gosec // caller-controlled hooks location
 	if err != nil {
 		if !os.IsNotExist(err) {
@@ -25,17 +25,17 @@ func parseCursorHooks(path string) (before []byte, top, hooks *orderedMap, entri
 		exists = true
 	}
 
-	top = newOrderedMap()
-	if err := json.Unmarshal(before, top); err != nil {
+	top = jsonObject{}
+	if err := json.Unmarshal(before, &top); err != nil {
 		return nil, nil, nil, nil, false, fmt.Errorf("parse %s: %w", path, err)
 	}
-	hooks = newOrderedMap()
-	if raw, ok := top.Get("hooks"); ok {
-		if err := json.Unmarshal(raw, hooks); err != nil {
+	hooks = jsonObject{}
+	if raw, ok := top["hooks"]; ok {
+		if err := json.Unmarshal(raw, &hooks); err != nil {
 			return nil, nil, nil, nil, false, fmt.Errorf("parse %s: hooks: %w", path, err)
 		}
 	}
-	if raw, ok := hooks.Get(cursorEvent); ok {
+	if raw, ok := hooks[cursorEvent]; ok {
 		if err := json.Unmarshal(raw, &entries); err != nil {
 			return nil, nil, nil, nil, false, fmt.Errorf("parse %s: hooks.%s: %w", path, cursorEvent, err)
 		}
@@ -44,14 +44,14 @@ func parseCursorHooks(path string) (before []byte, top, hooks *orderedMap, entri
 }
 
 // WireCursor adds the format-dispatch afterFileEdit hook while preserving
-// unrelated Cursor hooks and their source order.
+// unrelated Cursor hooks.
 func WireCursor(path, binPath string) (before, after []byte, err error) {
 	before, top, hooks, entries, exists, err := parseCursorHooks(path)
 	if err != nil {
 		return nil, nil, err
 	}
 	if !exists {
-		top.Set("version", json.RawMessage("1"))
+		top["version"] = json.RawMessage("1")
 	}
 
 	kept := slices.DeleteFunc(entries, func(entry json.RawMessage) bool {

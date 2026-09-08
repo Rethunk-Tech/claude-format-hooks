@@ -47,7 +47,7 @@ func TestWireCursorMissingFileCreatesVersionOne(t *testing.T) {
 
 	var top map[string]json.RawMessage
 	qt.Assert(t, qt.IsNil(json.Unmarshal(after, &top)))
-	qt.Check(t, qt.DeepEquals(keysInOrder(t, after), []string{"version", "hooks"}))
+	qt.Check(t, qt.DeepEquals(keysInOrder(t, after), []string{"hooks", "version"}))
 	var version int
 	qt.Assert(t, qt.IsNil(json.Unmarshal(top["version"], &version)))
 	qt.Check(t, qt.Equals(version, 1))
