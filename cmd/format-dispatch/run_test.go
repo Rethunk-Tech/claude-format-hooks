@@ -81,6 +81,14 @@ func fakeRouterTools(t *testing.T) string {
 	return marker
 }
 
+// upgradeEnv points --upgrade at a test release server and a temp install.
+func upgradeEnv(t *testing.T, releaseURL, dir, binDir string) {
+	t.Helper()
+	t.Setenv("CLAUDE_FORMAT_HOOKS_RELEASE_API", releaseURL)
+	t.Setenv("CLAUDE_HOOKS_BIN_DIR", binDir)
+	t.Setenv("CLAUDE_SETTINGS_FILE", filepath.Join(dir, "settings.json"))
+}
+
 // unrecognizedArgCases are the argument mistakes every subcommand must
 // reject the same way.
 var unrecognizedArgCases = []struct {
@@ -341,9 +349,7 @@ func TestDispatchArgsUpgradeHappyPathViaReleaseAPI(t *testing.T) {
 	}))
 	defer server.Close()
 
-	t.Setenv("CLAUDE_FORMAT_HOOKS_RELEASE_API", server.URL)
-	t.Setenv("CLAUDE_HOOKS_BIN_DIR", binDir)
-	t.Setenv("CLAUDE_SETTINGS_FILE", filepath.Join(dir, "settings.json"))
+	upgradeEnv(t, server.URL, dir, binDir)
 
 	var code int
 	stdout := captureStdout(t, func() {
@@ -372,9 +378,7 @@ func TestDispatchArgsUpgradeDryRunViaReleaseAPI(t *testing.T) {
 	}))
 	defer server.Close()
 
-	t.Setenv("CLAUDE_FORMAT_HOOKS_RELEASE_API", server.URL)
-	t.Setenv("CLAUDE_HOOKS_BIN_DIR", binDir)
-	t.Setenv("CLAUDE_SETTINGS_FILE", filepath.Join(dir, "settings.json"))
+	upgradeEnv(t, server.URL, dir, binDir)
 
 	var code int
 	stdout := captureStdout(t, func() {
@@ -489,35 +493,36 @@ func TestRunRealExtensionsSkipWithoutShebangPeek(t *testing.T) {
 	}
 }
 
-func TestRunOutsideProjectRootIsSkipped(t *testing.T) {
-	projectRoot := t.TempDir()
-	outside := t.TempDir()
-	abs := filepath.Join(outside, "f.json")
-	writeFile(t, abs, `{"b":1,"a":2}`)
+func TestRunDispatchesOnlyInsideTheProject(t *testing.T) {
+	const src = `{"b":1,"a":2}`
+	const formatted = "{\n  \"b\": 1,\n  \"a\": 2\n}\n"
 
-	t.Setenv("CLAUDE_PROJECT_DIR", projectRoot)
-	qt.Check(t, qt.Equals(run(strings.NewReader(payload(abs))), 0))
-	qt.Check(t, qt.Equals(readFile(t, abs), `{"b":1,"a":2}`))
-}
+	tests := []struct {
+		name    string
+		rel     string
+		outside bool
+		want    string
+	}{
+		{name: "a file under the project root is formatted", rel: "f.json", want: formatted},
+		{name: "a file outside the project root is skipped", rel: "f.json", outside: true, want: src},
+		{name: "a vendored file is skipped", rel: filepath.Join("node_modules", "pkg", "f.json"), want: src},
+	}
 
-func TestRunVendoredDirIsSkipped(t *testing.T) {
-	projectRoot := t.TempDir()
-	abs := filepath.Join(projectRoot, "node_modules", "pkg", "f.json")
-	writeFile(t, abs, `{"b":1,"a":2}`)
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			projectRoot := t.TempDir()
+			root := projectRoot
+			if tc.outside {
+				root = t.TempDir()
+			}
+			abs := filepath.Join(root, tc.rel)
+			writeFile(t, abs, src)
 
-	t.Setenv("CLAUDE_PROJECT_DIR", projectRoot)
-	qt.Check(t, qt.Equals(run(strings.NewReader(payload(abs))), 0))
-	qt.Check(t, qt.Equals(readFile(t, abs), `{"b":1,"a":2}`))
-}
-
-func TestRunDispatchesToJSONFormatter(t *testing.T) {
-	projectRoot := t.TempDir()
-	abs := filepath.Join(projectRoot, "f.json")
-	writeFile(t, abs, `{"b":1,"a":2}`)
-
-	t.Setenv("CLAUDE_PROJECT_DIR", projectRoot)
-	qt.Check(t, qt.Equals(run(strings.NewReader(payload(abs))), 0))
-	qt.Check(t, qt.Equals(readFile(t, abs), "{\n  \"b\": 1,\n  \"a\": 2\n}\n"))
+			t.Setenv("CLAUDE_PROJECT_DIR", projectRoot)
+			qt.Check(t, qt.Equals(run(strings.NewReader(payload(abs))), 0))
+			qt.Check(t, qt.Equals(readFile(t, abs), tc.want))
+		})
+	}
 }
 
 func TestRunDispatchesJSONFromToolResult(t *testing.T) {
