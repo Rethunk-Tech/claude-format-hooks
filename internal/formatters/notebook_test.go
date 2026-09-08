@@ -54,7 +54,7 @@ func TestNotebookFormatterSkipsWhenBothMissing(t *testing.T) {
 
 func TestNotebookFormatterSkipsWhenBlackNotebookSupportIsMissing(t *testing.T) {
 	isolateDiskCache(t)
-	writeFakeTool(t, "black", "echo 'No module named jupyter'; exit 1")
+	writeFakeTool(t, "black", `echo "No module named 'jupyter'"; exit 1`)
 	dir := t.TempDir()
 
 	res := NewNotebook().Format(t.Context(), dir, filepath.Join(dir, "f.ipynb"))
@@ -64,15 +64,13 @@ func TestNotebookFormatterSkipsWhenBlackNotebookSupportIsMissing(t *testing.T) {
 }
 
 func TestBlackNotebookSupportMissingRecognizesMissingExtras(t *testing.T) {
+	// CPython always quotes the module in ModuleNotFoundError, so those are
+	// the only forms black can actually surface here.
 	for _, diagnostic := range []string{
 		"No module named 'nbformat'",
-		`No module named "nbformat"`,
-		"No module named nbformat",
 		"No module named 'jupyter'",
-		`No module named "jupyter"`,
-		"No module named jupyter",
 		"ModuleNotFoundError: No module named 'nbformat'",
-		"ModuleNotFoundError: no module named jupyter",
+		"ModuleNotFoundError: no module named 'jupyter'",
 		"black[jupyter] is not installed",
 	} {
 		qt.Check(t, qt.IsTrue(blackNotebookSupportMissing(diagnostic, "")),
@@ -87,6 +85,7 @@ func TestBlackNotebookSupportMissingRejectsUnrelatedJupyterText(t *testing.T) {
 		"No module named jupyterlab",
 		"No module named jupyter_extra",
 		"No module named nbformat.core",
+		"No module named 'jupyterlab'",
 	} {
 		qt.Check(t, qt.IsFalse(blackNotebookSupportMissing(diagnostic, "")),
 			qt.Commentf("diagnostic=%q", diagnostic))
