@@ -64,12 +64,6 @@ func upgradeWithConfig(opts Options, dryRun bool, out io.Writer, cfg upgradeConf
 		return fmt.Errorf("binary path is empty")
 	}
 	target := HookBinaryPath(filepath.Dir(opts.BinPath))
-	if cfg.client == nil {
-		cfg.client = &http.Client{Timeout: 30 * time.Second}
-	}
-	if cfg.apiBaseURL == "" {
-		cfg.apiBaseURL = releaseAPIBaseURL
-	}
 	if cfg.goos == "" || cfg.goarch == "" {
 		return fmt.Errorf("runtime target is incomplete")
 	}
@@ -102,11 +96,11 @@ func upgradeWithConfig(opts Options, dryRun bool, out io.Writer, cfg upgradeConf
 		return fmt.Errorf("latest release %q has an asset without a download URL", release.TagName)
 	}
 
-	binary, err := fetchAsset(cfg.client, binaryAsset.BrowserDownloadURL)
+	binary, err := fetchHTTP(cfg.client, binaryAsset.BrowserDownloadURL)
 	if err != nil {
 		return fmt.Errorf("download %s: %w", assetName, err)
 	}
-	checksum, err := fetchAsset(cfg.client, checksumAsset.BrowserDownloadURL)
+	checksum, err := fetchHTTP(cfg.client, checksumAsset.BrowserDownloadURL)
 	if err != nil {
 		return fmt.Errorf("download %s: %w", checksumName, err)
 	}
@@ -141,10 +135,6 @@ func fetchLatestRelease(client *http.Client, baseURL string) (githubRelease, err
 	return release, nil
 }
 
-func fetchAsset(client *http.Client, url string) ([]byte, error) {
-	return fetchHTTP(client, url)
-}
-
 func fetchHTTP(client *http.Client, url string) ([]byte, error) {
 	req, err := http.NewRequest(http.MethodGet, url, nil)
 	if err != nil {
@@ -167,6 +157,8 @@ func fetchHTTP(client *http.Client, url string) ([]byte, error) {
 		}
 		return nil, fmt.Errorf("HTTP %s: %s", resp.Status, detail)
 	}
+	// Reject on the advertised size before transferring: the LimitReader
+	// below bounds the damage, but only after pulling down the full cap.
 	if resp.ContentLength > maxUpgradeDownloadBytes {
 		return nil, fmt.Errorf("response body exceeds maximum download size of %d bytes", maxUpgradeDownloadBytes)
 	}
