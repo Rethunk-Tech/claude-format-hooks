@@ -3,6 +3,7 @@ package installer
 import (
 	"bytes"
 	"crypto/sha256"
+	"encoding/hex"
 	"fmt"
 	"net/http"
 	"net/http/httptest"
@@ -18,7 +19,7 @@ import (
 
 func TestUpgradeHappyPathPreservesModeAndSettings(t *testing.T) {
 	binary := []byte("new release binary\n")
-	server, _, binaryRequests, checksumRequests := upgradeTestServer(t, binary, binary)
+	server, counts := upgradeTestServer(t, binary, binary)
 	defer server.Close()
 
 	oldBinary := []byte("old release binary\n")
@@ -39,8 +40,9 @@ func TestUpgradeHappyPathPreservesModeAndSettings(t *testing.T) {
 	assertFileIs(t, target, binary, "upgraded binary")
 	assertPerm(t, target, 0o751)
 	assertFileIs(t, settingsPath, settings, "upgrade must not touch settings")
-	assertRequests(t, "binary", binaryRequests, 1)
-	assertRequests(t, "checksum", checksumRequests, 1)
+	assertRequests(t, "binary", counts.binary, 1)
+	assertRequests(t, "checksum", counts.checksum, 1)
+	assertRequests(t, "attestation", counts.attestation, 1)
 	assertNoScratchLeftBehind(t, target)
 	if !strings.Contains(out.String(), "upgraded") {
 		t.Fatalf("upgrade output = %q, want success message", out.String())
@@ -97,7 +99,7 @@ func TestParseReleaseChecksumRequiresNamedAsset(t *testing.T) {
 
 func TestUpgradeChecksumMismatchLeavesBinaryUntouched(t *testing.T) {
 	binary := []byte("new release binary\n")
-	server, _, _, _ := upgradeTestServer(t, binary, []byte("different binary\n"))
+	server, _ := upgradeTestServer(t, binary, []byte("different binary\n"))
 	defer server.Close()
 
 	oldBinary := []byte("old release binary\n")
@@ -113,9 +115,44 @@ func TestUpgradeChecksumMismatchLeavesBinaryUntouched(t *testing.T) {
 	assertNoScratchLeftBehind(t, target)
 }
 
+func TestUpgradeUnattestedBinaryLeavesBinaryUntouched(t *testing.T) {
+	binary := []byte("unattested release binary\n")
+	server, counts := upgradeTestServerForTarget(t, binary, binary,
+		runtime.GOOS, runtime.GOARCH, true, true, false)
+	defer server.Close()
+
+	oldBinary := []byte("old release binary\n")
+	target := installedBinary(t, oldBinary, 0o700)
+
+	err := upgradeWithConfig(Options{BinPath: target}, false, nil, releaseConfig(server))
+	if err == nil || !strings.Contains(err.Error(), "attests no build provenance") {
+		t.Fatalf("upgrade error = %v, want missing provenance error", err)
+	}
+	if !strings.Contains(err.Error(), "gh attestation verify") {
+		t.Fatalf("upgrade error = %v, want an actionable manual-verification hint", err)
+	}
+
+	assertFileIs(t, target, oldBinary, "binary changed after failed provenance check")
+	assertPerm(t, target, 0o700)
+	assertNoScratchLeftBehind(t, target)
+	assertRequests(t, "attestation", counts.attestation, 1)
+}
+
+// A repository that has never attested anything answers 404 rather than an
+// empty list, so both shapes have to refuse.
+func TestVerifyReleaseProvenanceRefusesUnattestedRepository(t *testing.T) {
+	server := httptest.NewServer(http.NotFoundHandler())
+	defer server.Close()
+
+	err := verifyReleaseProvenance(server.Client(), server.URL, []byte("release binary\n"))
+	if err == nil || !strings.Contains(err.Error(), "fetch attestations") {
+		t.Fatalf("verifyReleaseProvenance error = %v, want fetch failure", err)
+	}
+}
+
 func TestUpgradeDryRunDoesNotWriteOrDownloadAssets(t *testing.T) {
 	binary := []byte("new release binary\n")
-	server, releaseRequests, binaryRequests, checksumRequests := upgradeTestServer(t, binary, binary)
+	server, counts := upgradeTestServer(t, binary, binary)
 	defer server.Close()
 
 	oldBinary := []byte("old release binary\n")
@@ -127,9 +164,10 @@ func TestUpgradeDryRunDoesNotWriteOrDownloadAssets(t *testing.T) {
 		t.Fatal(err)
 	}
 	assertFileIs(t, target, oldBinary, "dry-run changed binary")
-	assertRequests(t, "release", releaseRequests, 0)
-	assertRequests(t, "binary", binaryRequests, 0)
-	assertRequests(t, "checksum", checksumRequests, 0)
+	assertRequests(t, "release", counts.release, 0)
+	assertRequests(t, "binary", counts.binary, 0)
+	assertRequests(t, "checksum", counts.checksum, 0)
+	assertRequests(t, "attestation", counts.attestation, 0)
 	if !strings.Contains(out.String(), "--dry-run") || !strings.Contains(out.String(), target) {
 		t.Fatalf("dry-run output = %q, want plan with target", out.String())
 	}
@@ -137,7 +175,7 @@ func TestUpgradeDryRunDoesNotWriteOrDownloadAssets(t *testing.T) {
 
 func TestUpgradeUsesReleaseAPIEnvironmentOverride(t *testing.T) {
 	binary := []byte("environment release binary\n")
-	server, _, _, _ := upgradeTestServer(t, binary, binary)
+	server, _ := upgradeTestServer(t, binary, binary)
 	defer server.Close()
 	t.Setenv("CLAUDE_FORMAT_HOOKS_RELEASE_API", server.URL)
 
@@ -245,7 +283,7 @@ func TestFetchHTTPReportsNon2xx(t *testing.T) {
 
 func TestUpgradeOversizedBinaryLeavesInstalledBinaryUntouched(t *testing.T) {
 	oversized := bytes.Repeat([]byte("x"), maxUpgradeDownloadBytes+1)
-	server, _, _, _ := upgradeTestServer(t, oversized, nil)
+	server, _ := upgradeTestServer(t, oversized, nil)
 	defer server.Close()
 
 	target := HookBinaryPath(t.TempDir())
@@ -263,7 +301,7 @@ func TestUpgradeOversizedBinaryLeavesInstalledBinaryUntouched(t *testing.T) {
 
 func TestUpgradeFreshInstallUsesExecutableMode(t *testing.T) {
 	binary := []byte("fresh release binary\n")
-	server, _, _, _ := upgradeTestServer(t, binary, binary)
+	server, _ := upgradeTestServer(t, binary, binary)
 	defer server.Close()
 
 	target := HookBinaryPath(filepath.Join(t.TempDir(), "nested", "bin"))
@@ -290,8 +328,8 @@ func TestUpgradeFreshInstallUsesExecutableMode(t *testing.T) {
 }
 
 func TestUpgradeMissingBinaryAsset(t *testing.T) {
-	server, _, _, _ := upgradeTestServerForTarget(t, []byte("binary\n"), []byte("binary\n"),
-		runtime.GOOS, runtime.GOARCH, false, true)
+	server, _ := upgradeTestServerForTarget(t, []byte("binary\n"), []byte("binary\n"),
+		runtime.GOOS, runtime.GOARCH, false, true, true)
 	defer server.Close()
 
 	err := upgradeWithConfig(Options{BinPath: HookBinaryPath(t.TempDir())}, false, nil, releaseConfig(server))
@@ -301,8 +339,8 @@ func TestUpgradeMissingBinaryAsset(t *testing.T) {
 }
 
 func TestUpgradeMissingChecksumAsset(t *testing.T) {
-	server, _, _, _ := upgradeTestServerForTarget(t, []byte("binary\n"), []byte("binary\n"),
-		runtime.GOOS, runtime.GOARCH, true, false)
+	server, _ := upgradeTestServerForTarget(t, []byte("binary\n"), []byte("binary\n"),
+		runtime.GOOS, runtime.GOARCH, true, false, true)
 	defer server.Close()
 
 	err := upgradeWithConfig(Options{BinPath: HookBinaryPath(t.TempDir())}, false, nil, releaseConfig(server))
@@ -313,7 +351,7 @@ func TestUpgradeMissingChecksumAsset(t *testing.T) {
 
 func TestUpgradeWindowsAssetPairOnLinux(t *testing.T) {
 	binary := []byte("windows release binary\n")
-	server, _, _, _ := upgradeTestServerForTarget(t, binary, binary, "windows", "amd64", true, true)
+	server, _ := upgradeTestServerForTarget(t, binary, binary, "windows", "amd64", true, true, true)
 	defer server.Close()
 
 	target := HookBinaryPath(t.TempDir())
@@ -329,11 +367,11 @@ func TestUpgradeWindowsAssetPairOnLinux(t *testing.T) {
 	assertFileIs(t, target, binary, "windows asset result")
 }
 
-func upgradeTestServer(t *testing.T, binary, checksumBinary []byte) (*httptest.Server, *atomic.Int32, *atomic.Int32, *atomic.Int32) {
-	return upgradeTestServerForTarget(t, binary, checksumBinary, runtime.GOOS, runtime.GOARCH, true, true)
+func upgradeTestServer(t *testing.T, binary, checksumBinary []byte) (*httptest.Server, releaseRequestCounts) {
+	return upgradeTestServerForTarget(t, binary, checksumBinary, runtime.GOOS, runtime.GOARCH, true, true, true)
 }
 
-func upgradeTestServerForTarget(t *testing.T, binary, checksumBinary []byte, goos, goarch string, includeBinary, includeChecksum bool) (*httptest.Server, *atomic.Int32, *atomic.Int32, *atomic.Int32) {
+func upgradeTestServerForTarget(t *testing.T, binary, checksumBinary []byte, goos, goarch string, includeBinary, includeChecksum, attested bool) (*httptest.Server, releaseRequestCounts) {
 	t.Helper()
 	assetName := fmt.Sprintf("format-dispatch-%s-%s", goos, goarch)
 	if goos == "windows" {
@@ -341,9 +379,14 @@ func upgradeTestServerForTarget(t *testing.T, binary, checksumBinary []byte, goo
 	}
 	checksum := sha256.Sum256(checksumBinary)
 	checksumFile := []byte(fmt.Sprintf("%x  %s\n", checksum, assetName))
-	var releaseRequests atomic.Int32
-	var binaryRequests atomic.Int32
-	var checksumRequests atomic.Int32
+	counts := releaseRequestCounts{
+		release:     new(atomic.Int32),
+		binary:      new(atomic.Int32),
+		checksum:    new(atomic.Int32),
+		attestation: new(atomic.Int32),
+	}
+	binaryDigest := sha256.Sum256(binary)
+	attestationPath := "/repos/" + releaseRepository + "/attestations/sha256:" + hex.EncodeToString(binaryDigest[:])
 	assetJSON := make([]string, 0, 2)
 	if includeBinary {
 		assetJSON = append(assetJSON, fmt.Sprintf(`{"name":%q,"browser_download_url":%q}`, assetName, "__SERVER__/binary"))
@@ -356,18 +399,36 @@ func upgradeTestServerForTarget(t *testing.T, binary, checksumBinary []byte, goo
 	server = httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		switch r.URL.Path {
 		case "/repos/" + releaseRepository + "/releases/latest":
-			releaseRequests.Add(1)
+			counts.release.Add(1)
 			assets := strings.ReplaceAll(strings.Join(assetJSON, ","), "__SERVER__", server.URL)
 			_, _ = fmt.Fprintf(w, `{"tag_name":"v9.9.9","assets":[%s]}`, assets)
 		case "/binary":
-			binaryRequests.Add(1)
+			counts.binary.Add(1)
 			_, _ = w.Write(binary)
 		case "/checksum":
-			checksumRequests.Add(1)
+			counts.checksum.Add(1)
 			_, _ = w.Write(checksumFile)
+		case attestationPath:
+			counts.attestation.Add(1)
+			if !attested {
+				_, _ = fmt.Fprint(w, `{"attestations":[]}`)
+				return
+			}
+			// The live API answers with a null bundle and an offloaded
+			// bundle_url; the fixture keeps that shape so the verifier can
+			// never quietly grow a dependency on an inline bundle.
+			_, _ = fmt.Fprint(w,
+				`{"attestations":[{"repository_id":1,"bundle_url":"https://example.invalid/b.json.sn","bundle":null}]}`)
 		default:
 			http.NotFound(w, r)
 		}
 	}))
-	return server, &releaseRequests, &binaryRequests, &checksumRequests
+	return server, counts
+}
+
+type releaseRequestCounts struct {
+	release     *atomic.Int32
+	binary      *atomic.Int32
+	checksum    *atomic.Int32
+	attestation *atomic.Int32
 }

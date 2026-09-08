@@ -32,6 +32,10 @@ type releaseAsset struct {
 	BrowserDownloadURL string `json:"browser_download_url"`
 }
 
+type releaseAttestations struct {
+	Attestations []json.RawMessage `json:"attestations"`
+}
+
 type upgradeConfig struct {
 	client     *http.Client
 	apiBaseURL string
@@ -40,7 +44,8 @@ type upgradeConfig struct {
 }
 
 // Upgrade downloads the latest release binary for this runtime, verifies its
-// published checksum, and atomically replaces the installed hook binary.
+// published checksum and build provenance, and atomically replaces the
+// installed hook binary.
 // Settings are intentionally not changed; the installed hook path remains
 // wired even while its binary is upgraded.
 func Upgrade(opts Options, dryRun bool, out io.Writer) error {
@@ -107,6 +112,11 @@ func upgradeWithConfig(opts Options, dryRun bool, out io.Writer, cfg upgradeConf
 	if err := verifyReleaseChecksum(checksum, assetName, binary); err != nil {
 		return fmt.Errorf("verify %s: %w", assetName, err)
 	}
+	if err := verifyReleaseProvenance(cfg.client, cfg.apiBaseURL, binary); err != nil {
+		return fmt.Errorf("verify build provenance for %s: %w; refusing to install an unattested binary. "+
+			"Verify a download yourself with `gh attestation verify <file> --repo %s` and install it manually, "+
+			"or wait for a release built with provenance", assetName, err, releaseRepository)
+	}
 
 	mode, err := existingBinaryMode(target)
 	if err != nil {
@@ -119,6 +129,46 @@ func upgradeWithConfig(opts Options, dryRun bool, out io.Writer, cfg upgradeConf
 		return fmt.Errorf("replace %s: %w", target, err)
 	}
 	_, _ = fmt.Fprintf(out, "==> upgraded %s to release %s\n", target, release.TagName)
+	return nil
+}
+
+// verifyReleaseProvenance requires GitHub to hold a build-provenance
+// attestation for these exact bytes under the release repository. The binary
+// and its .sha256 ship in the same release, so the checksum proves transit
+// only: whoever can rewrite the release rewrites both. Minting an attestation
+// instead needs the release workflow's short-lived OIDC identity, which write
+// access to release assets does not grant.
+//
+// ponytail: the trust anchor is TLS to the release API host, which this path
+// already trusts for the release metadata and asset URLs it acts on
+// (install.sh states that trust). Ceiling: the attestation's Sigstore bundle
+// is not verified and the workflow path inside it is not read. Measured
+// against api.github.com in 2026-09, the endpoint returns "bundle": null and
+// offloads the bundle to a snappy-compressed blob URL; snappy is not in the
+// standard library. Reading it would buy little here anyway -- the endpoint is
+// repository-scoped, so a provenance attestation already proves this
+// repository's OIDC identity signed these bytes, and an attacker able to add
+// another attesting workflow already has the access to edit the release
+// workflow. Upgrade path if the threat model grows to include a compromised
+// API host: fetch bundle_url and verify the bundle (needs a snappy decoder
+// and sigstore-go).
+func verifyReleaseProvenance(client *http.Client, baseURL string, binary []byte) error {
+	digest := sha256.Sum256(binary)
+	url := strings.TrimRight(baseURL, "/") + "/repos/" + releaseRepository +
+		"/attestations/sha256:" + hex.EncodeToString(digest[:]) + "?predicate_type=provenance"
+	body, err := fetchHTTP(client, url)
+	if err != nil {
+		return fmt.Errorf("fetch attestations: %w", err)
+	}
+	// A digest with no attestation answers 404 on a repository that has never
+	// attested anything and an empty list on one that has; both are a refusal.
+	var attestations releaseAttestations
+	if err := json.Unmarshal(body, &attestations); err != nil {
+		return fmt.Errorf("decode attestations: %w", err)
+	}
+	if len(attestations.Attestations) == 0 {
+		return fmt.Errorf("%s attests no build provenance for this download", releaseRepository)
+	}
 	return nil
 }
 

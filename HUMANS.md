@@ -20,6 +20,9 @@ cd claude-format-hooks
 Without Go: download the platform binary from
 [releases](https://github.com/Rethunk-Tech/claude-format-hooks/releases/latest),
 place at `~/.claude/hooks/format-dispatch` (`chmod +x`), run `--install`.
+The `.sha256` sidecar ships in the same release as the binary, so it proves
+transit only. Check where the bytes were built before trusting them, with
+`gh attestation verify <binary> --repo Rethunk-Tech/claude-format-hooks`.
 
 `--install` wires `PostToolUse` in `~/.claude/settings.json` and
 `afterFileEdit` in `~/.cursor/hooks.json`. With `bun` on PATH, it also
@@ -46,6 +49,11 @@ format-dispatch --version
 format-dispatch --check .              # CI: exit 1 if formatting needed
 format-dispatch --upgrade [--dry-run]
 ```
+
+`--upgrade` checks the release `.sha256` and then requires GitHub to hold a
+build-provenance attestation for the downloaded bytes; a binary the release
+workflow did not attest is refused rather than installed. `--dry-run` prints
+the planned asset and path without going near the network.
 
 **Config:** `~/.claude/claude-format-hooks.json` (`$CLAUDE_FORMAT_HOOKS_CONFIG`);
 project `.claude-format-hooks.json` for `disabled` / `disabledFormatters`;

@@ -22,10 +22,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Route `.tftest.hcl`, `.tfmock.hcl`, and `.tfquery.hcl` through Terraform
   formatting; bare `.hcl`, `.tf.json`, and `.tfvars.json` are not registered
   Terraform extensions.
-- `--upgrade` downloads and verifies the latest platform release binary, then
-  atomically replaces the installed hook without rewriting `settings.json`;
+- `--upgrade` downloads the latest platform release binary, verifies its
+  `.sha256` and its GitHub build-provenance attestation, then atomically
+  replaces the installed hook without rewriting `settings.json`;
   `--upgrade --dry-run` previews the planned asset and path offline without
-  writing.
+  writing. The checksum ships in the same release as the binary and so proves
+  transit only, while an attestation cannot be minted without the release
+  workflow's OIDC identity. A binary with no attestation is refused, which
+  includes every release published before this landed.
 - `.proto` formatting via `buf format -w`, following the same
   system-binary pattern as `terraform fmt` and `rustfmt` (skipped silently
   when `buf` is not on `PATH`).
