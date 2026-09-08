@@ -353,21 +353,7 @@ func TestCheckHonorsDisableConfig(t *testing.T) {
 }
 
 func TestCheckHonorsProjectConfigDisablesBiomeForGraphQLRouter(t *testing.T) {
-	toolDir := t.TempDir()
-	marker := filepath.Join(t.TempDir(), "formatter")
-	scripts := map[string]string{
-		"biome": "#!/bin/sh\nprintf 'biome' > \"$FORMATTER_MARKER\"\nexit 0\n",
-		"bunx":  "#!/bin/sh\nprintf 'prettier' > \"$FORMATTER_MARKER\"\nexit 0\n",
-	}
-	if filepath.Separator == '\\' {
-		scripts = map[string]string{
-			"biome.cmd": "@echo off\r\n@<nul set /p \"=biome\" > \"%FORMATTER_MARKER%\"\r\n",
-			"bunx.cmd":  "@echo off\r\n@<nul set /p \"=prettier\" > \"%FORMATTER_MARKER%\"\r\n",
-		}
-	}
-	for name, script := range scripts {
-		qt.Assert(t, qt.IsNil(os.WriteFile(filepath.Join(toolDir, name), []byte(script), 0o755))) //nolint:gosec // test fixture
-	}
+	marker := fakeRouterTools(t)
 
 	projectRoot := t.TempDir()
 	writeCheckFile(t, projectRoot, "biome.json", "{}\n")
@@ -376,9 +362,6 @@ func TestCheckHonorsProjectConfigDisablesBiomeForGraphQLRouter(t *testing.T) {
 	writeFile(t, configPath, `{}`)
 	t.Setenv("CLAUDE_PROJECT_DIR", projectRoot)
 	t.Setenv("CLAUDE_FORMAT_HOOKS_CONFIG", configPath)
-	t.Setenv("CLAUDE_FORMAT_HOOKS_CACHE", filepath.Join(t.TempDir(), "cache"))
-	t.Setenv("FORMATTER_MARKER", marker)
-	t.Setenv("PATH", toolDir)
 
 	for _, ext := range []string{".graphql", ".gql"} {
 		t.Run(ext, func(t *testing.T) {

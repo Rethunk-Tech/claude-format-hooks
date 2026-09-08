@@ -56,6 +56,31 @@ func hookEnv(t *testing.T) (dir, settingsPath string) {
 	return dir, settingsPath
 }
 
+// fakeRouterTools puts stub biome and bunx executables on PATH that record
+// which of them ran, and returns the marker file they write to.
+func fakeRouterTools(t *testing.T) string {
+	t.Helper()
+	toolDir := t.TempDir()
+	marker := filepath.Join(t.TempDir(), "formatter")
+	scripts := map[string]string{
+		"biome": "#!/bin/sh\nprintf 'biome' > \"$FORMATTER_MARKER\"\nexit 0\n",
+		"bunx":  "#!/bin/sh\nprintf 'prettier' > \"$FORMATTER_MARKER\"\nexit 0\n",
+	}
+	if filepath.Separator == '\\' {
+		scripts = map[string]string{
+			"biome.cmd": "@echo off\r\n@<nul set /p \"=biome\" > \"%FORMATTER_MARKER%\"\r\n",
+			"bunx.cmd":  "@echo off\r\n@<nul set /p \"=prettier\" > \"%FORMATTER_MARKER%\"\r\n",
+		}
+	}
+	for name, script := range scripts {
+		qt.Assert(t, qt.IsNil(os.WriteFile(filepath.Join(toolDir, name), []byte(script), 0o755))) //nolint:gosec // test fixture
+	}
+	t.Setenv("CLAUDE_FORMAT_HOOKS_CACHE", filepath.Join(t.TempDir(), "cache"))
+	t.Setenv("FORMATTER_MARKER", marker)
+	t.Setenv("PATH", toolDir)
+	return marker
+}
+
 // unrecognizedArgCases are the argument mistakes every subcommand must
 // reject the same way.
 var unrecognizedArgCases = []struct {
@@ -607,30 +632,13 @@ func TestRunHonorsDisableConfig(t *testing.T) {
 }
 
 func TestRunProjectConfigDisablesBiomeForGraphQLRouter(t *testing.T) {
-	toolDir := t.TempDir()
-	marker := filepath.Join(t.TempDir(), "formatter")
-	scripts := map[string]string{
-		"biome": "#!/bin/sh\nprintf 'biome' > \"$FORMATTER_MARKER\"\nexit 0\n",
-		"bunx":  "#!/bin/sh\nprintf 'prettier' > \"$FORMATTER_MARKER\"\nexit 0\n",
-	}
-	if filepath.Separator == '\\' {
-		scripts = map[string]string{
-			"biome.cmd": "@echo off\r\n@<nul set /p \"=biome\" > \"%FORMATTER_MARKER%\"\r\n",
-			"bunx.cmd":  "@echo off\r\n@<nul set /p \"=prettier\" > \"%FORMATTER_MARKER%\"\r\n",
-		}
-	}
-	for name, script := range scripts {
-		qt.Assert(t, qt.IsNil(os.WriteFile(filepath.Join(toolDir, name), []byte(script), 0o755))) //nolint:gosec // test fixture
-	}
+	marker := fakeRouterTools(t)
 
 	projectRoot := t.TempDir()
 	configPath := filepath.Join(t.TempDir(), "claude-format-hooks.json")
 	writeFile(t, configPath, `{}`)
 	t.Setenv("CLAUDE_PROJECT_DIR", projectRoot)
 	t.Setenv("CLAUDE_FORMAT_HOOKS_CONFIG", configPath)
-	t.Setenv("CLAUDE_FORMAT_HOOKS_CACHE", filepath.Join(t.TempDir(), "cache"))
-	t.Setenv("FORMATTER_MARKER", marker)
-	t.Setenv("PATH", toolDir)
 	writeFile(t, filepath.Join(projectRoot, "biome.json"), "{}\n")
 	writeFile(t, filepath.Join(projectRoot, projectConfigFile), `{"disabledFormatters":["biome"]}`)
 

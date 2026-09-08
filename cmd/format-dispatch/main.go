@@ -156,17 +156,8 @@ func runInstall(args []string, uninstall bool) int {
 		action = installer.Uninstall
 	}
 
-	var dryRun bool
-	switch len(args) {
-	case 0:
-	case 1:
-		if args[0] != "--dry-run" {
-			fmt.Fprintf(os.Stderr, "format-dispatch %s: unrecognized argument %q\n\n%s", label, args[0], usage)
-			return 1
-		}
-		dryRun = true
-	default:
-		fmt.Fprintf(os.Stderr, "format-dispatch %s: unexpected arguments %q\n\n%s", label, args, usage)
+	dryRun, ok := parseDryRun(args, label)
+	if !ok {
 		return 1
 	}
 
@@ -193,22 +184,32 @@ func runInstall(args []string, uninstall bool) int {
 	return 0
 }
 
+// parseDryRun reads a subcommand's only accepted argument. It reports the
+// mistake against label and returns ok=false when args are not --dry-run
+// alone or empty.
+func parseDryRun(args []string, label string) (dryRun, ok bool) {
+	switch len(args) {
+	case 0:
+		return false, true
+	case 1:
+		if args[0] != "--dry-run" {
+			fmt.Fprintf(os.Stderr, "format-dispatch %s: unrecognized argument %q\n\n%s", label, args[0], usage)
+			return false, false
+		}
+		return true, true
+	default:
+		fmt.Fprintf(os.Stderr, "format-dispatch %s: unexpected arguments %q\n\n%s", label, args, usage)
+		return false, false
+	}
+}
+
 // runUpgrade downloads the latest release binary for this platform, verifies
 // its checksum, and replaces the installed hook binary. It never rewrites
 // settings.json. `--dry-run` previews the plan without writing.
 func runUpgrade(args []string) int {
 	const label = "--upgrade"
-	var dryRun bool
-	switch len(args) {
-	case 0:
-	case 1:
-		if args[0] != "--dry-run" {
-			fmt.Fprintf(os.Stderr, "format-dispatch %s: unrecognized argument %q\n\n%s", label, args[0], usage)
-			return 1
-		}
-		dryRun = true
-	default:
-		fmt.Fprintf(os.Stderr, "format-dispatch %s: unexpected arguments %q\n\n%s", label, args, usage)
+	dryRun, ok := parseDryRun(args, label)
+	if !ok {
 		return 1
 	}
 
