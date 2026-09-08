@@ -399,7 +399,6 @@ func projectDisables(projectRoot, ext, formatterName string) (disabled bool, cfg
 // Names itself "json" and the graphql router "prettier" while biome may run
 // underneath, so a project-level "biome" disable is invisible to extension
 // filtering alone.
-// Keep --check's cache guard on this same predicate.
 func projectRebuildsRouterRegistry(ext string, projectCfg config.Config) bool {
 	if !strings.EqualFold(ext, ".json") &&
 		!strings.EqualFold(ext, ".graphql") &&
