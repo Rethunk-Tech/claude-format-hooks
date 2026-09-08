@@ -22,6 +22,25 @@ import (
 // projectRoot, using biome's own built-in defaults — the same way the
 // bunx-based formatters (prettier, taplo, markdownlint-cli2) format any
 // project regardless of whether that project has opted into their config.
+// biomeConfigNames are the config filenames that mark a directory as the
+// root of a Biome project.
+var biomeConfigNames = []string{"biome.json", "biome.jsonc"}
+
+// biomeUsable reports whether Biome both owns this file's project and has a
+// launcher available, so a router can hand off to it. The routers held byte
+// identical copies of this decision; keeping it in one place is what stops
+// them drifting apart.
+func biomeUsable(projectRoot, abs string, disabled bool) bool {
+	if disabled || cachedFindUpward(filepath.Dir(abs), projectRoot, biomeConfigNames...) == "" {
+		return false
+	}
+	if _, err := lookPath("biome"); err == nil {
+		return true
+	}
+	_, err := lookPath("bunx")
+	return err == nil
+}
+
 type biomeFormatter struct{}
 
 // NewBiome returns the biomeFormatter for JS/TS/JSX/TSX/CSS/JSONC, GraphQL,
@@ -31,7 +50,7 @@ func NewBiome() Formatter { return biomeFormatter{} }
 func (biomeFormatter) Name() string { return "biome" }
 
 func (biomeFormatter) Format(ctx context.Context, projectRoot, abs string) Result {
-	cfgDir := cachedFindUpward(filepath.Dir(abs), projectRoot, "biome.json", "biome.jsonc")
+	cfgDir := cachedFindUpward(filepath.Dir(abs), projectRoot, biomeConfigNames...)
 	if cfgDir == "" {
 		cfgDir = projectRoot
 	}

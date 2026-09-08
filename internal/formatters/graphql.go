@@ -2,7 +2,6 @@ package formatters
 
 import (
 	"context"
-	"path/filepath"
 
 	"github.com/Rethunk-Tech/claude-format-hooks/internal/config"
 )
@@ -34,13 +33,8 @@ func NewGraphQLRouter(cfg config.Config) Formatter {
 func (graphqlRouter) Name() string { return "prettier" }
 
 func (r graphqlRouter) Format(ctx context.Context, projectRoot, abs string) Result {
-	if !r.biomeDisabled && cachedFindUpward(filepath.Dir(abs), projectRoot, "biome.json", "biome.jsonc") != "" {
-		if _, err := lookPath("biome"); err == nil {
-			return r.biome.Format(ctx, projectRoot, abs)
-		}
-		if _, err := lookPath("bunx"); err == nil {
-			return r.biome.Format(ctx, projectRoot, abs)
-		}
+	if biomeUsable(projectRoot, abs, r.biomeDisabled) {
+		return r.biome.Format(ctx, projectRoot, abs)
 	}
 	return r.prettier.Format(ctx, projectRoot, abs)
 }
