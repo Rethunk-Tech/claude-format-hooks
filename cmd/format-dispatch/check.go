@@ -23,8 +23,6 @@ import (
 // would be far too tight.
 const checkTimeout = 15 * time.Minute
 
-var checkWalkDir = filepath.WalkDir
-
 // runCheck reports which of the given paths a formatter would change,
 // without changing them. Directories are walked; unsupported extensions,
 // vendored directories, and file types whose tool is not installed are
@@ -276,7 +274,7 @@ func collectCheckTargets(paths []string) ([]string, error) {
 		if inVendored(absDir, projectRoot, vendorRoot, filepath.Dir(absDir)) {
 			continue
 		}
-		err = checkWalkDir(p, func(path string, d fs.DirEntry, err error) error { //nolint:gosec // walking an operator-supplied directory is the entire contract
+		err = filepath.WalkDir(p, func(path string, d fs.DirEntry, err error) error { //nolint:gosec // walking an operator-supplied directory is the entire contract
 			if err != nil {
 				return err
 			}
