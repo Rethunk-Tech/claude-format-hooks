@@ -202,6 +202,9 @@ func TestInVendoredDir(t *testing.T) {
 		{".agents/skills/foo.md", true},
 		{"dist/bundle.js", true},
 		{"build/out.css", true},
+		{"target/debug/build/foo/out/generated.rs", true},
+		{".orchestrate/contracts-wave1.md", true},
+		{".playwright-mcp/trace.zip", true},
 		{"coverage/lcov.info", true},
 		{"test-results/report.json", true},
 		{"vendor/github.com/foo/bar.go", true},
@@ -217,7 +220,7 @@ func TestInVendoredDir(t *testing.T) {
 		// be treated as vendored.
 		{"node_modules_extra/foo.js", false},
 		{"src/vendored/foo.ts", false},
-		{"target/generated.go", false},
+		{"target_extra/generated.go", false},
 	}
 	for _, tc := range cases {
 		qt.Check(t, qt.Equals(InVendoredDir(tc.path), tc.want), qt.Commentf("path=%q", tc.path))
