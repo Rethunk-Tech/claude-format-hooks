@@ -357,7 +357,7 @@ func projectRootEnv() string {
 // resolveTarget resolves path to an absolute path and its project root,
 // and applies every project-boundary guard shared by every dispatch-bound
 // file: existence (and not-a-directory), containment within projectRoot,
-// and exclusion from vendored directories. skipReason is empty on
+// and exclusion from skipped directories. skipReason is empty on
 // success; otherwise it's why run() should skip this file, suitable for
 // the invocation log as-is.
 func resolveTarget(path string) (abs, projectRoot, skipReason string) {
@@ -388,8 +388,8 @@ func resolveTarget(path string) (abs, projectRoot, skipReason string) {
 	if err != nil {
 		return abs, projectRoot, "skip: relative path error"
 	}
-	if dispatch.InVendoredDir(rel) {
-		return abs, projectRoot, "skip: vendored directory"
+	if dispatch.InSkippedDir(rel) {
+		return abs, projectRoot, "skip: non-source directory"
 	}
 	return abs, projectRoot, ""
 }

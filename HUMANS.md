@@ -41,7 +41,7 @@ unrelated keys are preserved exactly; only their order changes, once.
 ## Usage
 
 Formats supported extensions on each Write/Edit/MultiEdit/NotebookEdit.
-Unsupported extensions and vendored paths are no-ops — see
+Unsupported extensions and skipped paths are no-ops — see
 [AGENTS.md § Invariants](AGENTS.md#invariants).
 
 ```bash
@@ -87,7 +87,7 @@ Removes only this binary's hook entries from Claude and Cursor settings.
 
 ## Troubleshooting
 
-- **Nothing formatted:** extension unsupported/disabled, vendored dir, or missing
+- **Nothing formatted:** extension unsupported/disabled, skipped dir, or missing
   formatter (`bunx`/tool not on PATH; 30s tool-absence cache).
 - **stderr diagnostic:** formatter failed; hook still exits 0. Run the underlying
   tool for full output.

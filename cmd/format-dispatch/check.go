@@ -25,7 +25,7 @@ const checkTimeout = 15 * time.Minute
 
 // runCheck reports which of the given paths a formatter would change,
 // without changing them. Directories are walked; unsupported extensions,
-// vendored directories, and file types whose tool is not installed are
+// skipped directories, and file types whose tool is not installed are
 // skipped.
 //
 // This is the inverse of the hook contract: the hook always exits 0 because
@@ -199,15 +199,15 @@ func copyBeside(abs string, content []byte) (path string, cleanup func(), err er
 	return path, func() { _ = os.Remove(path) }, nil //nolint:gosec // removes only the temp copy created immediately above
 }
 
-// inVendored reports whether abs sits under a vendored directory.
-// dispatch.InVendoredDir matches path SEGMENTS, so abs must first be made
+// inSkipped reports whether abs sits under a skipped directory.
+// dispatch.InSkippedDir matches path SEGMENTS, so abs must first be made
 // relative to a root -- handing it an absolute path would let an unrelated
 // ancestor named "build" or "vendor" silently exclude the whole run. The
 // project root wins, then the working directory, then fallbackRoot for when
 // os.Getwd failed. A path that cannot be made relative at all (a different
 // Windows volume, say) is judged on its own base name.
-func inVendored(abs, projectRoot, vendorRoot, fallbackRoot string) bool {
-	relRoot := vendorRoot
+func inSkipped(abs, projectRoot, workingRoot, fallbackRoot string) bool {
+	relRoot := workingRoot
 	if projectRoot != "" {
 		relRoot = projectRoot
 	} else if relRoot == "" {
@@ -217,22 +217,22 @@ func inVendored(abs, projectRoot, vendorRoot, fallbackRoot string) bool {
 	if err != nil {
 		rel = filepath.Base(abs)
 	}
-	return dispatch.InVendoredDir(rel)
+	return dispatch.InSkippedDir(rel)
 }
 
 // collectCheckTargets expands the given paths into a sorted, deduplicated
-// file list, walking directories and applying the same vendored-directory
+// file list, walking directories and applying the same skipped-directory
 // exclusion the hook uses. Sorting keeps output stable so a CI diff of two
 // runs is meaningful.
 func collectCheckTargets(paths []string) ([]string, error) {
 	seen := map[string]bool{}
 	projectRoot := projectRootEnv()
-	vendorRoot, err := os.Getwd()
+	workingRoot, err := os.Getwd()
 	if err != nil {
-		vendorRoot = ""
+		workingRoot = ""
 	}
 
-	// InVendoredDir matches path SEGMENTS, so it must be given a path
+	// InSkippedDir matches path SEGMENTS, so it must be given a path
 	// relative to the project or working directory -- handing it an absolute
 	// path would let an unrelated ancestor directory named "build" or
 	// "vendor" silently exclude the whole run.
@@ -249,7 +249,7 @@ func collectCheckTargets(paths []string) ([]string, error) {
 		if projectRoot != "" && !within(abs, projectRoot) {
 			return
 		}
-		if inVendored(abs, projectRoot, vendorRoot, root) {
+		if inSkipped(abs, projectRoot, workingRoot, root) {
 			return
 		}
 		seen[abs] = true
@@ -271,7 +271,7 @@ func collectCheckTargets(paths []string) ([]string, error) {
 		if projectRoot != "" && !within(absDir, projectRoot) {
 			continue
 		}
-		if inVendored(absDir, projectRoot, vendorRoot, filepath.Dir(absDir)) {
+		if inSkipped(absDir, projectRoot, workingRoot, filepath.Dir(absDir)) {
 			continue
 		}
 		err = filepath.WalkDir(p, func(path string, d fs.DirEntry, err error) error { //nolint:gosec // walking an operator-supplied directory is the entire contract
@@ -283,9 +283,9 @@ func collectCheckTargets(paths []string) ([]string, error) {
 				rel = path
 			}
 			if d.IsDir() {
-				// Prune rather than filter per-file: skipping a vendored
+				// Prune rather than filter per-file: skipping a non-source
 				// tree at its root avoids walking node_modules at all.
-				if rel != "." && dispatch.InVendoredDir(rel) {
+				if rel != "." && dispatch.InSkippedDir(rel) {
 					return fs.SkipDir
 				}
 				return nil

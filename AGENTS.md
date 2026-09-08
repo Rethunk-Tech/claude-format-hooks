@@ -32,7 +32,7 @@ Single package: `go test -race -v ./internal/formatters/...`.
 | [`internal/hookio/`](internal/hookio/) | Stdin → file path (Claude + Cursor schemas) |
 | [`internal/diskcache/`](internal/diskcache/) | TTL disk cache shared by config + formatters |
 | [`internal/config/`](internal/config/) | Indent: defaults → user config → `.editorconfig` |
-| [`internal/dispatch/`](internal/dispatch/) | Extension registry, vendored-dir skip list |
+| [`internal/dispatch/`](internal/dispatch/) | Extension registry, non-source skip list |
 | [`internal/formatters/`](internal/formatters/) | Per-type formatters (native + external) |
 | [`internal/installer/`](internal/installer/) | Hook wiring, upgrade, bunx tool provisioning |
 

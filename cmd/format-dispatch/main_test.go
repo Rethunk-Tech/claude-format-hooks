@@ -128,7 +128,7 @@ func TestResolveTarget(t *testing.T) {
 				path := filepath.Join(projectRoot, "node_modules", "package", "file.json")
 				writeFile(t, path, "content")
 				t.Setenv("CLAUDE_PROJECT_DIR", projectRoot)
-				return path, path, projectRoot, "skip: vendored directory"
+				return path, path, projectRoot, "skip: non-source directory"
 			},
 		},
 		{

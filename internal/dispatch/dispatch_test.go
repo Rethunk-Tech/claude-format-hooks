@@ -188,7 +188,7 @@ func TestDispatchSkipsMissingFormatter(t *testing.T) {
 	qt.Check(t, qt.IsNil(result.Err))
 }
 
-func TestInVendoredDir(t *testing.T) {
+func TestInSkippedDir(t *testing.T) {
 	cases := []struct {
 		path string
 		want bool
@@ -215,14 +215,14 @@ func TestInVendoredDir(t *testing.T) {
 		{"src/.mypy_cache/3.12/module.meta.json", true},
 		{".pytest_cache/v/cache/nodeids", true},
 		{"tests/.tox/py312/bin/python", true},
-		// A directory name that merely contains a vendored segment as a
+		// A directory name that merely contains a skipped segment as a
 		// substring, rather than matching a full path segment, must not
-		// be treated as vendored.
+		// be treated as skipped.
 		{"node_modules_extra/foo.js", false},
 		{"src/vendored/foo.ts", false},
 		{"target_extra/generated.go", false},
 	}
 	for _, tc := range cases {
-		qt.Check(t, qt.Equals(InVendoredDir(tc.path), tc.want), qt.Commentf("path=%q", tc.path))
+		qt.Check(t, qt.Equals(InSkippedDir(tc.path), tc.want), qt.Commentf("path=%q", tc.path))
 	}
 }

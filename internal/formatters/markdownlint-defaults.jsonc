@@ -59,7 +59,7 @@
 	// Only reached when markdownlint-cli2 is pointed at a glob -- the hook
 	// always hands it one already-filtered absolute path. Kept because this
 	// file is materialized into ~/.claude for operators to run directly.
-	// vendoredDirs in internal/dispatch/dispatch.go owns this list; mirror it
+	// skipDirs in internal/dispatch/dispatch.go owns this list; mirror it
 	// there, not here.
 	"ignores": [
 		"**/node_modules",

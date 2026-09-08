@@ -97,9 +97,12 @@ func NewRegistry(cfg config.Config) *Registry {
 	return &Registry{byExt: all}
 }
 
-// vendoredDirs are path segments never worth formatting: build output,
-// dependency trees, language/tool caches, and VCS metadata.
-var vendoredDirs = map[string]bool{
+// skipDirs are path segments that never hold hand-authored source, so
+// formatting them is wasted or wrong: build output, dependency trees,
+// language/tool caches, VCS metadata, and agent scratch. Only some of
+// these are vendored third-party code; membership is about the segment
+// never being authored by hand, not about where the bytes came from.
+var skipDirs = map[string]bool{
 	"node_modules":    true,
 	".next":           true,
 	".yarn":           true,
@@ -164,17 +167,17 @@ func KnownExtension(ext string) bool {
 	return knownExtensions[strings.ToLower(ext)]
 }
 
-// InVendoredDir reports whether relPath (relative to the project root)
+// InSkippedDir reports whether relPath (relative to the project root)
 // passes through a directory that should never be auto-formatted.
-func InVendoredDir(relPath string) bool {
+func InSkippedDir(relPath string) bool {
 	segs := strings.Split(filepath.ToSlash(relPath), "/")
-	return slices.ContainsFunc(segs, func(seg string) bool { return vendoredDirs[seg] })
+	return slices.ContainsFunc(segs, func(seg string) bool { return skipDirs[seg] })
 }
 
 // Dispatch routes abs to the formatter registered for ext.
 // Callers pass the already-resolved extension (which may differ from
 // filepath.Ext(abs) for extensionless shell-shebang paths) and must
-// already have confirmed Supported(ext) and !InVendoredDir(...);
+// already have confirmed Supported(ext) and !InSkippedDir(...);
 // Dispatch does not re-check either.
 func (r *Registry) Dispatch(ctx context.Context, projectRoot, abs, ext string) formatters.Result {
 	f := r.byExt[strings.ToLower(ext)]
