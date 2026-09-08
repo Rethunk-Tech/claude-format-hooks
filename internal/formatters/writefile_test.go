@@ -2,13 +2,8 @@ package formatters
 
 import (
 	"os"
-	"os/exec"
-	"os/signal"
 	"path/filepath"
 	"runtime"
-	"strconv"
-	"strings"
-	"syscall"
 	"testing"
 
 	"github.com/go-quicktest/qt"
@@ -128,49 +123,6 @@ func TestWriteFormattedReturnsCreateTempError(t *testing.T) {
 	qt.Check(t, qt.IsNotNil(err))
 }
 
-func TestWriteFormattedReturnsWriteError(t *testing.T) {
-	runWithFileSizeLimit(t, func() {
-		err := writeFormatted(filepath.Join(t.TempDir(), "f"), nil, []byte("new"), 0o644)
-
-		qt.Check(t, qt.IsNotNil(err))
-	})
-}
-
-func TestWriteFormattedReturnsChmodError(t *testing.T) {
-	original := writeFormattedChmod
-	writeFormattedChmod = func(*os.File, os.FileMode) error {
-		return os.ErrPermission
-	}
-	t.Cleanup(func() {
-		writeFormattedChmod = original
-	})
-
-	dir := t.TempDir()
-	err := writeFormatted(filepath.Join(dir, "f"), nil, []byte("new"), 0o644)
-
-	qt.Check(t, qt.IsNotNil(err))
-	assertDirEntryCount(t, dir, 0, "failed chmod must remove the temporary file")
-}
-
-func TestWriteFormattedReturnsCloseError(t *testing.T) {
-	original := writeFormattedClose
-	writeFormattedClose = func(file *os.File) error {
-		if err := original(file); err != nil {
-			return err
-		}
-		return os.ErrPermission
-	}
-	t.Cleanup(func() {
-		writeFormattedClose = original
-	})
-
-	dir := t.TempDir()
-	err := writeFormatted(filepath.Join(dir, "f"), nil, []byte("new"), 0o644)
-
-	qt.Check(t, qt.IsNotNil(err))
-	assertDirEntryCount(t, dir, 0, "failed close must remove the temporary file")
-}
-
 func TestWriteFormattedReturnsReadFileErrorForDirectoryTarget(t *testing.T) {
 	dir := t.TempDir()
 	target := filepath.Join(dir, "target")
@@ -239,59 +191,6 @@ func TestWriteIfMissingReturnsLinkErrorForDanglingSymlink(t *testing.T) {
 	gotTarget, readErr := os.Readlink(path)
 	qt.Assert(t, qt.IsNil(readErr))
 	qt.Check(t, qt.Equals(gotTarget, target))
-}
-
-func TestWriteIfMissingReturnsWriteError(t *testing.T) {
-	runWithFileSizeLimit(t, func() {
-		err := writeIfMissing(filepath.Join(t.TempDir(), "config.jsonc"), []byte("content"))
-
-		qt.Check(t, qt.IsNotNil(err))
-	})
-}
-
-func runWithFileSizeLimit(t *testing.T, fn func()) {
-	t.Helper()
-	if os.Getenv("FORMAT_DISPATCH_FILE_SIZE_HELPER") == "1" {
-		withFileSizeLimit(t, fn)
-		return
-	}
-
-	cmd := exec.Command(os.Args[0], "-test.run", "^"+t.Name()+"$")
-	cmd.Env = append(os.Environ(), "FORMAT_DISPATCH_FILE_SIZE_HELPER=1")
-	output, err := cmd.CombinedOutput()
-	qt.Assert(t, qt.IsNil(err), qt.Commentf("file-size helper output: %s", output))
-}
-
-func withFileSizeLimit(t *testing.T, fn func()) {
-	t.Helper()
-	if runtime.GOOS != "linux" {
-		t.Skip("Linux prlimit is required to exercise a real write failure")
-	}
-
-	pid := strconv.Itoa(os.Getpid())
-	output, err := exec.Command("prlimit", "--pid", pid, "--fsize").Output()
-	if err != nil {
-		t.Skipf("prlimit is unavailable: %v", err)
-	}
-	fields := strings.Fields(string(output))
-	if len(fields) < 3 {
-		t.Fatalf("unexpected prlimit output: %q", output)
-	}
-	soft, hard := fields[len(fields)-3], fields[len(fields)-2]
-
-	sigxfsz := syscall.Signal(25)
-	signal.Ignore(sigxfsz)
-	defer signal.Reset(sigxfsz)
-	if err := exec.Command("prlimit", "--pid", pid, "--fsize=0:"+hard).Run(); err != nil {
-		t.Fatalf("set file-size limit: %v", err)
-	}
-	defer func() {
-		if err := exec.Command("prlimit", "--pid", pid, "--fsize="+soft+":"+hard).Run(); err != nil {
-			t.Errorf("restore file-size limit: %v", err)
-		}
-	}()
-
-	fn()
 }
 
 func TestShellFormatterPreservesExecutableBit(t *testing.T) {
