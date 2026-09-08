@@ -102,9 +102,7 @@ func settingsPostToolUse(t *testing.T, raw []byte) []PostToolUseEntry {
 }
 
 func TestWireFreshInstall(t *testing.T) {
-	dir := t.TempDir()
-	settingsPath := filepath.Join(dir, "settings.json")
-	qt.Assert(t, qt.IsNil(os.WriteFile(settingsPath, []byte(`{"theme":"dark"}`), 0o600)))
+	settingsPath := settingsFile(t, `{"theme":"dark"}`)
 
 	_, after, err := Wire(settingsPath, binPath)
 	qt.Assert(t, qt.IsNil(err))
@@ -149,22 +147,16 @@ func TestUnwireReportsUnreadableSettingsFile(t *testing.T) {
 }
 
 func TestWireMissingSettingsFile(t *testing.T) {
-	dir := t.TempDir()
-	settingsPath := filepath.Join(dir, "settings.json")
+	settingsPath := settingsFile(t, "")
 
 	_, after, err := Wire(settingsPath, binPath)
 	qt.Assert(t, qt.IsNil(err))
 
-	entries := settingsPostToolUse(t, after)
-	qt.Assert(t, qt.HasLen(entries, 1))
-	qt.Check(t, qt.Equals(entries[0].Matcher, "Write|Edit|MultiEdit|NotebookEdit"))
-	qt.Check(t, qt.Equals(entries[0].Hooks[0].Command, binPath))
+	assertOnlyOurEntry(t, after, binPath)
 }
 
 func TestWireIdempotentReinstall(t *testing.T) {
-	dir := t.TempDir()
-	settingsPath := filepath.Join(dir, "settings.json")
-	qt.Assert(t, qt.IsNil(os.WriteFile(settingsPath, []byte(`{}`), 0o600)))
+	settingsPath := settingsFile(t, `{}`)
 
 	_, first, err := Wire(settingsPath, binPath)
 	qt.Assert(t, qt.IsNil(err))
@@ -179,17 +171,8 @@ func TestWireIdempotentReinstall(t *testing.T) {
 }
 
 func TestWireReplacesLegacyBareBasename(t *testing.T) {
-	dir := t.TempDir()
-	settingsPath := filepath.Join(dir, "settings.json")
+	settingsPath := settingsFile(t, settingsWithHook(binPath))
 	exeBinPath := filepath.Join(t.TempDir(), "format-dispatch.exe")
-	existing := `{
-		"hooks": {
-			"PostToolUse": [
-				{"matcher": "Write|Edit|MultiEdit|NotebookEdit", "hooks": [{"type": "command", "command": "` + binPath + `"}]}
-			]
-		}
-	}`
-	qt.Assert(t, qt.IsNil(os.WriteFile(settingsPath, []byte(existing), 0o600)))
 
 	_, after, err := Wire(settingsPath, exeBinPath)
 	qt.Assert(t, qt.IsNil(err))
@@ -200,17 +183,8 @@ func TestWireReplacesLegacyBareBasename(t *testing.T) {
 }
 
 func TestUnwireExeRemovesLegacyBareBasename(t *testing.T) {
-	dir := t.TempDir()
-	settingsPath := filepath.Join(dir, "settings.json")
+	settingsPath := settingsFile(t, settingsWithHook(binPath))
 	exeBinPath := filepath.Join(t.TempDir(), "format-dispatch.exe")
-	existing := `{
-		"hooks": {
-			"PostToolUse": [
-				{"matcher": "Write|Edit|MultiEdit|NotebookEdit", "hooks": [{"type": "command", "command": "` + binPath + `"}]}
-			]
-		}
-	}`
-	qt.Assert(t, qt.IsNil(os.WriteFile(settingsPath, []byte(existing), 0o600)))
 
 	_, after, err := Unwire(settingsPath, exeBinPath)
 	qt.Assert(t, qt.IsNil(err))
@@ -289,9 +263,7 @@ func TestWirePreservesUnrelatedHooks(t *testing.T) {
 }
 
 func TestUnwireRemovesOwnEntry(t *testing.T) {
-	dir := t.TempDir()
-	settingsPath := filepath.Join(dir, "settings.json")
-	qt.Assert(t, qt.IsNil(os.WriteFile(settingsPath, []byte(`{"theme":"dark"}`), 0o600)))
+	settingsPath := settingsFile(t, `{"theme":"dark"}`)
 
 	_, wired, err := Wire(settingsPath, binPath)
 	qt.Assert(t, qt.IsNil(err))
@@ -332,9 +304,7 @@ func TestUnwirePreservesOtherEntries(t *testing.T) {
 }
 
 func TestUnwireNoOwnEntryIsIdempotent(t *testing.T) {
-	dir := t.TempDir()
-	settingsPath := filepath.Join(dir, "settings.json")
-	qt.Assert(t, qt.IsNil(os.WriteFile(settingsPath, []byte(`{"theme":"dark"}`), 0o600)))
+	settingsPath := settingsFile(t, `{"theme":"dark"}`)
 
 	_, after, err := Unwire(settingsPath, binPath)
 	qt.Assert(t, qt.IsNil(err))
@@ -422,8 +392,7 @@ func TestInstallBacksUpExistingSettings(t *testing.T) {
 }
 
 func TestInstallFreshInstallWritesNoBackup(t *testing.T) {
-	dir := t.TempDir()
-	settingsPath := filepath.Join(dir, "settings.json")
+	settingsPath := settingsFile(t, "")
 
 	var out strings.Builder
 	qt.Assert(t, qt.IsNil(Install(Options{BinPath: binPath, SettingsPath: settingsPath}, false, &out)))
@@ -433,9 +402,7 @@ func TestInstallFreshInstallWritesNoBackup(t *testing.T) {
 }
 
 func TestInstallSecondRunOverwritesRollingBackup(t *testing.T) {
-	dir := t.TempDir()
-	settingsPath := filepath.Join(dir, "settings.json")
-	qt.Assert(t, qt.IsNil(os.WriteFile(settingsPath, []byte(`{"theme":"dark"}`), 0o600)))
+	settingsPath := settingsFile(t, `{"theme":"dark"}`)
 
 	var out strings.Builder
 	qt.Assert(t, qt.IsNil(Install(Options{BinPath: binPath, SettingsPath: settingsPath}, false, &out)))
@@ -449,31 +416,23 @@ func TestInstallSecondRunOverwritesRollingBackup(t *testing.T) {
 }
 
 func TestInstallDryRunDoesNotWrite(t *testing.T) {
-	dir := t.TempDir()
-	settingsPath := filepath.Join(dir, "settings.json")
-	qt.Assert(t, qt.IsNil(os.WriteFile(settingsPath, []byte(`{}`), 0o600)))
-	cursorPath := filepath.Join(dir, "hooks.json")
-	cursorBefore := []byte(`{"version":1,"hooks":{"sessionStart":[{"command":"session-start","timeout":5}]}}`)
-	qt.Assert(t, qt.IsNil(os.WriteFile(cursorPath, cursorBefore, 0o600)))
+	settingsPath := settingsFile(t, `{}`)
+	const cursorBefore = `{"version":1,"hooks":{"sessionStart":[{"command":"session-start","timeout":5}]}}`
+	cursorPath := cursorFile(t, cursorBefore)
 
 	var out strings.Builder
 	opts := Options{BinPath: binPath, SettingsPath: settingsPath, CursorHooksPath: cursorPath}
 	err := Install(opts, true, &out)
 	qt.Assert(t, qt.IsNil(err))
 
-	raw, err := os.ReadFile(settingsPath)
-	qt.Assert(t, qt.IsNil(err))
-	qt.Check(t, qt.Equals(string(raw), "{}"))
-	cursorRaw, err := os.ReadFile(cursorPath)
-	qt.Assert(t, qt.IsNil(err))
-	qt.Check(t, qt.DeepEquals(cursorRaw, cursorBefore))
+	qt.Check(t, qt.Equals(string(readFile(t, settingsPath)), "{}"))
+	qt.Check(t, qt.Equals(string(readFile(t, cursorPath)), cursorBefore))
 	qt.Check(t, qt.StringContains(out.String(), "dry-run"))
 	qt.Check(t, qt.StringContains(out.String(), cursorPath))
 }
 
 func TestInstallWritesSettings(t *testing.T) {
-	dir := t.TempDir()
-	settingsPath := filepath.Join(dir, "settings.json")
+	settingsPath := settingsFile(t, "")
 
 	var out strings.Builder
 	err := Install(Options{BinPath: binPath, SettingsPath: settingsPath}, false, &out)
@@ -485,9 +444,7 @@ func TestInstallWritesSettings(t *testing.T) {
 }
 
 func TestParseSettingsReportsMalformedTopLevelJSON(t *testing.T) {
-	dir := t.TempDir()
-	settingsPath := filepath.Join(dir, "settings.json")
-	qt.Assert(t, qt.IsNil(os.WriteFile(settingsPath, []byte(`{"hooks":`), 0o600)))
+	settingsPath := settingsFile(t, `{"hooks":`)
 
 	_, _, err := Wire(settingsPath, binPath)
 	qt.Assert(t, qt.IsNotNil(err))
@@ -495,9 +452,7 @@ func TestParseSettingsReportsMalformedTopLevelJSON(t *testing.T) {
 }
 
 func TestParseSettingsReportsHooksObjectError(t *testing.T) {
-	dir := t.TempDir()
-	settingsPath := filepath.Join(dir, "settings.json")
-	qt.Assert(t, qt.IsNil(os.WriteFile(settingsPath, []byte(`{"hooks":[]}`), 0o600)))
+	settingsPath := settingsFile(t, `{"hooks":[]}`)
 
 	_, _, err := Wire(settingsPath, binPath)
 	qt.Assert(t, qt.IsNotNil(err))
@@ -505,9 +460,7 @@ func TestParseSettingsReportsHooksObjectError(t *testing.T) {
 }
 
 func TestParseSettingsReportsPostToolUseArrayError(t *testing.T) {
-	dir := t.TempDir()
-	settingsPath := filepath.Join(dir, "settings.json")
-	qt.Assert(t, qt.IsNil(os.WriteFile(settingsPath, []byte(`{"hooks":{"PostToolUse":{}}}`), 0o600)))
+	settingsPath := settingsFile(t, `{"hooks":{"PostToolUse":{}}}`)
 
 	_, _, err := Wire(settingsPath, binPath)
 	qt.Assert(t, qt.IsNotNil(err))
@@ -585,14 +538,7 @@ func TestApplyChangeReportsBackupWriteFailure(t *testing.T) {
 	qt.Assert(t, qt.IsNil(os.Mkdir(backupPath, 0o755)))
 
 	var out strings.Builder
-	err := applyChange(
-		Options{SettingsPath: settingsPath},
-		[]byte(`{"before":true}`),
-		[]byte(`{"after":true}`),
-		false,
-		&out,
-		"updated",
-	)
+	err := applyFixedChange(settingsPath, &out)
 	qt.Assert(t, qt.IsNotNil(err))
 	qt.Check(t, qt.StringContains(err.Error(), "backup "+settingsPath+":"))
 }
@@ -602,14 +548,7 @@ func TestApplyChangeReportsSettingsReadFailure(t *testing.T) {
 	qt.Assert(t, qt.IsNil(os.Mkdir(settingsPath, 0o755)))
 
 	var out strings.Builder
-	err := applyChange(
-		Options{SettingsPath: settingsPath},
-		[]byte(`{"before":true}`),
-		[]byte(`{"after":true}`),
-		false,
-		&out,
-		"updated",
-	)
+	err := applyFixedChange(settingsPath, &out)
 	qt.Check(t, qt.IsNotNil(err))
 }
 
@@ -633,14 +572,7 @@ func TestApplyChangeReportsMkdirFailure(t *testing.T) {
 
 	settingsPath := filepath.Join(blocked, "nested", "settings.json")
 	var out strings.Builder
-	err := applyChange(
-		Options{SettingsPath: settingsPath},
-		[]byte(`{"before":true}`),
-		[]byte(`{"after":true}`),
-		false,
-		&out,
-		"updated",
-	)
+	err := applyFixedChange(settingsPath, &out)
 	qt.Check(t, qt.IsNotNil(err))
 }
 
@@ -662,14 +594,7 @@ func TestApplyChangeReportsSettingsWriteFailure(t *testing.T) {
 
 	settingsPath := filepath.Join(dir, "settings.json")
 	var out strings.Builder
-	err := applyChange(
-		Options{SettingsPath: settingsPath},
-		[]byte(`{"before":true}`),
-		[]byte(`{"after":true}`),
-		false,
-		&out,
-		"updated",
-	)
+	err := applyFixedChange(settingsPath, &out)
 	qt.Check(t, qt.IsNotNil(err))
 }
 
