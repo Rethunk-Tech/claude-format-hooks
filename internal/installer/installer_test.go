@@ -763,10 +763,3 @@ func withFileSizeLimit(t *testing.T, fn func()) {
 
 	fn()
 }
-
-func readFile(t *testing.T, path string) []byte {
-	t.Helper()
-	raw, err := os.ReadFile(path)
-	qt.Assert(t, qt.IsNil(err))
-	return raw
-}

@@ -12,6 +12,8 @@ import (
 	"strings"
 	"sync/atomic"
 	"testing"
+
+	"github.com/go-quicktest/qt"
 )
 
 func TestUpgradeHappyPathPreservesModeAndSettings(t *testing.T) {
@@ -19,64 +21,27 @@ func TestUpgradeHappyPathPreservesModeAndSettings(t *testing.T) {
 	server, _, binaryRequests, checksumRequests := upgradeTestServer(t, binary, binary)
 	defer server.Close()
 
-	dir := t.TempDir()
-	target := HookBinaryPath(dir)
 	oldBinary := []byte("old release binary\n")
-	if err := os.WriteFile(target, oldBinary, 0o751); err != nil {
-		t.Fatal(err)
-	}
-	settingsPath := filepath.Join(dir, "settings.json")
+	target := installedBinary(t, oldBinary, 0o751)
+	settingsPath := filepath.Join(filepath.Dir(target), "settings.json")
 	settings := []byte(`{"hooks":{"PostToolUse":[]}}`)
-	if err := os.WriteFile(settingsPath, settings, 0o600); err != nil {
-		t.Fatal(err)
-	}
+	qt.Assert(t, qt.IsNil(os.WriteFile(settingsPath, settings, 0o600)))
 
 	var out bytes.Buffer
 	err := upgradeWithConfig(Options{
 		BinPath:      target,
 		SettingsPath: settingsPath,
-	}, false, &out, upgradeConfig{
-		client:     server.Client(),
-		apiBaseURL: server.URL,
-		goos:       runtime.GOOS,
-		goarch:     runtime.GOARCH,
-	})
+	}, false, &out, releaseConfig(server))
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	got, err := os.ReadFile(target)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if !bytes.Equal(got, binary) {
-		t.Fatalf("upgraded binary = %q, want %q", got, binary)
-	}
-	info, err := os.Stat(target)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if runtime.GOOS != "windows" {
-		if got, want := info.Mode().Perm(), os.FileMode(0o751); got != want {
-			t.Fatalf("upgraded mode = %o, want %o", got, want)
-		}
-	}
-	gotSettings, err := os.ReadFile(settingsPath)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if !bytes.Equal(gotSettings, settings) {
-		t.Fatalf("settings changed from %q to %q", settings, gotSettings)
-	}
-	if got := binaryRequests.Load(); got != 1 {
-		t.Fatalf("binary requests = %d, want 1", got)
-	}
-	if got := checksumRequests.Load(); got != 1 {
-		t.Fatalf("checksum requests = %d, want 1", got)
-	}
-	if _, err := os.Stat(target + ".tmp"); !os.IsNotExist(err) {
-		t.Fatalf("temporary replacement file still exists: %v", err)
-	}
+	assertFileIs(t, target, binary, "upgraded binary")
+	assertPerm(t, target, 0o751)
+	assertFileIs(t, settingsPath, settings, "upgrade must not touch settings")
+	assertRequests(t, "binary", binaryRequests, 1)
+	assertRequests(t, "checksum", checksumRequests, 1)
+	assertNoScratchLeftBehind(t, target)
 	if !strings.Contains(out.String(), "upgraded") {
 		t.Fatalf("upgrade output = %q, want success message", out.String())
 	}
@@ -135,42 +100,17 @@ func TestUpgradeChecksumMismatchLeavesBinaryUntouched(t *testing.T) {
 	server, _, _, _ := upgradeTestServer(t, binary, []byte("different binary\n"))
 	defer server.Close()
 
-	dir := t.TempDir()
-	target := HookBinaryPath(dir)
 	oldBinary := []byte("old release binary\n")
-	if err := os.WriteFile(target, oldBinary, 0o700); err != nil {
-		t.Fatal(err)
-	}
+	target := installedBinary(t, oldBinary, 0o700)
 
-	err := upgradeWithConfig(Options{BinPath: target}, false, nil, upgradeConfig{
-		client:     server.Client(),
-		apiBaseURL: server.URL,
-		goos:       runtime.GOOS,
-		goarch:     runtime.GOARCH,
-	})
+	err := upgradeWithConfig(Options{BinPath: target}, false, nil, releaseConfig(server))
 	if err == nil || !strings.Contains(err.Error(), "checksum mismatch") {
 		t.Fatalf("upgrade error = %v, want checksum mismatch", err)
 	}
 
-	got, err := os.ReadFile(target)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if !bytes.Equal(got, oldBinary) {
-		t.Fatalf("binary changed after checksum mismatch: %q", got)
-	}
-	info, err := os.Stat(target)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if runtime.GOOS != "windows" {
-		if got, want := info.Mode().Perm(), os.FileMode(0o700); got != want {
-			t.Fatalf("binary mode = %o, want %o", got, want)
-		}
-	}
-	if _, err := os.Stat(target + ".tmp"); !os.IsNotExist(err) {
-		t.Fatalf("temporary replacement file still exists: %v", err)
-	}
+	assertFileIs(t, target, oldBinary, "binary changed after checksum mismatch")
+	assertPerm(t, target, 0o700)
+	assertNoScratchLeftBehind(t, target)
 }
 
 func TestUpgradeDryRunDoesNotWriteOrDownloadAssets(t *testing.T) {
@@ -178,39 +118,18 @@ func TestUpgradeDryRunDoesNotWriteOrDownloadAssets(t *testing.T) {
 	server, releaseRequests, binaryRequests, checksumRequests := upgradeTestServer(t, binary, binary)
 	defer server.Close()
 
-	dir := t.TempDir()
-	target := HookBinaryPath(dir)
 	oldBinary := []byte("old release binary\n")
-	if err := os.WriteFile(target, oldBinary, 0o751); err != nil {
-		t.Fatal(err)
-	}
+	target := installedBinary(t, oldBinary, 0o751)
 
 	var out bytes.Buffer
-	err := upgradeWithConfig(Options{BinPath: target}, true, &out, upgradeConfig{
-		client:     server.Client(),
-		apiBaseURL: server.URL,
-		goos:       runtime.GOOS,
-		goarch:     runtime.GOARCH,
-	})
+	err := upgradeWithConfig(Options{BinPath: target}, true, &out, releaseConfig(server))
 	if err != nil {
 		t.Fatal(err)
 	}
-	got, err := os.ReadFile(target)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if !bytes.Equal(got, oldBinary) {
-		t.Fatalf("dry-run changed binary: %q", got)
-	}
-	if got := releaseRequests.Load(); got != 0 {
-		t.Fatalf("dry-run release requests = %d, want 0", got)
-	}
-	if got := binaryRequests.Load(); got != 0 {
-		t.Fatalf("dry-run binary requests = %d, want 0", got)
-	}
-	if got := checksumRequests.Load(); got != 0 {
-		t.Fatalf("dry-run checksum requests = %d, want 0", got)
-	}
+	assertFileIs(t, target, oldBinary, "dry-run changed binary")
+	assertRequests(t, "release", releaseRequests, 0)
+	assertRequests(t, "binary", binaryRequests, 0)
+	assertRequests(t, "checksum", checksumRequests, 0)
 	if !strings.Contains(out.String(), "--dry-run") || !strings.Contains(out.String(), target) {
 		t.Fatalf("dry-run output = %q, want plan with target", out.String())
 	}
@@ -227,13 +146,7 @@ func TestUpgradeUsesReleaseAPIEnvironmentOverride(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	got, err := os.ReadFile(target)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if !bytes.Equal(got, binary) {
-		t.Fatalf("upgraded binary = %q, want %q", got, binary)
-	}
+	assertFileIs(t, target, binary, "upgraded binary")
 }
 
 func TestFetchHTTPRejectsOversizedContentLength(t *testing.T) {
@@ -341,22 +254,11 @@ func TestUpgradeOversizedBinaryLeavesInstalledBinaryUntouched(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	err := upgradeWithConfig(Options{BinPath: target}, false, nil, upgradeConfig{
-		client:     server.Client(),
-		apiBaseURL: server.URL,
-		goos:       runtime.GOOS,
-		goarch:     runtime.GOARCH,
-	})
+	err := upgradeWithConfig(Options{BinPath: target}, false, nil, releaseConfig(server))
 	if err == nil || !strings.Contains(err.Error(), "exceeds maximum download size") {
 		t.Fatalf("upgrade error = %v, want download size error", err)
 	}
-	got, err := os.ReadFile(target)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if !bytes.Equal(got, oldBinary) {
-		t.Fatalf("binary changed after oversized download: %q", got)
-	}
+	assertFileIs(t, target, oldBinary, "binary changed after oversized download")
 }
 
 func TestUpgradeFreshInstallUsesExecutableMode(t *testing.T) {
@@ -365,12 +267,7 @@ func TestUpgradeFreshInstallUsesExecutableMode(t *testing.T) {
 	defer server.Close()
 
 	target := HookBinaryPath(filepath.Join(t.TempDir(), "nested", "bin"))
-	err := upgradeWithConfig(Options{BinPath: target}, false, nil, upgradeConfig{
-		client:     server.Client(),
-		apiBaseURL: server.URL,
-		goos:       runtime.GOOS,
-		goarch:     runtime.GOARCH,
-	})
+	err := upgradeWithConfig(Options{BinPath: target}, false, nil, releaseConfig(server))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -397,12 +294,7 @@ func TestUpgradeMissingBinaryAsset(t *testing.T) {
 		runtime.GOOS, runtime.GOARCH, false, true)
 	defer server.Close()
 
-	err := upgradeWithConfig(Options{BinPath: HookBinaryPath(t.TempDir())}, false, nil, upgradeConfig{
-		client:     server.Client(),
-		apiBaseURL: server.URL,
-		goos:       runtime.GOOS,
-		goarch:     runtime.GOARCH,
-	})
+	err := upgradeWithConfig(Options{BinPath: HookBinaryPath(t.TempDir())}, false, nil, releaseConfig(server))
 	if err == nil || !strings.Contains(err.Error(), "has no asset") {
 		t.Fatalf("upgrade error = %v, want missing binary asset error", err)
 	}
@@ -413,12 +305,7 @@ func TestUpgradeMissingChecksumAsset(t *testing.T) {
 		runtime.GOOS, runtime.GOARCH, true, false)
 	defer server.Close()
 
-	err := upgradeWithConfig(Options{BinPath: HookBinaryPath(t.TempDir())}, false, nil, upgradeConfig{
-		client:     server.Client(),
-		apiBaseURL: server.URL,
-		goos:       runtime.GOOS,
-		goarch:     runtime.GOARCH,
-	})
+	err := upgradeWithConfig(Options{BinPath: HookBinaryPath(t.TempDir())}, false, nil, releaseConfig(server))
 	if err == nil || !strings.Contains(err.Error(), "has no asset") {
 		t.Fatalf("upgrade error = %v, want missing checksum asset error", err)
 	}
@@ -439,13 +326,7 @@ func TestUpgradeWindowsAssetPairOnLinux(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	got, err := os.ReadFile(target)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if !bytes.Equal(got, binary) {
-		t.Fatalf("windows asset result = %q, want %q", got, binary)
-	}
+	assertFileIs(t, target, binary, "windows asset result")
 }
 
 func upgradeTestServer(t *testing.T, binary, checksumBinary []byte) (*httptest.Server, *atomic.Int32, *atomic.Int32, *atomic.Int32) {
