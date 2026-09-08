@@ -538,7 +538,7 @@ func TestCheckProjectRoot(t *testing.T) {
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
 			paths, abs, want := tc.setup(t)
-			qt.Check(t, qt.Equals(checkProjectRoot(paths, abs), want))
+			qt.Check(t, qt.Equals(checkProjectRoot(checkRootCandidates(paths), abs), want))
 		})
 	}
 }

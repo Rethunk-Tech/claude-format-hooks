@@ -54,6 +54,7 @@ func runCheck(args []string, out, errOut io.Writer) int {
 		return 2
 	}
 	var wouldChange []string
+	rootCandidates := checkRootCandidates(args)
 	// Built on the first supported file, not up front: a run over files no
 	// formatter handles must stay silent, even about a malformed config.
 	var registry *dispatch.Registry
@@ -69,7 +70,7 @@ func runCheck(args []string, out, errOut io.Writer) int {
 		if cfg.IsDisabled(ext) || !registry.Supported(ext) {
 			continue
 		}
-		projectRoot := checkProjectRoot(args, abs)
+		projectRoot := checkProjectRoot(rootCandidates, abs)
 		registryForFile := registry
 		if disabled, projectCfg, err := projectDisables(projectRoot, ext, registry.Name(ext)); err != nil {
 			_, _ = fmt.Fprintf(errOut, "format-dispatch --check: project config: %v (ignoring)\n", err)
@@ -104,21 +105,13 @@ func runCheck(args []string, out, errOut io.Writer) int {
 // checkProjectRoot preserves the hook's project-root choice when --check is
 // run without CLAUDE_PROJECT_DIR: the path argument, rather than each nested
 // file discovered beneath it, defines the config and dispatch boundary.
-func checkProjectRoot(paths []string, abs string) string {
+func checkProjectRoot(candidates []string, abs string) string {
 	if root := projectRootEnv(); root != "" {
 		return root
 	}
 
 	best := ""
-	for _, path := range paths {
-		root, err := filepath.Abs(path)
-		if err != nil {
-			continue
-		}
-		info, err := os.Stat(root)
-		if err == nil && !info.IsDir() {
-			root = filepath.Dir(root)
-		}
+	for _, root := range candidates {
 		if within(abs, root) && len(root) > len(best) {
 			best = root
 		}
@@ -130,6 +123,24 @@ func checkProjectRoot(paths []string, abs string) string {
 		return cwd
 	}
 	return filepath.Dir(abs)
+}
+
+// checkRootCandidates resolves each path argument to the directory that
+// would define a config boundary. Loop-invariant across the run, so it is
+// computed once rather than re-Stat-ing every argument for every file.
+func checkRootCandidates(paths []string) []string {
+	candidates := make([]string, 0, len(paths))
+	for _, path := range paths {
+		root, err := filepath.Abs(path)
+		if err != nil {
+			continue
+		}
+		if info, err := os.Stat(root); err == nil && !info.IsDir() { //nolint:gosec // path is an operator-supplied --check argument
+			root = filepath.Dir(root)
+		}
+		candidates = append(candidates, root)
+	}
+	return candidates
 }
 
 // wouldReformat answers the question by actually formatting a copy and
