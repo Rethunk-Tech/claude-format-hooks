@@ -43,36 +43,6 @@ func parseCursorHooks(path string) (before []byte, top, hooks *orderedMap, entri
 	return before, top, hooks, entries, exists, nil
 }
 
-func renderCursorHooks(top, hooks *orderedMap, entries []json.RawMessage) ([]byte, error) {
-	eventDeleted := false
-	if len(entries) > 0 {
-		eventRaw, err := json.Marshal(entries)
-		if err != nil {
-			return nil, err
-		}
-		hooks.Set(cursorEvent, eventRaw)
-	} else {
-		_, eventDeleted = hooks.Get(cursorEvent)
-		hooks.Delete(cursorEvent)
-	}
-
-	if eventDeleted && len(hooks.keys) == 0 {
-		top.Delete("hooks")
-	} else {
-		hooksRaw, err := json.Marshal(hooks)
-		if err != nil {
-			return nil, err
-		}
-		top.Set("hooks", hooksRaw)
-	}
-
-	after, err := json.MarshalIndent(top, "", "  ")
-	if err != nil {
-		return nil, err
-	}
-	return append(after, '\n'), nil
-}
-
 // WireCursor adds the format-dispatch afterFileEdit hook while preserving
 // unrelated Cursor hooks and their source order.
 func WireCursor(path, binPath string) (before, after []byte, err error) {
@@ -93,7 +63,7 @@ func WireCursor(path, binPath string) (before, after []byte, err error) {
 	}
 	kept = append(kept, hookRaw)
 
-	after, err = renderCursorHooks(top, hooks, kept)
+	after, err = renderHooks(top, hooks, cursorEvent, kept)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -113,7 +83,7 @@ func UnwireCursor(path, binPath string) (before, after []byte, err error) {
 	kept := slices.DeleteFunc(entries, func(entry json.RawMessage) bool {
 		return cursorHookHasBin(entry, binPath)
 	})
-	after, err = renderCursorHooks(top, hooks, kept)
+	after, err = renderHooks(top, hooks, cursorEvent, kept)
 	if err != nil {
 		return nil, nil, err
 	}

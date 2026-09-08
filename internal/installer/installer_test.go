@@ -82,6 +82,14 @@ func TestDefaultOptionsFallsBackUnderHome(t *testing.T) {
 	qt.Check(t, qt.Equals(opts.CursorHooksPath, filepath.Join(home, ".cursor", "hooks.json")))
 }
 
+func settingsHasHooks(t *testing.T, raw []byte) bool {
+	t.Helper()
+	var top map[string]json.RawMessage
+	qt.Assert(t, qt.IsNil(json.Unmarshal(raw, &top)))
+	_, ok := top["hooks"]
+	return ok
+}
+
 func settingsPostToolUse(t *testing.T, raw []byte) []PostToolUseEntry {
 	t.Helper()
 	var top map[string]json.RawMessage
@@ -207,8 +215,7 @@ func TestUnwireExeRemovesLegacyBareBasename(t *testing.T) {
 	_, after, err := Unwire(settingsPath, exeBinPath)
 	qt.Assert(t, qt.IsNil(err))
 
-	entries := settingsPostToolUse(t, after)
-	qt.Check(t, qt.HasLen(entries, 0))
+	qt.Check(t, qt.Equals(settingsHasHooks(t, after), false))
 }
 
 func TestWireReplacesOldBiomeOnlyHook(t *testing.T) {
@@ -323,8 +330,7 @@ func TestUnwireRemovesOwnEntry(t *testing.T) {
 	qt.Assert(t, qt.IsNil(json.Unmarshal(top["theme"], &theme)))
 	qt.Check(t, qt.Equals(theme, "dark"))
 
-	entries := settingsPostToolUse(t, after)
-	qt.Check(t, qt.HasLen(entries, 0))
+	qt.Check(t, qt.Equals(settingsHasHooks(t, after), false))
 }
 
 func TestUnwirePreservesOtherEntries(t *testing.T) {
@@ -356,8 +362,7 @@ func TestUnwireNoOwnEntryIsIdempotent(t *testing.T) {
 	_, after, err := Unwire(settingsPath, binPath)
 	qt.Assert(t, qt.IsNil(err))
 
-	entries := settingsPostToolUse(t, after)
-	qt.Check(t, qt.HasLen(entries, 0))
+	qt.Check(t, qt.Equals(settingsHasHooks(t, after), false))
 }
 
 func TestUninstallDryRunDoesNotWrite(t *testing.T) {
@@ -395,8 +400,7 @@ func TestUninstallWritesSettings(t *testing.T) {
 	var out strings.Builder
 	qt.Assert(t, qt.IsNil(Uninstall(Options{BinPath: binPath, SettingsPath: settingsPath}, false, &out)))
 
-	entries := settingsPostToolUse(t, readFile(t, settingsPath))
-	qt.Check(t, qt.HasLen(entries, 0))
+	qt.Check(t, qt.Equals(settingsHasHooks(t, readFile(t, settingsPath)), false))
 }
 
 func TestInstallPropagatesWireError(t *testing.T) {

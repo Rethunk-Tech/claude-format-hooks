@@ -102,7 +102,7 @@ func parseSettings(settingsPath string) (before []byte, top, hooks *orderedMap, 
 		}
 	}
 
-	if raw, ok := hooks.Get("PostToolUse"); ok {
+	if raw, ok := hooks.Get(postToolUseEvent); ok {
 		if err := json.Unmarshal(raw, &entries); err != nil {
 			return nil, nil, nil, nil, fmt.Errorf("parse %s: hooks.PostToolUse: %w", settingsPath, err)
 		}
@@ -110,27 +110,44 @@ func parseSettings(settingsPath string) (before []byte, top, hooks *orderedMap, 
 	return before, top, hooks, entries, nil
 }
 
-// renderSettings re-embeds entries as hooks.PostToolUse into top/hooks and
+const postToolUseEvent = "PostToolUse"
+
+// renderHooks re-embeds entries as hooks.<event> into top/hooks and
 // serializes the result, indented, with every untouched key in its
-// original position.
-func renderSettings(top, hooks *orderedMap, entries []PostToolUseEntry) ([]byte, error) {
-	ptuRaw, err := json.Marshal(entries)
-	if err != nil {
-		return nil, err
+// original position. An event left with no entries is removed rather than
+// written as an empty array, and a hooks object emptied that way is removed
+// too, so uninstalling restores the document it started from.
+func renderHooks[T any](top, hooks *orderedMap, event string, entries []T) ([]byte, error) {
+	_, hooksExisted := top.Get("hooks")
+	eventDeleted := false
+	if len(entries) > 0 {
+		eventRaw, err := json.Marshal(entries)
+		if err != nil {
+			return nil, err
+		}
+		hooks.Set(event, eventRaw)
+	} else {
+		_, eventDeleted = hooks.Get(event)
+		hooks.Delete(event)
 	}
-	hooks.Set("PostToolUse", ptuRaw)
 
-	hooksRaw, err := json.Marshal(hooks)
-	if err != nil {
-		return nil, err
+	// Drop an emptied hooks object, but leave a pre-existing empty one that
+	// this call never touched: it is the operator's, not ours to tidy.
+	if len(hooks.keys) == 0 && (eventDeleted || !hooksExisted) {
+		top.Delete("hooks")
+	} else {
+		hooksRaw, err := json.Marshal(hooks)
+		if err != nil {
+			return nil, err
+		}
+		top.Set("hooks", hooksRaw)
 	}
-	top.Set("hooks", hooksRaw)
 
-	afterCompact, err := json.MarshalIndent(top, "", "  ")
+	after, err := json.MarshalIndent(top, "", "  ")
 	if err != nil {
 		return nil, err
 	}
-	return append(afterCompact, '\n'), nil
+	return append(after, '\n'), nil
 }
 
 // Wire reads the settings JSON at settingsPath and returns the document
@@ -158,7 +175,7 @@ func Wire(settingsPath, binPath string) (before, after []byte, err error) {
 		}},
 	})
 
-	after, err = renderSettings(top, hooks, kept)
+	after, err = renderHooks(top, hooks, postToolUseEvent, kept)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -178,7 +195,7 @@ func Unwire(settingsPath, binPath string) (before, after []byte, err error) {
 
 	kept := slices.DeleteFunc(entries, func(e PostToolUseEntry) bool { return hasBin(e, binPath) })
 
-	after, err = renderSettings(top, hooks, kept)
+	after, err = renderHooks(top, hooks, postToolUseEvent, kept)
 	if err != nil {
 		return nil, nil, err
 	}

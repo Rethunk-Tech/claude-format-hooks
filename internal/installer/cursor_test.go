@@ -133,8 +133,7 @@ func TestInstallAndUninstallWithCursorHooks(t *testing.T) {
 
 	qt.Assert(t, qt.IsNil(Uninstall(opts, false, &out)))
 	assertCursorHasOnlyOurHook(t, cursorPath, false)
-	entries = settingsPostToolUse(t, readFile(t, settingsPath))
-	qt.Check(t, qt.HasLen(entries, 0))
+	qt.Check(t, qt.Equals(settingsHasHooks(t, readFile(t, settingsPath)), false))
 }
 
 func TestUninstallMissingCursorLeavesFileMissing(t *testing.T) {
@@ -180,8 +179,7 @@ func TestInstallRollsBackClaudeWhenCursorWriteFails(t *testing.T) {
 		CursorHooksPath: cursorPath,
 	}, false, &out)
 	qt.Assert(t, qt.IsNotNil(err))
-	entries := settingsPostToolUse(t, readFile(t, settingsPath))
-	qt.Check(t, qt.HasLen(entries, 0))
+	qt.Check(t, qt.Equals(settingsHasHooks(t, readFile(t, settingsPath)), false))
 }
 
 func TestUnwireCursorWithoutEventOmitsEventKey(t *testing.T) {
