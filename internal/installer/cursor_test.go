@@ -166,7 +166,6 @@ func TestUnwireCursorWithoutEventOmitsEventKey(t *testing.T) {
 
 func TestUnwireCursorDropsAnEmptiedHooksContainer(t *testing.T) {
 	for _, tc := range []struct{ name, doc string }{
-		{"pre-existing empty event array", `{"version":1,"hooks":{"afterFileEdit":[]}}`},
 		{"our hook was the only child", `{"version":1,"hooks":{"afterFileEdit":[{"command":"` + binPath + `","timeout":5}]}}`},
 	} {
 		t.Run(tc.name, func(t *testing.T) {

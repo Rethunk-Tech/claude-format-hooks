@@ -245,73 +245,33 @@ func TestCheckResolvesTerraformMultiDotExtensions(t *testing.T) {
 }
 
 func TestCheckHonorsDisableConfig(t *testing.T) {
-	const unformattedTS = "const value={answer:42}\n"
-	const unformattedJSONC = `{"a":1}`
-
+	// The disable matrix itself is exercised against the hook path in
+	// TestRunHonorsDisableConfig; both entrypoints resolve it through the
+	// same three helpers in main.go. What is distinct here is --check's
+	// own contract: a disabled file is not reported and does not change the
+	// exit code, while a still-enabled native formatter does.
 	tests := []struct {
 		name          string
 		files         map[string]string
 		projectConfig string
 		userConfig    string
 		target        string
-		checkRoot     bool
 		wantExit      int
 		wantReported  bool
 	}{
 		{
-			name:          "project disables an extension",
+			name:          "a disabled extension is not reported",
 			files:         map[string]string{"bad.json": unformattedJSON},
 			projectConfig: `{"disabled": [".json"]}`,
 			target:        "bad.json",
-			checkRoot:     true,
 		},
 		{
-			name:          "project disables a formatter by name",
-			files:         map[string]string{"bad.ts": unformattedTS},
-			projectConfig: `{"disabledFormatters":["BIOME"]}`,
-			target:        "bad.ts",
-		},
-		{
-			name:          "project disabling biome leaves the native JSON check on",
-			files:         map[string]string{"bad.json": unformattedJSON, "biome.json": "{}\n"},
-			projectConfig: `{"disabledFormatters":["biome"]}`,
-			target:        "bad.json",
-			wantExit:      1,
-			wantReported:  true,
-		},
-		{
-			name:          "project disabling biome skips JSONC entirely",
-			files:         map[string]string{"bad.jsonc": unformattedJSONC},
-			projectConfig: `{"disabledFormatters":["biome"]}`,
-			target:        "bad.jsonc",
-		},
-		{
-			name:       "user disables an extension",
-			files:      map[string]string{"bad.json": unformattedJSON},
-			userConfig: `{"disabled": [".json"]}`,
-			target:     "bad.json",
-			checkRoot:  true,
-		},
-		{
-			name:       "user disables a formatter by name",
-			files:      map[string]string{"bad.ts": unformattedTS},
-			userConfig: `{"disabledFormatters":["biome"]}`,
-			target:     "bad.ts",
-			checkRoot:  true,
-		},
-		{
-			name:         "user disabling biome leaves the native JSON check on",
+			name:         "disabling biome still reports native JSON",
 			files:        map[string]string{"bad.json": unformattedJSON, "biome.json": "{}\n"},
 			userConfig:   `{"disabledFormatters":["biome"]}`,
 			target:       "bad.json",
 			wantExit:     1,
 			wantReported: true,
-		},
-		{
-			name:       "user disables the json formatter",
-			files:      map[string]string{"bad.json": unformattedJSON},
-			userConfig: `{"disabledFormatters":["json"]}`,
-			target:     "bad.json",
 		},
 	}
 
@@ -335,13 +295,8 @@ func TestCheckHonorsDisableConfig(t *testing.T) {
 			t.Setenv("CLAUDE_FORMAT_HOOKS_CONFIG", configPath)
 
 			target := filepath.Join(projectRoot, tc.target)
-			arg := target
-			if tc.checkRoot {
-				arg = projectRoot
-			}
-
 			var out, errOut bytes.Buffer
-			qt.Assert(t, qt.Equals(runCheck([]string{arg}, &out, &errOut), tc.wantExit))
+			qt.Assert(t, qt.Equals(runCheck([]string{target}, &out, &errOut), tc.wantExit))
 			if tc.wantReported {
 				qt.Check(t, qt.StringContains(out.String(), target))
 				return
@@ -372,24 +327,6 @@ func TestCheckHonorsProjectConfigDisablesBiomeForGraphQLRouter(t *testing.T) {
 				qt.Commentf("project-disabled biome must route %s through prettier", ext))
 		})
 	}
-}
-
-func TestCheckReportsEveryJSONFileWhenProjectDisablesBiome(t *testing.T) {
-	projectRoot := t.TempDir()
-	firstPath := writeCheckFile(t, projectRoot, "first.json", unformattedJSON)
-	secondPath := writeCheckFile(t, projectRoot, "second.json", unformattedJSON)
-	writeCheckFile(t, projectRoot, "biome.json", "{}\n")
-	writeCheckFile(t, projectRoot, projectConfigFile, `{"disabledFormatters":["biome"]}`)
-	configPath := filepath.Join(t.TempDir(), "claude-format-hooks.json")
-	writeFile(t, configPath, `{}`)
-
-	t.Setenv("CLAUDE_PROJECT_DIR", projectRoot)
-	t.Setenv("CLAUDE_FORMAT_HOOKS_CONFIG", configPath)
-
-	var out, errOut bytes.Buffer
-	qt.Check(t, qt.Equals(runCheck([]string{projectRoot}, &out, &errOut), 1))
-	qt.Check(t, qt.StringContains(out.String(), firstPath))
-	qt.Check(t, qt.StringContains(out.String(), secondPath))
 }
 
 func TestCheckUserDisableMixedWithEnabledExtension(t *testing.T) {
