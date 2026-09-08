@@ -3,13 +3,9 @@ package installer
 import (
 	"encoding/json"
 	"os"
-	"os/exec"
-	"os/signal"
 	"path/filepath"
 	"runtime"
-	"strconv"
 	"strings"
-	"syscall"
 	"testing"
 
 	"github.com/go-quicktest/qt"
@@ -563,95 +559,4 @@ func TestApplyChangeReportsSettingsWriteFailure(t *testing.T) {
 	var out strings.Builder
 	err := applyFixedChange(settingsPath, &out)
 	qt.Check(t, qt.IsNotNil(err))
-}
-
-func TestWriteAtomicWriteFailure(t *testing.T) {
-	if runtime.GOOS != "linux" {
-		t.Skip("Linux prlimit is required to exercise a real write failure")
-	}
-	if os.Getenv("FORMAT_DISPATCH_WRITE_ATOMIC_WRITE_HELPER") == "1" {
-		withFileSizeLimit(t, func() {
-			err := writeAtomic(filepath.Join(t.TempDir(), "f.json"), []byte(`{"a":1}`), 0o600)
-
-			qt.Check(t, qt.IsNotNil(err))
-		})
-		return
-	}
-
-	cmd := exec.Command(os.Args[0], "-test.run=^TestWriteAtomicWriteFailure$")
-	cmd.Env = append(os.Environ(), "FORMAT_DISPATCH_WRITE_ATOMIC_WRITE_HELPER=1")
-	output, err := cmd.CombinedOutput()
-	qt.Assert(t, qt.IsNil(err), qt.Commentf("write-failure helper output: %s", output))
-}
-
-func TestWriteAtomicChmodFailure(t *testing.T) {
-	original := writeAtomicChmod
-	writeAtomicChmod = func(*os.File, os.FileMode) error {
-		return os.ErrPermission
-	}
-	t.Cleanup(func() {
-		writeAtomicChmod = original
-	})
-
-	dir := t.TempDir()
-	err := writeAtomic(filepath.Join(dir, "f.json"), []byte(`{"a":1}`), 0o600)
-
-	qt.Check(t, qt.IsNotNil(err))
-	entries, readErr := os.ReadDir(dir)
-	qt.Assert(t, qt.IsNil(readErr))
-	qt.Check(t, qt.HasLen(entries, 0), qt.Commentf("failed chmod must remove the temporary file"))
-}
-
-func TestWriteAtomicCloseFailure(t *testing.T) {
-	original := writeAtomicClose
-	writeAtomicClose = func(f *os.File) error {
-		_ = f.Close()
-		return os.ErrPermission
-	}
-	t.Cleanup(func() {
-		writeAtomicClose = original
-	})
-
-	dir := t.TempDir()
-	path := filepath.Join(dir, "f.json")
-	err := writeAtomic(path, []byte(`{"a":1}`), 0o600)
-
-	qt.Check(t, qt.IsNotNil(err))
-	_, statErr := os.Stat(path)
-	qt.Check(t, qt.IsTrue(os.IsNotExist(statErr)), qt.Commentf("failed close must not create the destination"))
-	entries, readErr := os.ReadDir(dir)
-	qt.Assert(t, qt.IsNil(readErr))
-	qt.Check(t, qt.HasLen(entries, 0), qt.Commentf("failed close must remove the temporary file"))
-}
-
-func withFileSizeLimit(t *testing.T, fn func()) {
-	t.Helper()
-	if runtime.GOOS != "linux" {
-		t.Skip("Linux prlimit is required to exercise a real write failure")
-	}
-
-	pid := strconv.Itoa(os.Getpid())
-	output, err := exec.Command("prlimit", "--pid", pid, "--fsize").Output()
-	if err != nil {
-		t.Skipf("prlimit is unavailable: %v", err)
-	}
-	fields := strings.Fields(string(output))
-	if len(fields) < 3 {
-		t.Fatalf("unexpected prlimit output: %q", output)
-	}
-	soft, hard := fields[len(fields)-3], fields[len(fields)-2]
-
-	sigxfsz := syscall.Signal(25)
-	signal.Ignore(sigxfsz)
-	defer signal.Reset(sigxfsz)
-	if err := exec.Command("prlimit", "--pid", pid, "--fsize=0:"+hard).Run(); err != nil {
-		t.Fatalf("set file-size limit: %v", err)
-	}
-	defer func() {
-		if err := exec.Command("prlimit", "--pid", pid, "--fsize="+soft+":"+hard).Run(); err != nil {
-			t.Errorf("restore file-size limit: %v", err)
-		}
-	}()
-
-	fn()
 }

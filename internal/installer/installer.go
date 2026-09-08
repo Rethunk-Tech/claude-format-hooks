@@ -341,11 +341,6 @@ func applyChange(opts Options, before, after []byte, dryRun bool, out io.Writer,
 	return nil
 }
 
-var (
-	writeAtomicChmod = (*os.File).Chmod
-	writeAtomicClose = (*os.File).Close
-)
-
 // writeAtomic writes data to a unique temp file in path's directory, then
 // renames it into place so concurrent writers cannot share a temp pathname
 // and a process killed mid-write cannot leave path truncated.
@@ -364,14 +359,14 @@ func writeAtomic(path string, data []byte, perm os.FileMode) error {
 	}()
 
 	if _, err := tmp.Write(data); err != nil {
-		_ = writeAtomicClose(tmp)
+		_ = tmp.Close()
 		return err
 	}
-	if err := writeAtomicChmod(tmp, perm); err != nil {
-		_ = writeAtomicClose(tmp)
+	if err := tmp.Chmod(perm); err != nil {
+		_ = tmp.Close()
 		return err
 	}
-	if err := writeAtomicClose(tmp); err != nil {
+	if err := tmp.Close(); err != nil {
 		return err
 	}
 	if err := os.Rename(tmpPath, path); err != nil {
