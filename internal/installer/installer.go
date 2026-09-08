@@ -82,33 +82,44 @@ type jsonObject map[string]json.RawMessage
 // parseSettings reads settingsPath (a missing file is treated as `{}`) and
 // decodes it down to its hooks.PostToolUse entries, leaving every key it
 // does not touch untouched.
-func parseSettings(settingsPath string) (before []byte, top, hooks jsonObject, entries []PostToolUseEntry, err error) {
-	before, err = os.ReadFile(settingsPath) //nolint:gosec // caller-controlled settings location (env override or fixed default)
+// parseHookDoc reads a hooks document (a missing file is treated as `{}`)
+// and decodes it down to one event's entries, leaving every key it does not
+// touch as a raw blob. exists distinguishes an absent file from an empty
+// one, which is what tells WireCursor whether to add a version field.
+func parseHookDoc[T any](path, event string) (before []byte, top, hooks jsonObject, entries []T, exists bool, err error) {
+	before, err = os.ReadFile(path) //nolint:gosec // caller-controlled hooks location (env override or fixed default)
 	if err != nil {
 		if !os.IsNotExist(err) {
-			return nil, nil, nil, nil, err
+			return nil, nil, nil, nil, false, err
 		}
 		before = []byte("{}")
+	} else {
+		exists = true
 	}
 
 	top = jsonObject{}
 	if err := json.Unmarshal(before, &top); err != nil {
-		return nil, nil, nil, nil, fmt.Errorf("parse %s: %w", settingsPath, err)
+		return nil, nil, nil, nil, false, fmt.Errorf("parse %s: %w", path, err)
 	}
 
 	hooks = jsonObject{}
 	if raw, ok := top["hooks"]; ok {
 		if err := json.Unmarshal(raw, &hooks); err != nil {
-			return nil, nil, nil, nil, fmt.Errorf("parse %s: hooks: %w", settingsPath, err)
+			return nil, nil, nil, nil, false, fmt.Errorf("parse %s: hooks: %w", path, err)
 		}
 	}
 
-	if raw, ok := hooks[postToolUseEvent]; ok {
+	if raw, ok := hooks[event]; ok {
 		if err := json.Unmarshal(raw, &entries); err != nil {
-			return nil, nil, nil, nil, fmt.Errorf("parse %s: hooks.PostToolUse: %w", settingsPath, err)
+			return nil, nil, nil, nil, false, fmt.Errorf("parse %s: hooks.%s: %w", path, event, err)
 		}
 	}
-	return before, top, hooks, entries, nil
+	return before, top, hooks, entries, exists, nil
+}
+
+func parseSettings(settingsPath string) (before []byte, top, hooks jsonObject, entries []PostToolUseEntry, err error) {
+	before, top, hooks, entries, _, err = parseHookDoc[PostToolUseEntry](settingsPath, postToolUseEvent)
+	return before, top, hooks, entries, err
 }
 
 const postToolUseEvent = "PostToolUse"

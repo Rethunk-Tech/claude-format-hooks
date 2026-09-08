@@ -1,7 +1,6 @@
 package formatters
 
 import (
-	"bytes"
 	"context"
 	"fmt"
 	"go/format"
@@ -33,12 +32,5 @@ func (goFormatter) Format(_ context.Context, _, abs string) Result {
 		return Result{Skipped: true}
 	}
 
-	if bytes.Equal(out, src) {
-		return Result{}
-	}
-
-	if err := writeFormatted(abs, src, out, 0o644); err != nil {
-		return Result{Err: fmt.Errorf("write: %w", err)}
-	}
-	return Result{}
+	return writeIfChanged(abs, src, out, 0o644)
 }

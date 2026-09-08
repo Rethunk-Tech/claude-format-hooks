@@ -93,12 +93,5 @@ func (f jsonFormatter) Format(_ context.Context, _, abs string) Result {
 	// already ends in "}\n" would gain an extra blank line every single
 	// time it's formatted — a non-idempotent, ever-growing bug.
 	out := append(bytes.TrimRight(buf.Bytes(), "\n\t \r"), '\n')
-	if bytes.Equal(out, src) {
-		return Result{}
-	}
-
-	if err := writeFormatted(abs, src, out, 0o644); err != nil {
-		return Result{Err: fmt.Errorf("write: %w", err)}
-	}
-	return Result{}
+	return writeIfChanged(abs, src, out, 0o644)
 }

@@ -2,6 +2,7 @@ package formatters
 
 import (
 	"bytes"
+	"fmt"
 	"os"
 	"path/filepath"
 )
@@ -72,4 +73,16 @@ func writeFormatted(abs string, source, out []byte, defaultMode os.FileMode) err
 		}
 	}
 	return os.Rename(tmpName, target) //nolint:gosec // target resolves the formatter's input path, by design
+}
+
+// writeIfChanged persists out when it differs from src, shaping the outcome
+// as a Result. Every native formatter ends this way; only the mode differs.
+func writeIfChanged(abs string, src, out []byte, perm os.FileMode) Result {
+	if bytes.Equal(out, src) {
+		return Result{}
+	}
+	if err := writeFormatted(abs, src, out, perm); err != nil {
+		return Result{Err: fmt.Errorf("write: %w", err)}
+	}
+	return Result{}
 }

@@ -2,8 +2,6 @@ package installer
 
 import (
 	"encoding/json"
-	"fmt"
-	"os"
 	"slices"
 )
 
@@ -15,32 +13,7 @@ type cursorHookCommand struct {
 }
 
 func parseCursorHooks(path string) (before []byte, top, hooks jsonObject, entries []json.RawMessage, exists bool, err error) {
-	before, err = os.ReadFile(path) //nolint:gosec // caller-controlled hooks location
-	if err != nil {
-		if !os.IsNotExist(err) {
-			return nil, nil, nil, nil, false, err
-		}
-		before = []byte("{}")
-	} else {
-		exists = true
-	}
-
-	top = jsonObject{}
-	if err := json.Unmarshal(before, &top); err != nil {
-		return nil, nil, nil, nil, false, fmt.Errorf("parse %s: %w", path, err)
-	}
-	hooks = jsonObject{}
-	if raw, ok := top["hooks"]; ok {
-		if err := json.Unmarshal(raw, &hooks); err != nil {
-			return nil, nil, nil, nil, false, fmt.Errorf("parse %s: hooks: %w", path, err)
-		}
-	}
-	if raw, ok := hooks[cursorEvent]; ok {
-		if err := json.Unmarshal(raw, &entries); err != nil {
-			return nil, nil, nil, nil, false, fmt.Errorf("parse %s: hooks.%s: %w", path, cursorEvent, err)
-		}
-	}
-	return before, top, hooks, entries, exists, nil
+	return parseHookDoc[json.RawMessage](path, cursorEvent)
 }
 
 // WireCursor adds the format-dispatch afterFileEdit hook while preserving

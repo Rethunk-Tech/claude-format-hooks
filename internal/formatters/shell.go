@@ -49,12 +49,5 @@ func (f shellFormatter) Format(_ context.Context, _, abs string) Result {
 	}
 
 	out := buf.Bytes()
-	if bytes.Equal(out, src) {
-		return Result{}
-	}
-
-	if err := writeFormatted(abs, src, out, 0o755); err != nil {
-		return Result{Err: fmt.Errorf("write: %w", err)}
-	}
-	return Result{}
+	return writeIfChanged(abs, src, out, 0o755)
 }
