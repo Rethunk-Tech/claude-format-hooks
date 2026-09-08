@@ -45,11 +45,18 @@ if [ "$GOOS" = "windows" ]; then
 fi
 BIN_PATH="$BIN_DIR/$BIN_NAME"
 
-echo "==> Building format-dispatch..."
-mkdir -p "$BIN_DIR"
-(cd "$REPO_DIR" && go build -o "$BIN_PATH" ./cmd/format-dispatch)
-chmod +x "$BIN_PATH"
-echo "==> Built: $BIN_PATH"
+# --upgrade replaces the installed binary with a published release, so
+# building first would only discard the build. The build still runs when
+# there is nothing installed yet, since --upgrade is run by that binary.
+if [ "$ACTION" = "--upgrade" ] && [ -x "$BIN_PATH" ]; then
+  echo "==> Upgrading in place: $BIN_PATH"
+else
+  echo "==> Building format-dispatch..."
+  mkdir -p "$BIN_DIR"
+  (cd "$REPO_DIR" && go build -o "$BIN_PATH" ./cmd/format-dispatch)
+  chmod +x "$BIN_PATH"
+  echo "==> Built: $BIN_PATH"
+fi
 
 # Provisioning the bunx-dispatched formatters runs in `--install` below --
 # see internal/installer/tools.go.
