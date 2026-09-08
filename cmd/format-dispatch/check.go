@@ -55,7 +55,6 @@ func runCheck(args []string, out, errOut io.Writer) int {
 	}
 	var wouldChange []string
 	var registry *dispatch.Registry
-	registryByProjectRoot := make(map[string]*dispatch.Registry)
 	var cfg config.Config
 	var cfgLoaded bool
 	for _, abs := range files {
@@ -93,7 +92,7 @@ func runCheck(args []string, out, errOut io.Writer) int {
 		} else if disabled {
 			continue
 		} else {
-			registryForFile = registryForCheck(registry, cfg, ext, projectCfg, projectRoot, registryByProjectRoot)
+			registryForFile = registryWithProjectConfig(registry, cfg, ext, projectCfg)
 		}
 		fileCtx, fileCancel := context.WithTimeoutCause(ctx, formatterTimeout, errFormatterTimeout)
 		changed, err := wouldReformat(fileCtx, registryForFile, projectRoot, abs, ext)
@@ -116,24 +115,6 @@ func runCheck(args []string, out, errOut io.Writer) int {
 	}
 	_, _ = fmt.Fprintf(out, "format-dispatch --check: %d file(s) need formatting\n", len(wouldChange))
 	return 1
-}
-
-// registryForCheck returns the per-file registry for --check, caching the
-// project-biome-disabled json and graphql/gql router NewRegistry rebuild by
-// projectRoot so a large tree does not rebuild once per file. The cache guard
-// must use projectRebuildsRouterRegistry — the same predicate
-// registryWithProjectConfig uses — so a future rebuild trigger cannot leave
-// --check serving a stale map.
-func registryForCheck(registry *dispatch.Registry, userCfg config.Config, ext string, projectCfg config.Config, projectRoot string, cache map[string]*dispatch.Registry) *dispatch.Registry {
-	if !projectRebuildsRouterRegistry(ext, projectCfg) {
-		return registryWithProjectConfig(registry, userCfg, ext, projectCfg)
-	}
-	if cached, ok := cache[projectRoot]; ok {
-		return cached
-	}
-	registryForFile := registryWithProjectConfig(registry, userCfg, ext, projectCfg)
-	cache[projectRoot] = registryForFile
-	return registryForFile
 }
 
 // checkProjectRoot preserves the hook's project-root choice when --check is

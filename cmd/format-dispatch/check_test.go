@@ -391,7 +391,7 @@ func TestCheckHonorsProjectConfigDisablesBiomeForGraphQLRouter(t *testing.T) {
 	}
 }
 
-func TestCheckReusesProjectDisabledBiomeRegistryForMultipleJSONFiles(t *testing.T) {
+func TestCheckReportsEveryJSONFileWhenProjectDisablesBiome(t *testing.T) {
 	projectRoot := t.TempDir()
 	firstPath := writeCheckFile(t, projectRoot, "first.json", unformattedJSON)
 	secondPath := writeCheckFile(t, projectRoot, "second.json", unformattedJSON)
@@ -407,64 +407,6 @@ func TestCheckReusesProjectDisabledBiomeRegistryForMultipleJSONFiles(t *testing.
 	qt.Check(t, qt.Equals(runCheck([]string{projectRoot}, &out, &errOut), 1))
 	qt.Check(t, qt.StringContains(out.String(), firstPath))
 	qt.Check(t, qt.StringContains(out.String(), secondPath))
-}
-
-func TestRegistryForCheckMemoizesPerProjectRoot(t *testing.T) {
-	projectRoot := t.TempDir()
-	userCfg := config.Config{}
-	projectCfg := config.Config{DisabledFormatters: []string{"biome"}}
-	registry := dispatch.NewRegistry(userCfg)
-	cache := make(map[string]*dispatch.Registry)
-
-	first := registryForCheck(registry, userCfg, ".json", projectCfg, projectRoot, cache)
-	second := registryForCheck(registry, userCfg, ".json", projectCfg, projectRoot, cache)
-	graphql := registryForCheck(registry, userCfg, ".graphql", projectCfg, projectRoot, cache)
-	gql := registryForCheck(registry, userCfg, ".gql", projectCfg, projectRoot, cache)
-
-	qt.Check(t, qt.IsTrue(first != registry))
-	qt.Check(t, qt.IsTrue(first == second))
-	qt.Check(t, qt.IsTrue(first == graphql))
-	qt.Check(t, qt.IsTrue(first == gql))
-	qt.Check(t, qt.IsTrue(cache[projectRoot] == first))
-	qt.Check(t, qt.Equals(len(cache), 1))
-
-	otherProjectRoot := t.TempDir()
-	other := registryForCheck(registry, userCfg, ".json", projectCfg, otherProjectRoot, cache)
-
-	qt.Check(t, qt.Equals(len(cache), 2))
-	qt.Check(t, qt.IsTrue(first != other))
-}
-
-func TestRegistryForCheckDoesNotCacheWhenPredicateFalse(t *testing.T) {
-	userCfg := config.Config{}
-	registry := dispatch.NewRegistry(userCfg)
-	tests := []struct {
-		name       string
-		extension  string
-		projectCfg config.Config
-	}{
-		{name: "json", extension: ".json"},
-		{name: "uppercase json", extension: ".JSON"},
-		{
-			name:       "typescript with biome disabled",
-			extension:  ".ts",
-			projectCfg: config.Config{DisabledFormatters: []string{"biome"}},
-		},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			projectRoot := t.TempDir()
-			cache := make(map[string]*dispatch.Registry)
-
-			first := registryForCheck(registry, userCfg, tt.extension, tt.projectCfg, projectRoot, cache)
-			second := registryForCheck(registry, userCfg, tt.extension, tt.projectCfg, projectRoot, cache)
-
-			qt.Check(t, qt.IsTrue(first == registry))
-			qt.Check(t, qt.IsTrue(second == registry))
-			qt.Check(t, qt.Equals(len(cache), 0))
-		})
-	}
 }
 
 func TestCheckUserDisableMixedWithEnabledExtension(t *testing.T) {
