@@ -333,6 +333,8 @@ func TestDispatchArgsUpgradeHappyPathViaReleaseAPI(t *testing.T) {
 	}
 	checksumFile := []byte(fmt.Sprintf("%x  %s\n", digest, assetName))
 
+	attestationPath := fmt.Sprintf("/repos/Rethunk-Tech/claude-format-hooks/attestations/sha256:%x", digest)
+
 	var server *httptest.Server
 	server = httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		switch r.URL.Path {
@@ -343,6 +345,11 @@ func TestDispatchArgsUpgradeHappyPathViaReleaseAPI(t *testing.T) {
 			_, _ = w.Write(binary)
 		case "/checksum":
 			_, _ = w.Write(checksumFile)
+		case attestationPath:
+			// Null bundle with an offloaded bundle_url, matching both the live
+			// API and the installer package's own upgrade fixtures.
+			_, _ = fmt.Fprint(w,
+				`{"attestations":[{"repository_id":1,"bundle_url":"https://example.invalid/b.json.sn","bundle":null}]}`)
 		default:
 			http.NotFound(w, r)
 		}
