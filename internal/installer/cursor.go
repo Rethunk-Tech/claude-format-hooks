@@ -12,14 +12,10 @@ type cursorHookCommand struct {
 	Timeout int    `json:"timeout"`
 }
 
-func parseCursorHooks(path string) (before []byte, top, hooks jsonObject, entries []json.RawMessage, exists bool, err error) {
-	return parseHookDoc[json.RawMessage](path, cursorEvent)
-}
-
 // WireCursor adds the format-dispatch afterFileEdit hook while preserving
 // unrelated Cursor hooks.
 func WireCursor(path, binPath string) (before, after []byte, err error) {
-	before, top, hooks, entries, exists, err := parseCursorHooks(path)
+	before, top, hooks, entries, exists, err := parseHookDoc[json.RawMessage](path, cursorEvent)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -45,7 +41,7 @@ func WireCursor(path, binPath string) (before, after []byte, err error) {
 
 // UnwireCursor removes only format-dispatch afterFileEdit hooks.
 func UnwireCursor(path, binPath string) (before, after []byte, err error) {
-	before, top, hooks, entries, exists, err := parseCursorHooks(path)
+	before, top, hooks, entries, exists, err := parseHookDoc[json.RawMessage](path, cursorEvent)
 	if err != nil {
 		return nil, nil, err
 	}

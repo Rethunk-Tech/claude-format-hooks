@@ -1,6 +1,7 @@
 package installer
 
 import (
+	"bytes"
 	"context"
 	"fmt"
 	"io"
@@ -59,10 +60,6 @@ func ProvisionTools(out io.Writer) error {
 // an install whose important output is the settings.json diff, and a full
 // npm error dump would bury it.
 func firstLine(output []byte) []byte {
-	for i, b := range output {
-		if b == '\n' {
-			return output[:i]
-		}
-	}
-	return output
+	line, _, _ := bytes.Cut(output, []byte("\n"))
+	return line
 }

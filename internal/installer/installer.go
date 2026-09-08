@@ -79,9 +79,6 @@ func DefaultOptions() (Options, error) {
 // Rewriting sorts keys, which is encoding/json's behaviour for a map.
 type jsonObject map[string]json.RawMessage
 
-// parseSettings reads settingsPath (a missing file is treated as `{}`) and
-// decodes it down to its hooks.PostToolUse entries, leaving every key it
-// does not touch untouched.
 // parseHookDoc reads a hooks document (a missing file is treated as `{}`)
 // and decodes it down to one event's entries, leaving every key it does not
 // touch as a raw blob. exists distinguishes an absent file from an empty
@@ -115,11 +112,6 @@ func parseHookDoc[T any](path, event string) (before []byte, top, hooks jsonObje
 		}
 	}
 	return before, top, hooks, entries, exists, nil
-}
-
-func parseSettings(settingsPath string) (before []byte, top, hooks jsonObject, entries []PostToolUseEntry, err error) {
-	before, top, hooks, entries, _, err = parseHookDoc[PostToolUseEntry](settingsPath, postToolUseEvent)
-	return before, top, hooks, entries, err
 }
 
 const postToolUseEvent = "PostToolUse"
@@ -167,7 +159,7 @@ func renderHooks[T any](top, hooks jsonObject, event string, entries []T) ([]byt
 // other top-level key, hooks.* event, and PostToolUse entry survives with its
 // value byte-for-byte, though rewriting sorts the object's keys.
 func Wire(settingsPath, binPath string) (before, after []byte, err error) {
-	before, top, hooks, entries, err := parseSettings(settingsPath)
+	before, top, hooks, entries, _, err := parseHookDoc[PostToolUseEntry](settingsPath, postToolUseEvent)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -198,7 +190,7 @@ func Wire(settingsPath, binPath string) (before, after []byte, err error) {
 // PostToolUse entry survives with its value byte-for-byte, though rewriting
 // sorts the object's keys.
 func Unwire(settingsPath, binPath string) (before, after []byte, err error) {
-	before, top, hooks, entries, err := parseSettings(settingsPath)
+	before, top, hooks, entries, _, err := parseHookDoc[PostToolUseEntry](settingsPath, postToolUseEvent)
 	if err != nil {
 		return nil, nil, err
 	}
