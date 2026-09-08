@@ -22,13 +22,19 @@ import (
 	"github.com/go-quicktest/qt"
 )
 
-func captureStderr(t *testing.T, fn func()) string {
+func captureStderr(t *testing.T, fn func()) string { return capture(t, &os.Stderr, fn) }
+
+func captureStdout(t *testing.T, fn func()) string { return capture(t, &os.Stdout, fn) }
+
+// capture swaps one standard stream for a pipe, runs fn, and returns what
+// was written to it.
+func capture(t *testing.T, stream **os.File, fn func()) string {
 	t.Helper()
-	orig := os.Stderr
+	orig := *stream
 	r, w, err := os.Pipe()
 	qt.Assert(t, qt.IsNil(err))
-	os.Stderr = w
-	defer func() { os.Stderr = orig }()
+	*stream = w
+	defer func() { *stream = orig }()
 
 	fn()
 
@@ -39,21 +45,34 @@ func captureStderr(t *testing.T, fn func()) string {
 	return buf.String()
 }
 
-func captureStdout(t *testing.T, fn func()) string {
+// hookEnv points the installer's three paths at a fresh temp directory.
+func hookEnv(t *testing.T) (dir, settingsPath string) {
 	t.Helper()
-	orig := os.Stdout
-	r, w, err := os.Pipe()
-	qt.Assert(t, qt.IsNil(err))
-	os.Stdout = w
-	defer func() { os.Stdout = orig }()
+	dir = t.TempDir()
+	settingsPath = filepath.Join(dir, "settings.json")
+	t.Setenv("CLAUDE_HOOKS_BIN_DIR", filepath.Join(dir, "bin"))
+	t.Setenv("CLAUDE_SETTINGS_FILE", settingsPath)
+	t.Setenv("CURSOR_HOOKS_FILE", filepath.Join(dir, "hooks.json"))
+	return dir, settingsPath
+}
 
-	fn()
+// unrecognizedArgCases are the argument mistakes every subcommand must
+// reject the same way.
+var unrecognizedArgCases = []struct {
+	name       string
+	args       []string
+	wantSubstr string
+}{
+	{"typo of --dry-run", []string{"--dryrun"}, "unrecognized argument"},
+	{"unrelated flag", []string{"--bogus"}, "unrecognized argument"},
+	{"extra arguments", []string{"--dry-run", "extra"}, "unexpected arguments"},
+}
 
-	qt.Assert(t, qt.IsNil(w.Close()))
-	var buf bytes.Buffer
-	_, err = io.Copy(&buf, r)
-	qt.Assert(t, qt.IsNil(err))
-	return buf.String()
+// assertNotWritten checks a path the run under test must have left alone.
+func assertNotWritten(t *testing.T, path, why string) {
+	t.Helper()
+	_, err := os.Stat(path)
+	qt.Check(t, qt.IsTrue(os.IsNotExist(err)), qt.Commentf("%s", why))
 }
 
 func TestDispatchArgsHelp(t *testing.T) {
@@ -119,25 +138,15 @@ func TestVersionStringFrom(t *testing.T) {
 
 func TestDispatchArgsRoutesInstallAndUninstall(t *testing.T) {
 	t.Run("--install", func(t *testing.T) {
-		dir := t.TempDir()
-		t.Setenv("CLAUDE_HOOKS_BIN_DIR", filepath.Join(dir, "bin"))
-		settingsPath := filepath.Join(dir, "settings.json")
-		t.Setenv("CLAUDE_SETTINGS_FILE", settingsPath)
-		t.Setenv("CURSOR_HOOKS_FILE", filepath.Join(dir, "hooks.json"))
+		dir, settingsPath := hookEnv(t)
 
 		qt.Check(t, qt.Equals(dispatchArgs([]string{"--install", "--dry-run"}), 0))
-		_, err := os.Stat(settingsPath)
-		qt.Check(t, qt.IsTrue(os.IsNotExist(err)), qt.Commentf("--dry-run must not write settings.json"))
-		_, err = os.Stat(filepath.Join(dir, "hooks.json"))
-		qt.Check(t, qt.IsTrue(os.IsNotExist(err)), qt.Commentf("--dry-run must not write hooks.json"))
+		assertNotWritten(t, settingsPath, "--dry-run must not write settings.json")
+		assertNotWritten(t, filepath.Join(dir, "hooks.json"), "--dry-run must not write hooks.json")
 	})
 
 	t.Run("--uninstall", func(t *testing.T) {
-		dir := t.TempDir()
-		t.Setenv("CLAUDE_HOOKS_BIN_DIR", filepath.Join(dir, "bin"))
-		settingsPath := filepath.Join(dir, "settings.json")
-		t.Setenv("CLAUDE_SETTINGS_FILE", settingsPath)
-		t.Setenv("CURSOR_HOOKS_FILE", filepath.Join(dir, "hooks.json"))
+		dir, settingsPath := hookEnv(t)
 
 		qt.Check(t, qt.Equals(dispatchArgs([]string{"--install"}), 0))
 		qt.Check(t, qt.Equals(dispatchArgs([]string{"--uninstall"}), 0))
@@ -220,57 +229,30 @@ func TestRunInstallWiresAndUninstallsSettings(t *testing.T) {
 }
 
 func TestRunInstallDryRunDoesNotWrite(t *testing.T) {
-	dir := t.TempDir()
-	t.Setenv("CLAUDE_HOOKS_BIN_DIR", filepath.Join(dir, "bin"))
-	settingsPath := filepath.Join(dir, "settings.json")
-	t.Setenv("CLAUDE_SETTINGS_FILE", settingsPath)
-	t.Setenv("CURSOR_HOOKS_FILE", filepath.Join(dir, "hooks.json"))
+	dir, settingsPath := hookEnv(t)
 
 	qt.Check(t, qt.Equals(runInstall([]string{"--dry-run"}, false), 0))
-	_, err := os.Stat(settingsPath)
-	qt.Check(t, qt.IsTrue(os.IsNotExist(err)), qt.Commentf("--dry-run must not write settings.json"))
-	_, err = os.Stat(filepath.Join(dir, "hooks.json"))
-	qt.Check(t, qt.IsTrue(os.IsNotExist(err)), qt.Commentf("--dry-run must not write hooks.json"))
+	assertNotWritten(t, settingsPath, "--dry-run must not write settings.json")
+	assertNotWritten(t, filepath.Join(dir, "hooks.json"), "--dry-run must not write hooks.json")
 }
 
 func TestRunInstallRejectsUnrecognizedArgs(t *testing.T) {
-	cases := []struct {
-		name       string
-		args       []string
-		wantSubstr string
-	}{
-		{"typo of --dry-run", []string{"--dryrun"}, "unrecognized argument"},
-		{"unrelated flag", []string{"--bogus"}, "unrecognized argument"},
-		{"extra arguments", []string{"--dry-run", "extra"}, "unexpected arguments"},
-	}
+	cases := unrecognizedArgCases
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
-			dir := t.TempDir()
-			t.Setenv("CLAUDE_HOOKS_BIN_DIR", filepath.Join(dir, "bin"))
-			settingsPath := filepath.Join(dir, "settings.json")
-			t.Setenv("CLAUDE_SETTINGS_FILE", settingsPath)
-			t.Setenv("CURSOR_HOOKS_FILE", filepath.Join(dir, "hooks.json"))
+			_, settingsPath := hookEnv(t)
 
 			var code int
 			stderr := captureStderr(t, func() { code = runInstall(tc.args, false) })
 			qt.Check(t, qt.Equals(code, 1))
 			qt.Check(t, qt.StringContains(stderr, tc.wantSubstr))
-			_, err := os.Stat(settingsPath)
-			qt.Check(t, qt.IsTrue(os.IsNotExist(err)), qt.Commentf("a rejected arg must not write settings.json"))
+			assertNotWritten(t, settingsPath, "a rejected arg must not write settings.json")
 		})
 	}
 }
 
 func TestRunUpgradeRejectsUnrecognizedArgs(t *testing.T) {
-	cases := []struct {
-		name       string
-		args       []string
-		wantSubstr string
-	}{
-		{"typo of --dry-run", []string{"--dryrun"}, "unrecognized argument"},
-		{"unrelated flag", []string{"--bogus"}, "unrecognized argument"},
-		{"extra arguments", []string{"--dry-run", "extra"}, "unexpected arguments"},
-	}
+	cases := unrecognizedArgCases
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
 			dir := t.TempDir()
@@ -526,42 +508,102 @@ func TestRunDispatchesJSONFromToolResult(t *testing.T) {
 	qt.Check(t, qt.Equals(readFile(t, abs), "{\n  \"b\": 1,\n  \"a\": 2\n}\n"))
 }
 
-func TestRunProjectConfigDisablesFormatter(t *testing.T) {
-	projectRoot := t.TempDir()
-	abs := filepath.Join(projectRoot, "f.json")
-	src := `{"b":1,"a":2}`
-	writeFile(t, abs, src)
-	writeFile(t, filepath.Join(projectRoot, projectConfigFile), `{"disabled": [".json"]}`)
+func TestRunHonorsDisableConfig(t *testing.T) {
+	const unformattedTS = "const value={answer:42}\n"
 
-	t.Setenv("CLAUDE_PROJECT_DIR", projectRoot)
-	qt.Check(t, qt.Equals(run(strings.NewReader(payload(abs))), 0))
-	qt.Check(t, qt.Equals(readFile(t, abs), src), qt.Commentf("project-disabled extension must not be formatted"))
-}
+	tests := []struct {
+		name          string
+		file          string
+		src           string
+		extraFiles    map[string]string
+		projectConfig string
+		userConfig    string
+		want          string
+		wantLog       string
+	}{
+		{
+			name:          "project disables an extension",
+			file:          "f.json",
+			src:           `{"b":1,"a":2}`,
+			projectConfig: `{"disabled": [".json"]}`,
+		},
+		{
+			name:          "project disables a formatter by name",
+			file:          "f.ts",
+			src:           unformattedTS,
+			projectConfig: `{"disabledFormatters":["BIOME"]}`,
+		},
+		{
+			name:          "project disabling biome leaves the native JSON router on",
+			file:          "f.json",
+			src:           `{"b":1,"a":2}`,
+			extraFiles:    map[string]string{"biome.json": "{}\n"},
+			projectConfig: `{"disabledFormatters":["biome"]}`,
+			want:          "{\n  \"b\": 1,\n  \"a\": 2\n}\n",
+		},
+		{
+			name:          "project disabling biome skips JSONC",
+			file:          "f.jsonc",
+			src:           `{"a":1}`,
+			projectConfig: `{"disabledFormatters":["biome"]}`,
+		},
+		{
+			name:       "user disables an extension",
+			file:       "f.json",
+			src:        `{"b":1,"a":2}`,
+			userConfig: `{"disabled": [".json"]}`,
+			wantLog:    `outcome="skip: disabled by config"`,
+		},
+		{
+			name:       "user disables a formatter by name",
+			file:       "f.ts",
+			src:        unformattedTS,
+			userConfig: `{"disabledFormatters":["biome"]}`,
+		},
+		{
+			name:       "user disables the json formatter",
+			file:       "f.json",
+			src:        `{"b":1,"a":2}`,
+			userConfig: `{"disabledFormatters":["json"]}`,
+		},
+	}
 
-func TestRunProjectConfigDisablesFormatterByName(t *testing.T) {
-	projectRoot := t.TempDir()
-	abs := filepath.Join(projectRoot, "f.ts")
-	src := "const value={answer:42}\n"
-	writeFile(t, abs, src)
-	writeFile(t, filepath.Join(projectRoot, projectConfigFile), `{"disabledFormatters":["BIOME"]}`)
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			projectRoot := t.TempDir()
+			abs := filepath.Join(projectRoot, tc.file)
+			writeFile(t, abs, tc.src)
+			for name, content := range tc.extraFiles {
+				writeFile(t, filepath.Join(projectRoot, name), content)
+			}
+			if tc.projectConfig != "" {
+				writeFile(t, filepath.Join(projectRoot, projectConfigFile), tc.projectConfig)
+			}
+			t.Setenv("CLAUDE_PROJECT_DIR", projectRoot)
+			if tc.userConfig != "" {
+				configPath := filepath.Join(t.TempDir(), "claude-format-hooks.json")
+				writeFile(t, configPath, tc.userConfig)
+				t.Setenv("CLAUDE_FORMAT_HOOKS_CONFIG", configPath)
+			}
+			var logPath string
+			if tc.wantLog != "" {
+				logPath = filepath.Join(t.TempDir(), "format-dispatch.log")
+				t.Setenv("CLAUDE_FORMAT_HOOKS_LOG", logPath)
+			}
 
-	t.Setenv("CLAUDE_PROJECT_DIR", projectRoot)
-	qt.Check(t, qt.Equals(run(strings.NewReader(payload(abs))), 0))
-	qt.Check(t, qt.Equals(readFile(t, abs), src), qt.Commentf("project-disabled formatter must not be formatted"))
-}
+			qt.Check(t, qt.Equals(run(strings.NewReader(payload(abs))), 0))
 
-func TestRunProjectConfigDisablesBiomeForJSONRouter(t *testing.T) {
-	projectRoot := t.TempDir()
-	abs := filepath.Join(projectRoot, "f.json")
-	src := `{"b":1,"a":2}`
-	writeFile(t, abs, src)
-	writeFile(t, filepath.Join(projectRoot, "biome.json"), "{}\n")
-	writeFile(t, filepath.Join(projectRoot, projectConfigFile), `{"disabledFormatters":["biome"]}`)
-
-	t.Setenv("CLAUDE_PROJECT_DIR", projectRoot)
-	qt.Check(t, qt.Equals(run(strings.NewReader(payload(abs))), 0))
-	qt.Check(t, qt.Equals(readFile(t, abs), "{\n  \"b\": 1,\n  \"a\": 2\n}\n"),
-		qt.Commentf("project-disabled biome must leave the native JSON router enabled"))
+			want := tc.want
+			if want == "" {
+				want = tc.src
+			}
+			qt.Check(t, qt.Equals(readFile(t, abs), want),
+				qt.Commentf("a disabled formatter must leave the file alone"))
+			if tc.wantLog != "" {
+				qt.Check(t, qt.StringContains(readFile(t, logPath), tc.wantLog))
+			}
+		})
+	}
 }
 
 func TestRunProjectConfigDisablesBiomeForGraphQLRouter(t *testing.T) {
@@ -603,64 +645,6 @@ func TestRunProjectConfigDisablesBiomeForGraphQLRouter(t *testing.T) {
 	}
 }
 
-func TestRunProjectConfigDisablesBiomeForJSONC(t *testing.T) {
-	projectRoot := t.TempDir()
-	abs := filepath.Join(projectRoot, "f.jsonc")
-	src := `{"a":1}`
-	writeFile(t, abs, src)
-	writeFile(t, filepath.Join(projectRoot, projectConfigFile), `{"disabledFormatters":["biome"]}`)
-
-	t.Setenv("CLAUDE_PROJECT_DIR", projectRoot)
-	qt.Check(t, qt.Equals(run(strings.NewReader(payload(abs))), 0))
-	qt.Check(t, qt.Equals(readFile(t, abs), src), qt.Commentf("project-disabled biome must not format JSONC"))
-}
-
-func TestRunUserConfigDisablesFormatter(t *testing.T) {
-	projectRoot := t.TempDir()
-	abs := filepath.Join(projectRoot, "f.json")
-	src := `{"b":1,"a":2}`
-	writeFile(t, abs, src)
-	configPath := filepath.Join(t.TempDir(), "claude-format-hooks.json")
-	writeFile(t, configPath, `{"disabled": [".json"]}`)
-
-	t.Setenv("CLAUDE_PROJECT_DIR", projectRoot)
-	t.Setenv("CLAUDE_FORMAT_HOOKS_CONFIG", configPath)
-	logPath := filepath.Join(t.TempDir(), "format-dispatch.log")
-	t.Setenv("CLAUDE_FORMAT_HOOKS_LOG", logPath)
-
-	qt.Check(t, qt.Equals(run(strings.NewReader(payload(abs))), 0))
-	qt.Check(t, qt.Equals(readFile(t, abs), src), qt.Commentf("user-disabled extension must not be formatted"))
-	qt.Check(t, qt.StringContains(readFile(t, logPath), `outcome="skip: disabled by config"`))
-}
-
-func TestRunUserConfigDisablesFormatterByName(t *testing.T) {
-	projectRoot := t.TempDir()
-	abs := filepath.Join(projectRoot, "f.ts")
-	src := "const value={answer:42}\n"
-	writeFile(t, abs, src)
-	configPath := filepath.Join(t.TempDir(), "claude-format-hooks.json")
-	writeFile(t, configPath, `{"disabledFormatters":["biome"]}`)
-
-	t.Setenv("CLAUDE_PROJECT_DIR", projectRoot)
-	t.Setenv("CLAUDE_FORMAT_HOOKS_CONFIG", configPath)
-	qt.Check(t, qt.Equals(run(strings.NewReader(payload(abs))), 0))
-	qt.Check(t, qt.Equals(readFile(t, abs), src), qt.Commentf("user-disabled formatter must not be formatted"))
-}
-
-func TestRunUserConfigDisablesJSONFormatterByName(t *testing.T) {
-	projectRoot := t.TempDir()
-	abs := filepath.Join(projectRoot, "f.json")
-	src := `{"b":1,"a":2}`
-	writeFile(t, abs, src)
-	configPath := filepath.Join(t.TempDir(), "claude-format-hooks.json")
-	writeFile(t, configPath, `{"disabledFormatters":["json"]}`)
-
-	t.Setenv("CLAUDE_PROJECT_DIR", projectRoot)
-	t.Setenv("CLAUDE_FORMAT_HOOKS_CONFIG", configPath)
-	qt.Check(t, qt.Equals(run(strings.NewReader(payload(abs))), 0))
-	qt.Check(t, qt.Equals(readFile(t, abs), src), qt.Commentf("user-disabled json formatter must not be formatted"))
-}
-
 func TestRunUserConfigMalformedFallsBackAndWarns(t *testing.T) {
 	projectRoot := t.TempDir()
 	abs := filepath.Join(projectRoot, "f.json")
@@ -699,8 +683,7 @@ func TestLogInvocationNoopWhenEnvUnset(t *testing.T) {
 
 	logInvocation("/some/file.json", "json", "ok", time.Millisecond)
 
-	_, err := os.Stat(logPath)
-	qt.Check(t, qt.IsTrue(os.IsNotExist(err)), qt.Commentf("logInvocation must not write anywhere when unset"))
+	assertNotWritten(t, logPath, "logInvocation must not write anywhere when unset")
 }
 
 func TestLogInvocationSwallowsWriteFailure(t *testing.T) {
