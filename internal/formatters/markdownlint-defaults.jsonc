@@ -56,14 +56,28 @@
 		},
 		"MD060": { "style": "compact" }
 	},
+	// Only reached when markdownlint-cli2 is pointed at a glob -- the hook
+	// always hands it one already-filtered absolute path. Kept because this
+	// file is materialized into ~/.claude for operators to run directly.
+	// vendoredDirs in internal/dispatch/dispatch.go owns this list; mirror it
+	// there, not here.
 	"ignores": [
 		"**/node_modules",
-		"**/vendor",
+		"**/.next",
+		"**/.yarn",
+		"**/.git",
+		"**/.agents",
 		"**/dist",
 		"**/build",
-		"**/.next",
-		"**/target",
-		".orchestrate",
-		".playwright-mcp"
+		"**/coverage",
+		"**/test-results",
+		"**/vendor",
+		"**/.venv",
+		"**/.terraform",
+		"**/__pycache__",
+		"**/.ruff_cache",
+		"**/.mypy_cache",
+		"**/.pytest_cache",
+		"**/.tox"
 	]
 }
