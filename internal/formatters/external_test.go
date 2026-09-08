@@ -208,6 +208,9 @@ func TestPythonFormatterSkipsWhenBothMissing(t *testing.T) {
 }
 
 func TestPythonFormatterPrefersRuffOverBlack(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("fake shell-script tools are POSIX-shell only")
+	}
 	isolateDiskCache(t)
 	dir := t.TempDir()
 	path := filepath.Join(dir, "ruff")
