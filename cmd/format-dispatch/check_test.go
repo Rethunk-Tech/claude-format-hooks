@@ -59,7 +59,7 @@ func TestCheckNeverModifiesTheFilesItInspects(t *testing.T) {
 	var out, errOut bytes.Buffer
 	qt.Assert(t, qt.Equals(runCheck([]string{dir}, &out, &errOut), 1))
 
-	after, err := os.ReadFile(path) //nolint:gosec // path is the temp file this test wrote
+	after, err := os.ReadFile(path)
 	qt.Assert(t, qt.IsNil(err))
 	qt.Check(t, qt.Equals(string(after), unformattedJSON))
 }
@@ -156,7 +156,7 @@ func TestWouldReformatReportsFormattedCopyReadError(t *testing.T) {
 	script := "#!/bin/sh\nfor arg in \"$@\"; do\n  case \"$arg\" in\n    *.ts) rm -f \"$arg\"; exit 0 ;;\n  esac\ndone\nexit 1\n"
 	for _, name := range []string{"biome", "bunx"} {
 		tool := filepath.Join(toolDir, name)
-		qt.Assert(t, qt.IsNil(os.WriteFile(tool, []byte(script), 0o755))) //nolint:gosec // test fixture
+		qt.Assert(t, qt.IsNil(os.WriteFile(tool, []byte(script), 0o755)))
 	}
 	t.Setenv("CLAUDE_PROJECT_DIR", projectRoot)
 	t.Setenv("CLAUDE_FORMAT_HOOKS_CONFIG", configPath)
@@ -193,7 +193,7 @@ func TestCopyBesideCreatesAndCleansSibling(t *testing.T) {
 func TestCopyBesideReportsFileAsDirectoryWriteFailure(t *testing.T) {
 	dir := t.TempDir()
 	blocker := filepath.Join(dir, "not-a-directory")
-	qt.Assert(t, qt.IsNil(os.WriteFile(blocker, nil, 0o600))) //nolint:gosec // test fixture
+	qt.Assert(t, qt.IsNil(os.WriteFile(blocker, nil, 0o600)))
 
 	path, cleanup, err := copyBeside(filepath.Join(blocker, "target.json"), []byte(unformattedJSON))
 
@@ -224,7 +224,7 @@ func TestCheckResolvesTerraformMultiDotExtensions(t *testing.T) {
 	toolDir := t.TempDir()
 	terraform := filepath.Join(toolDir, "terraform")
 	script := "#!/bin/sh\nfor arg in \"$@\"; do\n  case \"$arg\" in\n    *.tftest.hcl|*.tfmock.hcl|*.tfquery.hcl) printf 'formatted\\n' > \"$arg\"; exit 0 ;;\n  esac\ndone\nexit 1\n"
-	qt.Assert(t, qt.IsNil(os.WriteFile(terraform, []byte(script), 0o755))) //nolint:gosec // test fixture
+	qt.Assert(t, qt.IsNil(os.WriteFile(terraform, []byte(script), 0o755)))
 
 	t.Setenv("CLAUDE_PROJECT_DIR", projectRoot)
 	t.Setenv("CLAUDE_FORMAT_HOOKS_CONFIG", configPath)
@@ -493,7 +493,7 @@ func TestCheckDispatchesNestedBiomeFromProjectRoot(t *testing.T) {
 	script := "#!/bin/sh\nprintf '%s' \"$PWD\" > \"$FMTCHECK_MARKER\"\nfor arg in \"$@\"; do\n  case \"$arg\" in\n    *.ts) printf 'const value = { answer: 42 };\\n' > \"$arg\"; exit 0 ;;\n  esac\ndone\nexit 1\n"
 	for _, name := range []string{"biome", "bunx"} {
 		tool := filepath.Join(toolDir, name)
-		qt.Assert(t, qt.IsNil(os.WriteFile(tool, []byte(script), 0o755))) //nolint:gosec // test fixture
+		qt.Assert(t, qt.IsNil(os.WriteFile(tool, []byte(script), 0o755)))
 	}
 
 	t.Setenv("CLAUDE_PROJECT_DIR", projectRoot)
@@ -512,7 +512,7 @@ func TestCheckDispatchesNestedBiomeFromProjectRoot(t *testing.T) {
 	timeoutScript := "#!/bin/sh\nprintf 'timeout:%s' \"$PWD\" > \"$FMTCHECK_MARKER\"\nexec /bin/sleep 30\n"
 	for _, name := range []string{"biome", "bunx"} {
 		tool := filepath.Join(toolDir, name)
-		qt.Assert(t, qt.IsNil(os.WriteFile(tool, []byte(timeoutScript), 0o755))) //nolint:gosec // test fixture
+		qt.Assert(t, qt.IsNil(os.WriteFile(tool, []byte(timeoutScript), 0o755)))
 	}
 	var timeoutOut, timeoutErrOut bytes.Buffer
 	started := time.Now()

@@ -10,10 +10,18 @@ linters:
     - errorlint
     - gocritic
     - gosec
+    - nolintlint
     - predeclared
     - revive
     - unconvert
     - wastedassign
+  settings:
+    nolintlint:
+      # A suppression that no longer suppresses anything is a stale decision
+      # record; an unexplained one can't be reviewed.
+      allow-unused: false
+      require-explanation: true
+      require-specific: true
   exclusions:
     rules:
       # Test fixtures read/write their own t.TempDir() files — gosec's

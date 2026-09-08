@@ -165,7 +165,7 @@ func Set(dir, key, value string) {
 		return
 	}
 	data := strconv.FormatInt(time.Now().Unix(), 10) + "\n" + value
-	_ = os.WriteFile(filepath.Join(dir, key), []byte(data), 0o600) //nolint:gosec // dir/key are our own fixed cache location, never user input
+	_ = os.WriteFile(filepath.Join(dir, key), []byte(data), 0o600)
 }
 
 // Remove deletes any cached entry for key within dir.

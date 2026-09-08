@@ -80,7 +80,7 @@ func TestGetExpiresAfterMaxAge(t *testing.T) {
 	dir := t.TempDir()
 	path := filepath.Join(dir, "k")
 	stale := time.Now().Add(-time.Hour).Unix()
-	qt.Assert(t, qt.IsNil(os.WriteFile(path, []byte(strconv.FormatInt(stale, 10)+"\nvalue"), 0o600))) //nolint:gosec // test fixture
+	qt.Assert(t, qt.IsNil(os.WriteFile(path, []byte(strconv.FormatInt(stale, 10)+"\nvalue"), 0o600)))
 
 	_, ok := Get(dir, "k", time.Minute)
 	qt.Check(t, qt.IsFalse(ok), qt.Commentf("an hour-old entry must not survive a one-minute TTL"))
@@ -96,8 +96,8 @@ func TestGetPrunesExpiredEntriesInTheSameNamespace(t *testing.T) {
 	stale := strconv.FormatInt(time.Now().Add(-time.Hour).Unix(), 10) + "\nvalue"
 
 	Set(dir, freshKey, "fresh")
-	qt.Assert(t, qt.IsNil(os.WriteFile(filepath.Join(dir, staleKey), []byte(stale), 0o600))) //nolint:gosec // test fixture
-	qt.Assert(t, qt.IsNil(os.WriteFile(filepath.Join(dir, otherKey), []byte(stale), 0o600))) //nolint:gosec // test fixture
+	qt.Assert(t, qt.IsNil(os.WriteFile(filepath.Join(dir, staleKey), []byte(stale), 0o600)))
+	qt.Assert(t, qt.IsNil(os.WriteFile(filepath.Join(dir, otherKey), []byte(stale), 0o600)))
 
 	_, ok := Get(dir, freshKey, time.Minute)
 	qt.Assert(t, qt.IsTrue(ok))
@@ -121,7 +121,7 @@ func TestGetSweepsANamespaceOnlyOncePerProcess(t *testing.T) {
 	// process is left for the next invocation rather than costing every
 	// subsequent read an os.ReadDir of the whole cache directory.
 	lateKey := Key("sweeponce", "late")
-	qt.Assert(t, qt.IsNil(os.WriteFile(filepath.Join(dir, lateKey), []byte(stale), 0o600))) //nolint:gosec // test fixture
+	qt.Assert(t, qt.IsNil(os.WriteFile(filepath.Join(dir, lateKey), []byte(stale), 0o600)))
 	_, ok = Get(dir, freshKey, time.Minute)
 	qt.Assert(t, qt.IsTrue(ok))
 
@@ -137,8 +137,8 @@ func TestGetPrunesHyphenatedBinaryNamesAsOneNamespace(t *testing.T) {
 	stale := strconv.FormatInt(time.Now().Add(-time.Hour).Unix(), 10) + "\nvalue"
 
 	Set(dir, freshKey, "fresh")
-	qt.Assert(t, qt.IsNil(os.WriteFile(filepath.Join(dir, staleKey), []byte(stale), 0o600))) //nolint:gosec // test fixture
-	qt.Assert(t, qt.IsNil(os.WriteFile(filepath.Join(dir, otherKey), []byte(stale), 0o600))) //nolint:gosec // test fixture
+	qt.Assert(t, qt.IsNil(os.WriteFile(filepath.Join(dir, staleKey), []byte(stale), 0o600)))
+	qt.Assert(t, qt.IsNil(os.WriteFile(filepath.Join(dir, otherKey), []byte(stale), 0o600)))
 
 	_, ok := Get(dir, freshKey, time.Minute)
 	qt.Assert(t, qt.IsTrue(ok))
@@ -152,7 +152,7 @@ func TestGetPrunesHyphenatedBinaryNamesAsOneNamespace(t *testing.T) {
 func TestGetTreatsEntryWithNoNewlineAsAMiss(t *testing.T) {
 	dir := t.TempDir()
 	path := filepath.Join(dir, "k")
-	qt.Assert(t, qt.IsNil(os.WriteFile(path, []byte("no-newline-at-all"), 0o600))) //nolint:gosec // test fixture
+	qt.Assert(t, qt.IsNil(os.WriteFile(path, []byte("no-newline-at-all"), 0o600)))
 
 	_, ok := Get(dir, "k", time.Hour)
 	qt.Check(t, qt.IsFalse(ok))
@@ -161,7 +161,7 @@ func TestGetTreatsEntryWithNoNewlineAsAMiss(t *testing.T) {
 func TestGetTreatsMalformedEntryAsAMiss(t *testing.T) {
 	dir := t.TempDir()
 	path := filepath.Join(dir, "k")
-	qt.Assert(t, qt.IsNil(os.WriteFile(path, []byte("not-a-timestamp\nvalue"), 0o600))) //nolint:gosec // test fixture
+	qt.Assert(t, qt.IsNil(os.WriteFile(path, []byte("not-a-timestamp\nvalue"), 0o600)))
 
 	_, ok := Get(dir, "k", time.Hour)
 	qt.Check(t, qt.IsFalse(ok))
@@ -182,7 +182,7 @@ func TestCacheEntryExpiredRejectsUnreadableAndMalformedEntries(t *testing.T) {
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
 			if tc.body != "" {
-				qt.Assert(t, qt.IsNil(os.WriteFile(tc.path, []byte(tc.body), 0o600))) //nolint:gosec // test fixture
+				qt.Assert(t, qt.IsNil(os.WriteFile(tc.path, []byte(tc.body), 0o600)))
 			}
 			qt.Check(t, qt.IsFalse(cacheEntryExpired(tc.path, time.Minute)))
 		})
@@ -193,7 +193,7 @@ func TestPruneLeavesEntryWithoutNamespace(t *testing.T) {
 	dir := t.TempDir()
 	path := filepath.Join(dir, "k")
 	stale := strconv.FormatInt(time.Now().Add(-time.Hour).Unix(), 10) + "\nvalue"
-	qt.Assert(t, qt.IsNil(os.WriteFile(path, []byte(stale), 0o600))) //nolint:gosec // test fixture
+	qt.Assert(t, qt.IsNil(os.WriteFile(path, []byte(stale), 0o600)))
 
 	prune(dir, cacheNamespacePrefix("k"), time.Minute)
 
@@ -204,7 +204,7 @@ func TestPruneLeavesEntryWithoutNamespace(t *testing.T) {
 func TestPruneSwallowsReadDirError(t *testing.T) {
 	parent := t.TempDir()
 	file := filepath.Join(parent, "not-a-directory")
-	qt.Assert(t, qt.IsNil(os.WriteFile(file, []byte("x"), 0o600))) //nolint:gosec // test fixture
+	qt.Assert(t, qt.IsNil(os.WriteFile(file, []byte("x"), 0o600)))
 
 	prune(filepath.Join(file, "child"), "ns-", time.Minute)
 
@@ -271,6 +271,6 @@ func TestSetSwallowsWriteFailure(t *testing.T) {
 	// regular file, not a directory) makes MkdirAll fail — Set must not
 	// panic or otherwise surface that.
 	parent := filepath.Join(t.TempDir(), "not-a-dir")
-	qt.Assert(t, qt.IsNil(os.WriteFile(parent, []byte("x"), 0o600))) //nolint:gosec // test fixture
+	qt.Assert(t, qt.IsNil(os.WriteFile(parent, []byte("x"), 0o600)))
 	Set(filepath.Join(parent, "sub"), "k", "value")
 }

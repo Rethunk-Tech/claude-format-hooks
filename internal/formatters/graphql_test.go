@@ -109,7 +109,7 @@ func writeGraphQLTools(t *testing.T, tools ...graphqlTestTool) {
 			script = "@echo off\r\n<nul set /p \"=" + tool.marker + "\" > \"%GRAPHQL_MARKER%\"\r\n"
 		}
 		path := filepath.Join(dir, name)
-		qt.Assert(t, qt.IsNil(os.WriteFile(path, []byte(script), 0o755))) //nolint:gosec // test fixture
+		qt.Assert(t, qt.IsNil(os.WriteFile(path, []byte(script), 0o755)))
 	}
 	t.Setenv("PATH", dir)
 }

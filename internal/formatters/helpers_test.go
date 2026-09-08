@@ -14,13 +14,13 @@ func sourceFile(t *testing.T, name, src string) (dir, path string) {
 	t.Helper()
 	dir = t.TempDir()
 	path = filepath.Join(dir, name)
-	qt.Assert(t, qt.IsNil(os.WriteFile(path, []byte(src), 0o600))) //nolint:gosec // test fixture
+	qt.Assert(t, qt.IsNil(os.WriteFile(path, []byte(src), 0o600)))
 	return dir, path
 }
 
 func readSource(t *testing.T, path string) []byte {
 	t.Helper()
-	raw, err := os.ReadFile(path) //nolint:gosec // path is a temp file the test wrote
+	raw, err := os.ReadFile(path)
 	qt.Assert(t, qt.IsNil(err))
 	return raw
 }

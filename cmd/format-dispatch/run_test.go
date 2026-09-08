@@ -73,7 +73,7 @@ func fakeRouterTools(t *testing.T) string {
 		}
 	}
 	for name, script := range scripts {
-		qt.Assert(t, qt.IsNil(os.WriteFile(filepath.Join(toolDir, name), []byte(script), 0o755))) //nolint:gosec // test fixture
+		qt.Assert(t, qt.IsNil(os.WriteFile(filepath.Join(toolDir, name), []byte(script), 0o755)))
 	}
 	t.Setenv("CLAUDE_FORMAT_HOOKS_CACHE", filepath.Join(t.TempDir(), "cache"))
 	t.Setenv("FORMATTER_MARKER", marker)
@@ -190,12 +190,12 @@ func TestDispatchArgsRoutesInstallAndUninstall(t *testing.T) {
 func writeFile(t *testing.T, path, content string) {
 	t.Helper()
 	qt.Assert(t, qt.IsNil(os.MkdirAll(filepath.Dir(path), 0o700)))
-	qt.Assert(t, qt.IsNil(os.WriteFile(path, []byte(content), 0o600))) //nolint:gosec // test fixture
+	qt.Assert(t, qt.IsNil(os.WriteFile(path, []byte(content), 0o600)))
 }
 
 func readFile(t *testing.T, path string) string {
 	t.Helper()
-	b, err := os.ReadFile(path) //nolint:gosec // test fixture
+	b, err := os.ReadFile(path)
 	qt.Assert(t, qt.IsNil(err))
 	return string(b)
 }
@@ -325,7 +325,7 @@ func TestDispatchArgsUpgradeHappyPathViaReleaseAPI(t *testing.T) {
 	target := installer.HookBinaryPath(binDir)
 	oldBinary := []byte("old release binary\n")
 	qt.Assert(t, qt.IsNil(os.MkdirAll(binDir, 0o700)))
-	qt.Assert(t, qt.IsNil(os.WriteFile(target, oldBinary, 0o751))) //nolint:gosec // test fixture
+	qt.Assert(t, qt.IsNil(os.WriteFile(target, oldBinary, 0o751)))
 
 	assetName := fmt.Sprintf("format-dispatch-%s-%s", runtime.GOOS, runtime.GOARCH)
 	if runtime.GOOS == "windows" {
@@ -367,7 +367,7 @@ func TestDispatchArgsUpgradeDryRunViaReleaseAPI(t *testing.T) {
 	target := installer.HookBinaryPath(binDir)
 	oldBinary := []byte("old release binary\n")
 	qt.Assert(t, qt.IsNil(os.MkdirAll(binDir, 0o700)))
-	qt.Assert(t, qt.IsNil(os.WriteFile(target, oldBinary, 0o751))) //nolint:gosec // test fixture
+	qt.Assert(t, qt.IsNil(os.WriteFile(target, oldBinary, 0o751)))
 
 	var binaryRequests atomic.Int32
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -744,7 +744,7 @@ func TestRunPrintsDiagnosticOnFormatterFailure(t *testing.T) {
 	toolDir := t.TempDir()
 	script := filepath.Join(toolDir, "bunx")
 	body := "#!/bin/sh\ni=1\nwhile [ $i -le 20 ]; do echo \"line $i\"; i=$((i+1)); done\nexit 1\n"
-	qt.Assert(t, qt.IsNil(os.WriteFile(script, []byte(body), 0o755))) //nolint:gosec // test fixture
+	qt.Assert(t, qt.IsNil(os.WriteFile(script, []byte(body), 0o755)))
 	t.Setenv("PATH", toolDir)
 
 	projectRoot := t.TempDir()

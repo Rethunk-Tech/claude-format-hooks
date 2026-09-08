@@ -16,7 +16,7 @@ func TestResolveMarkdownlintConfigMaterializesDefaults(t *testing.T) {
 	path := resolveMarkdownlintConfig(home)
 
 	qt.Assert(t, qt.Equals(path, filepath.Join(home, ".claude", userMarkdownlintConfigFile)))
-	written, err := os.ReadFile(path) //nolint:gosec // path is the temp dir this test just wrote
+	written, err := os.ReadFile(path)
 	qt.Assert(t, qt.IsNil(err))
 	qt.Check(t, qt.DeepEquals(written, markdownlintDefaults), qt.Commentf("materialized file must be the embedded defaults verbatim"))
 }
@@ -29,12 +29,12 @@ func TestResolveMarkdownlintConfigNeverOverwritesAnEditedFile(t *testing.T) {
 	path := filepath.Join(home, ".claude", userMarkdownlintConfigFile)
 	qt.Assert(t, qt.IsNil(os.MkdirAll(filepath.Dir(path), 0o755)))
 	edited := []byte(`{ "config": { "MD013": true } }`)
-	qt.Assert(t, qt.IsNil(os.WriteFile(path, edited, 0o644))) //nolint:gosec // test fixture
+	qt.Assert(t, qt.IsNil(os.WriteFile(path, edited, 0o644)))
 
 	got := resolveMarkdownlintConfig(home)
 
 	qt.Assert(t, qt.Equals(got, path))
-	after, err := os.ReadFile(path) //nolint:gosec // path is the temp dir this test just wrote
+	after, err := os.ReadFile(path)
 	qt.Assert(t, qt.IsNil(err))
 	qt.Check(t, qt.DeepEquals(after, edited), qt.Commentf("an existing config is the user's and must survive"))
 }
@@ -53,7 +53,7 @@ func TestResolveMarkdownlintConfigReturnsEmptyWhenUnwritable(t *testing.T) {
 	// "no --config" rather than failing the write that triggered the hook.
 	home := t.TempDir()
 	blocker := filepath.Join(home, ".claude")
-	qt.Assert(t, qt.IsNil(os.WriteFile(blocker, []byte("not a directory"), 0o644))) //nolint:gosec // test fixture
+	qt.Assert(t, qt.IsNil(os.WriteFile(blocker, []byte("not a directory"), 0o644)))
 
 	qt.Check(t, qt.Equals(resolveMarkdownlintConfig(home), ""))
 }
@@ -64,7 +64,7 @@ func TestWriteIfMissingKeepsTheExistingFile(t *testing.T) {
 
 	qt.Assert(t, qt.IsNil(writeIfMissing(path, []byte("second"))))
 
-	got, err := os.ReadFile(path) //nolint:gosec // path is the temp dir this test just wrote
+	got, err := os.ReadFile(path)
 	qt.Assert(t, qt.IsNil(err))
 	qt.Check(t, qt.Equals(string(got), "first"), qt.Commentf("writeIfMissing must not clobber"))
 }

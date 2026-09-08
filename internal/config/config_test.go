@@ -149,7 +149,7 @@ func TestResolveIndentRechecksAfterTTLExpires(t *testing.T) {
 	stalePath := filepath.Join(cacheDir, key)
 	stale := time.Now().Add(-2 * editorconfigCacheTTL).Unix()
 	qt.Assert(t, qt.IsNil(os.MkdirAll(cacheDir, 0o700)))
-	qt.Assert(t, qt.IsNil(os.WriteFile(stalePath, []byte(strconv.FormatInt(stale, 10)+"\n"+encodeIndentSpec(fallback)), 0o600))) //nolint:gosec // test fixture
+	qt.Assert(t, qt.IsNil(os.WriteFile(stalePath, []byte(strconv.FormatInt(stale, 10)+"\n"+encodeIndentSpec(fallback)), 0o600)))
 
 	qt.Assert(t, qt.IsNil(os.WriteFile(filepath.Join(dir, ".editorconfig"), []byte("root = true\n\n[*.json]\nindent_style = tab\n"), 0o600)))
 	spec := ResolveJSONIndent(Default(), abs)

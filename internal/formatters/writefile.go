@@ -63,7 +63,7 @@ func writeFormatted(abs string, source, out []byte, defaultMode os.FileMode) err
 			return nil
 		}
 	}
-	return os.Rename(tmpName, target) //nolint:gosec // target resolves the formatter's input path, by design
+	return os.Rename(tmpName, target)
 }
 
 // writeIfChanged persists out when it differs from src, shaping the outcome

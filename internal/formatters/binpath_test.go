@@ -69,7 +69,7 @@ func TestLookPathRechecksAfterTTLExpires(t *testing.T) {
 	path := filepath.Join(dir, "missing-was-missing-now-stale")
 	qt.Assert(t, qt.IsNil(os.MkdirAll(dir, 0o700)))
 	stale := time.Now().Add(-2 * binPathCacheTTL).Unix()
-	qt.Assert(t, qt.IsNil(os.WriteFile(path, []byte(strconv.FormatInt(stale, 10)+"\n"), 0o600))) //nolint:gosec // test fixture
+	qt.Assert(t, qt.IsNil(os.WriteFile(path, []byte(strconv.FormatInt(stale, 10)+"\n"), 0o600)))
 
 	got, err := lookPath("was-missing-now-stale")
 	qt.Check(t, qt.IsNil(err), qt.Commentf("a stale marker must not mask a now-installed binary"))
@@ -84,7 +84,7 @@ func TestLookPathSuccessClearsAStaleMarker(t *testing.T) {
 	qt.Assert(t, qt.IsTrue(ok))
 	path := filepath.Join(dir, "missing-clears-its-marker")
 	qt.Assert(t, qt.IsNil(os.MkdirAll(dir, 0o700)))
-	qt.Assert(t, qt.IsNil(os.WriteFile(path, []byte("123\n"), 0o600))) //nolint:gosec // test fixture, deliberately stale/bogus
+	qt.Assert(t, qt.IsNil(os.WriteFile(path, []byte("123\n"), 0o600)))
 
 	_, err := lookPath("clears-its-marker")
 	qt.Assert(t, qt.IsNil(err))

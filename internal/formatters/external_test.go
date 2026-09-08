@@ -26,7 +26,7 @@ func writeFakeTool(t *testing.T, name, body string) {
 	dir := t.TempDir()
 	path := filepath.Join(dir, name)
 	script := "#!/bin/sh\n" + body + "\n"
-	qt.Assert(t, qt.IsNil(os.WriteFile(path, []byte(script), 0o755))) //nolint:gosec // test fixture, not the file under format
+	qt.Assert(t, qt.IsNil(os.WriteFile(path, []byte(script), 0o755)))
 	t.Setenv("PATH", dir)
 }
 
@@ -214,9 +214,9 @@ func TestPythonFormatterPrefersRuffOverBlack(t *testing.T) {
 	isolateDiskCache(t)
 	dir := t.TempDir()
 	path := filepath.Join(dir, "ruff")
-	qt.Assert(t, qt.IsNil(os.WriteFile(path, []byte("#!/bin/sh\nexit 0\n"), 0o755))) //nolint:gosec // test fixture
+	qt.Assert(t, qt.IsNil(os.WriteFile(path, []byte("#!/bin/sh\nexit 0\n"), 0o755)))
 	blackPath := filepath.Join(dir, "black")
-	qt.Assert(t, qt.IsNil(os.WriteFile(blackPath, []byte("#!/bin/sh\nexit 1\n"), 0o755))) //nolint:gosec // test fixture
+	qt.Assert(t, qt.IsNil(os.WriteFile(blackPath, []byte("#!/bin/sh\nexit 1\n"), 0o755)))
 	t.Setenv("PATH", dir)
 
 	fileDir := t.TempDir()
@@ -335,7 +335,7 @@ func TestTerraformFormatterPrefersTerraformOverTofu(t *testing.T) {
 	writeFakeTool(t, "terraform", "exit 0")
 	terraformDir := os.Getenv("PATH")
 	tofu := filepath.Join(terraformDir, "tofu")
-	qt.Assert(t, qt.IsNil(os.WriteFile(tofu, []byte("#!/bin/sh\nexit 1\n"), 0o755))) //nolint:gosec // test fixture
+	qt.Assert(t, qt.IsNil(os.WriteFile(tofu, []byte("#!/bin/sh\nexit 1\n"), 0o755)))
 
 	res := NewTerraform().Format(t.Context(), dir, abs)
 
@@ -375,7 +375,7 @@ func TestCachedFindUpwardRechecksAfterTTLExpires(t *testing.T) {
 	diskcache.Set(cacheDir, key, "")
 	stalePath := filepath.Join(cacheDir, key)
 	stale := time.Now().Add(-2 * findUpwardCacheTTL).Unix()
-	qt.Assert(t, qt.IsNil(os.WriteFile(stalePath, []byte(strconv.FormatInt(stale, 10)+"\n"), 0o600))) //nolint:gosec // test fixture
+	qt.Assert(t, qt.IsNil(os.WriteFile(stalePath, []byte(strconv.FormatInt(stale, 10)+"\n"), 0o600)))
 
 	qt.Assert(t, qt.IsNil(os.WriteFile(filepath.Join(root, "biome.json"), []byte("{}"), 0o600)))
 	qt.Check(t, qt.Equals(cachedFindUpward(root, root, "biome.json", "biome.jsonc"), root),

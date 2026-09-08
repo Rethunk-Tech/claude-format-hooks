@@ -17,8 +17,8 @@ func TestNotebookFormatterPrefersRuffOverBlack(t *testing.T) {
 	dir := t.TempDir()
 	ruffPath := filepath.Join(dir, "ruff")
 	blackPath := filepath.Join(dir, "black")
-	qt.Assert(t, qt.IsNil(os.WriteFile(ruffPath, []byte("#!/bin/sh\nexit 0\n"), 0o755)))  //nolint:gosec // test fixture
-	qt.Assert(t, qt.IsNil(os.WriteFile(blackPath, []byte("#!/bin/sh\nexit 1\n"), 0o755))) //nolint:gosec // test fixture
+	qt.Assert(t, qt.IsNil(os.WriteFile(ruffPath, []byte("#!/bin/sh\nexit 0\n"), 0o755)))
+	qt.Assert(t, qt.IsNil(os.WriteFile(blackPath, []byte("#!/bin/sh\nexit 1\n"), 0o755)))
 	t.Setenv("PATH", dir)
 
 	fileDir := t.TempDir()

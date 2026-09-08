@@ -35,7 +35,7 @@ func installedBinary(t *testing.T, content []byte, perm os.FileMode) string {
 
 func readFile(t *testing.T, path string) []byte {
 	t.Helper()
-	raw, err := os.ReadFile(path) //nolint:gosec // path is a temp file the test wrote
+	raw, err := os.ReadFile(path)
 	qt.Assert(t, qt.IsNil(err))
 	return raw
 }

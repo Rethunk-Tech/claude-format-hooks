@@ -310,7 +310,7 @@ func applyChange(opts Options, before, after []byte, dryRun bool, out io.Writer,
 
 	backupPath := opts.SettingsPath + ".bak"
 	wroteBackup := false
-	if existing, err := os.ReadFile(opts.SettingsPath); err == nil { //nolint:gosec // caller-controlled settings location
+	if existing, err := os.ReadFile(opts.SettingsPath); err == nil {
 		if err := writeAtomic(backupPath, existing, 0o600); err != nil {
 			return fmt.Errorf("backup %s: %w", opts.SettingsPath, err)
 		}

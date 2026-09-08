@@ -133,7 +133,7 @@ func checkRootCandidates(paths []string) []string {
 		if err != nil {
 			continue
 		}
-		if info, err := os.Stat(root); err == nil && !info.IsDir() { //nolint:gosec // path is an operator-supplied --check argument
+		if info, err := os.Stat(root); err == nil && !info.IsDir() {
 			root = filepath.Dir(root)
 		}
 		candidates = append(candidates, root)
