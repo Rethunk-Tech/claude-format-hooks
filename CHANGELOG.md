@@ -75,6 +75,24 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `hooks` child, `hooks` is omitted too. A pre-existing empty `"hooks": {}`
   placeholder is left in place.
 
+- `--install` and `--uninstall` rewrite `settings.json` and
+  `~/.cursor/hooks.json` with their top-level keys sorted. Every value and
+  every unrelated key survives byte for byte; only the order changes, once.
+- An operator still carrying the pre-binary hand-written `biome check
+  --write` hook keeps it: `--install` no longer removes that entry.
+- `./install.sh --upgrade` no longer compiles from source before
+  downloading the release binary that replaces it. The build still runs
+  when nothing is installed yet, since `--upgrade` is run by that binary.
+- `internal/diskcache` sweeps expired entries once per namespace per
+  process instead of on every read. The sweep costs an `os.ReadDir` of the
+  whole cache directory, and that directory grows one entry per file
+  formatted, so a read had been scaling with the session's history: 206us
+  against a 2.8us bare `exec.LookPath` once ~2000 entries had accumulated,
+  now flat at ~2.4us.
+- `--check` resolves its project-root candidates once for the run rather
+  than re-running `filepath.Abs` and `os.Stat` over every path argument for
+  every file inspected.
+
 ### Fixed
 
 - gosec CI clears: `checkProjectRoot` stats the Abs root (G703), shebang
@@ -127,6 +145,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `markdownlint-cli2` now resolves the patched `js-yaml` 5.2.2 release, so
   the installer no longer needs a global dependency override for
   GHSA-pm4m-ph32-ghv5.
+
+- A relative `$CLAUDE_PROJECT_DIR` no longer silently skips every file.
+  The containment check compared it by prefix against an already absolute
+  path, so nothing ever matched and the hook exited 0 having formatted
+  nothing. `--check` had absolutized the same value all along.
+- `--uninstall` drops the emptied `hooks` container from `settings.json`
+  instead of leaving `"hooks": {"PostToolUse": []}` behind, matching what
+  the Cursor document already did. A pre-existing empty `"hooks": {}` the
+  run never touched is still left in place.
+- `--check` no longer walks and collects vendored directories when neither
+  `$CLAUDE_PROJECT_DIR` nor the working directory yields a root to make the
+  path relative to. Reachable when `os.Getwd` fails, and on Windows when a
+  check spans volumes.
+- bun's global `package.json` is written atomically. It is shared with
+  everything else installed globally, and a plain write could truncate it.
 
 ### Documentation
 
