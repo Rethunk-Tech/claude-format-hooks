@@ -140,10 +140,7 @@ func registryForCheck(registry *dispatch.Registry, userCfg config.Config, ext st
 // run without CLAUDE_PROJECT_DIR: the path argument, rather than each nested
 // file discovered beneath it, defines the config and dispatch boundary.
 func checkProjectRoot(paths []string, abs string) string {
-	if root := os.Getenv("CLAUDE_PROJECT_DIR"); root != "" {
-		if absolute, err := filepath.Abs(root); err == nil {
-			return absolute
-		}
+	if root := projectRootEnv(); root != "" {
 		return root
 	}
 
@@ -234,12 +231,7 @@ func copyBeside(abs string, content []byte) (path string, cleanup func(), err er
 // runs is meaningful.
 func collectCheckTargets(paths []string) ([]string, error) {
 	seen := map[string]bool{}
-	projectRoot := os.Getenv("CLAUDE_PROJECT_DIR")
-	if projectRoot != "" {
-		if abs, err := filepath.Abs(projectRoot); err == nil {
-			projectRoot = abs
-		}
-	}
+	projectRoot := projectRootEnv()
 	vendorRoot, err := os.Getwd()
 	if err != nil {
 		vendorRoot = ""

@@ -324,6 +324,21 @@ func buildRegistry() (*dispatch.Registry, config.Config) {
 	return dispatch.NewRegistry(cfg), cfg
 }
 
+// projectRootEnv returns $CLAUDE_PROJECT_DIR as an absolute path, or "" if
+// unset. Absolutizing here is load-bearing: within compares an already
+// absolute file path against this root by prefix, so a relative value would
+// match nothing and silently skip every file.
+func projectRootEnv() string {
+	root := os.Getenv("CLAUDE_PROJECT_DIR")
+	if root == "" {
+		return ""
+	}
+	if abs, err := filepath.Abs(root); err == nil {
+		return abs
+	}
+	return root
+}
+
 // resolveTarget resolves path to an absolute path and its project root,
 // and applies every project-boundary guard shared by every dispatch-bound
 // file: existence (and not-a-directory), containment within projectRoot,
@@ -342,7 +357,7 @@ func resolveTarget(path string) (abs, projectRoot, skipReason string) {
 		return abs, "", "skip: stat failed or is a directory"
 	}
 
-	projectRoot = os.Getenv("CLAUDE_PROJECT_DIR")
+	projectRoot = projectRootEnv()
 	if projectRoot == "" {
 		if wd, err := os.Getwd(); err == nil {
 			projectRoot = wd

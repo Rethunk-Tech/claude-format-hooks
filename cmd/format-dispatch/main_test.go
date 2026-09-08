@@ -108,6 +108,19 @@ func TestResolveTarget(t *testing.T) {
 			},
 		},
 		{
+			name: "relative project root is absolutized",
+			setup: func(t *testing.T) (string, string, string, string) {
+				t.Helper()
+				parent := t.TempDir()
+				projectRoot := filepath.Join(parent, "proj")
+				path := filepath.Join(projectRoot, "target.json")
+				writeFile(t, path, "content")
+				t.Chdir(parent)
+				t.Setenv("CLAUDE_PROJECT_DIR", "proj")
+				return path, path, projectRoot, ""
+			},
+		},
+		{
 			name: "vendored directory",
 			setup: func(t *testing.T) (string, string, string, string) {
 				t.Helper()
