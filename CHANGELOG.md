@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.4.0] - 2026-09-07
+
 ### Added
 
 - `--install` / `--uninstall` also wire Cursor `~/.cursor/hooks.json` as
@@ -96,6 +98,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `--check` resolves its project-root candidates once for the run rather
   than re-running `filepath.Abs` and `os.Stat` over every path argument for
   every file inspected.
+- The directory skip list also covers `target`, `out`, `.turbo`, `.swc`,
+  `.cache`, `.gradle`, `.orchestrate`, and `.playwright-mcp`. `--check`
+  prunes a skipped tree at its root, so a Rust project no longer walks all
+  of `target/` and a Next project no longer walks `out/`.
+- The skip diagnostic reads `skip: non-source directory` rather than
+  `skip: vendored directory`. Only some of the listed segments are vendored
+  third-party code; the rest are build output, tool caches, VCS metadata,
+  and agent scratch.
 
 ### Fixed
 
@@ -158,7 +168,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   instead of leaving `"hooks": {"PostToolUse": []}` behind, matching what
   the Cursor document already did. A pre-existing empty `"hooks": {}` the
   run never touched is still left in place.
-- `--check` no longer walks and collects vendored directories when neither
+- `--check` no longer walks and collects skipped directories when neither
   `$CLAUDE_PROJECT_DIR` nor the working directory yields a root to make the
   path relative to. Reachable when `os.Getwd` fails, and on Windows when a
   check spans volumes.
@@ -420,7 +430,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 Initial release.
 
-[Unreleased]: https://github.com/Rethunk-Tech/claude-format-hooks/compare/v0.3.0...HEAD
+[Unreleased]: https://github.com/Rethunk-Tech/claude-format-hooks/compare/v0.4.0...HEAD
+[0.4.0]: https://github.com/Rethunk-Tech/claude-format-hooks/compare/v0.3.0...v0.4.0
 [0.3.0]: https://github.com/Rethunk-Tech/claude-format-hooks/compare/v0.2.0...v0.3.0
 [0.2.0]: https://github.com/Rethunk-Tech/claude-format-hooks/compare/v0.1.0...v0.2.0
 [0.1.0]: https://github.com/Rethunk-Tech/claude-format-hooks/releases/tag/v0.1.0
