@@ -155,16 +155,13 @@ func TestWireMissingSettingsFile(t *testing.T) {
 func TestWireIdempotentReinstall(t *testing.T) {
 	settingsPath := settingsFile(t, `{}`)
 
-	_, first, err := Wire(settingsPath, binPath)
-	qt.Assert(t, qt.IsNil(err))
-	qt.Assert(t, qt.IsNil(os.WriteFile(settingsPath, first, 0o600)))
+	first := wireInstalled(t, settingsPath)
 
 	_, second, err := Wire(settingsPath, binPath)
 	qt.Assert(t, qt.IsNil(err))
 
-	entries := settingsPostToolUse(t, second)
-	qt.Assert(t, qt.HasLen(entries, 1))
-	qt.Check(t, qt.Equals(entries[0].Hooks[0].Command, binPath))
+	qt.Check(t, qt.DeepEquals(second, first), qt.Commentf("a second wire must render the same document"))
+	assertOnlyOurEntry(t, second, binPath)
 }
 
 func TestWireReplacesLegacyBareBasename(t *testing.T) {
@@ -301,7 +298,9 @@ func TestUninstallDryRunDoesNotWrite(t *testing.T) {
 	settingsPath := filepath.Join(dir, "settings.json")
 	wired := wireInstalled(t, settingsPath)
 	cursorPath := filepath.Join(dir, "hooks.json")
-	cursorWired := wireCursorInstalled(t, cursorPath)
+	_, cursorWired, cursorErr := WireCursor(cursorPath, binPath)
+	qt.Assert(t, qt.IsNil(cursorErr))
+	qt.Assert(t, qt.IsNil(os.WriteFile(cursorPath, cursorWired, 0o600)))
 
 	var out strings.Builder
 	opts := Options{BinPath: binPath, SettingsPath: settingsPath, CursorHooksPath: cursorPath}

@@ -115,14 +115,12 @@ func TestUninstallMissingCursorLeavesFileMissing(t *testing.T) {
 	dir := t.TempDir()
 	settingsPath := filepath.Join(dir, "settings.json")
 	cursorPath := filepath.Join(dir, "hooks.json")
-	_, wired, err := Wire(settingsPath, binPath)
-	qt.Assert(t, qt.IsNil(err))
-	qt.Assert(t, qt.IsNil(os.WriteFile(settingsPath, wired, 0o600)))
+	wireInstalled(t, settingsPath)
 
 	var out strings.Builder
 	opts := Options{BinPath: binPath, SettingsPath: settingsPath, CursorHooksPath: cursorPath}
 	qt.Assert(t, qt.IsNil(Uninstall(opts, false, &out)))
-	_, err = os.Stat(cursorPath)
+	_, err := os.Stat(cursorPath)
 	qt.Check(t, qt.IsTrue(os.IsNotExist(err)))
 }
 
@@ -176,7 +174,14 @@ func TestUnwireCursorDropsAnEmptiedHooksContainer(t *testing.T) {
 
 			_, after, err := UnwireCursor(path, binPath)
 			qt.Assert(t, qt.IsNil(err))
-			assertHooksGoneVersionKept(t, after)
+			var top map[string]json.RawMessage
+			qt.Assert(t, qt.IsNil(json.Unmarshal(after, &top)))
+			_, hasHooks := top["hooks"]
+			qt.Check(t, qt.IsFalse(hasHooks), qt.Commentf("an emptied hooks container must be dropped"))
+
+			version, ok := cursorVersion(t, after)
+			qt.Assert(t, qt.IsTrue(ok))
+			qt.Check(t, qt.Equals(version, 1))
 		})
 	}
 }

@@ -41,15 +41,6 @@ func assertIdempotent(t *testing.T, f Formatter, dir, path string) []byte {
 	return first
 }
 
-// assertSingleTrailingNewline checks output ends with exactly one newline.
-func assertSingleTrailingNewline(t *testing.T, out []byte) {
-	t.Helper()
-	qt.Check(t, qt.IsTrue(len(out) > 0 && out[len(out)-1] == '\n'),
-		qt.Commentf("output must end with exactly one newline, got %q", out))
-	qt.Check(t, qt.IsFalse(len(out) >= 2 && out[len(out)-2] == '\n'),
-		qt.Commentf("output has a trailing blank line, got %q", out))
-}
-
 // assertDirectoryIsAReadError checks a formatter reports a directory as a
 // read failure rather than the "not my syntax" Skipped path.
 func assertDirectoryIsAReadError(t *testing.T, f Formatter) {

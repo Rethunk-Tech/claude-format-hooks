@@ -29,7 +29,11 @@ func TestJSONFormatterIdempotent(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			dir, path := sourceFile(t, "t.json", tc.src)
 
-			assertSingleTrailingNewline(t, assertIdempotent(t, NewJSON(config.Default()), dir, path))
+			out := assertIdempotent(t, NewJSON(config.Default()), dir, path)
+			qt.Check(t, qt.IsTrue(len(out) > 0 && out[len(out)-1] == '\n'),
+				qt.Commentf("output must end with exactly one newline, got %q", out))
+			qt.Check(t, qt.IsFalse(len(out) >= 2 && out[len(out)-2] == '\n'),
+				qt.Commentf("output has a trailing blank line, got %q", out))
 		})
 	}
 }
@@ -103,11 +107,8 @@ func TestJSONRouterUsesPathBiomeWithoutBunx(t *testing.T) {
 
 func TestJSONRouterSkipsDisabledBiome(t *testing.T) {
 	isolateDiskCache(t)
-	dir := t.TempDir()
+	dir, path := biomeProject(t, "t.json", `{"a":1}`)
 	writeFakeTool(t, "biome", "exit 0")
-	qt.Assert(t, qt.IsNil(os.WriteFile(filepath.Join(dir, "biome.json"), []byte("{}\n"), 0o600)))
-	path := filepath.Join(dir, "t.json")
-	qt.Assert(t, qt.IsNil(os.WriteFile(path, []byte(`{"a":1}`), 0o600)))
 
 	cfg := config.Default()
 	cfg.DisabledFormatters = []string{"BIOME"}
