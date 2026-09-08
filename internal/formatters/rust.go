@@ -17,9 +17,5 @@ func (rustFormatter) Format(ctx context.Context, projectRoot, abs string) Result
 	if _, err := lookPath("rustfmt"); err != nil {
 		return Result{Skipped: true}
 	}
-	ok, diag := runExternal(ctx, projectRoot, "rustfmt", []string{"--", abs})
-	if !ok {
-		return Result{Diagnostic: diag}
-	}
-	return Result{}
+	return runExternalResult(ctx, projectRoot, "rustfmt", []string{"--", abs})
 }

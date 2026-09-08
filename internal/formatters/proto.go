@@ -23,9 +23,5 @@ func (protoFormatter) Format(ctx context.Context, projectRoot, abs string) Resul
 	// -w rewrites in place. buf resolves any buf.yaml by walking up from the
 	// file itself, so running from projectRoot does not hide a nested
 	// module's config the way a fixed --path would.
-	ok, diag := runExternal(ctx, projectRoot, "buf", []string{"format", "-w", abs})
-	if !ok {
-		return Result{Diagnostic: diag}
-	}
-	return Result{}
+	return runExternalResult(ctx, projectRoot, "buf", []string{"format", "-w", abs})
 }

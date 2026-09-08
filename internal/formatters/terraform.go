@@ -24,9 +24,5 @@ func (terraformFormatter) Format(ctx context.Context, projectRoot, abs string) R
 			return Result{Skipped: true}
 		}
 	}
-	ok, diag := runExternal(ctx, projectRoot, bin, []string{"fmt", abs})
-	if !ok {
-		return Result{Diagnostic: diag}
-	}
-	return Result{}
+	return runExternalResult(ctx, projectRoot, bin, []string{"fmt", abs})
 }

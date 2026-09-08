@@ -17,18 +17,10 @@ func (pythonFormatter) Name() string { return "ruff/black" }
 
 func (pythonFormatter) Format(ctx context.Context, projectRoot, abs string) Result {
 	if _, err := lookPath("ruff"); err == nil {
-		return runPythonTool(ctx, projectRoot, "ruff", []string{"format", "--", abs})
+		return runExternalResult(ctx, projectRoot, "ruff", []string{"format", "--", abs})
 	}
 	if _, err := lookPath("black"); err == nil {
-		return runPythonTool(ctx, projectRoot, "black", []string{"--quiet", "--", abs})
+		return runExternalResult(ctx, projectRoot, "black", []string{"--quiet", "--", abs})
 	}
 	return Result{Skipped: true}
-}
-
-func runPythonTool(ctx context.Context, dir, name string, args []string) Result {
-	ok, diag := runExternal(ctx, dir, name, args)
-	if !ok {
-		return Result{Diagnostic: diag}
-	}
-	return Result{}
 }

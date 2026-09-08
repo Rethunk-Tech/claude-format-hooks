@@ -161,13 +161,7 @@ func runInstall(args []string, uninstall bool) int {
 		return 1
 	}
 
-	opts, err := installer.DefaultOptions()
-	if err != nil {
-		fmt.Fprintf(os.Stderr, "format-dispatch %s: %v\n", label, err)
-		return 1
-	}
-	if err := action(opts, dryRun, os.Stdout); err != nil {
-		fmt.Fprintf(os.Stderr, "format-dispatch %s: %v\n", label, err)
+	if !runInstallerAction(label, dryRun, action) {
 		return 1
 	}
 
@@ -182,6 +176,23 @@ func runInstall(args []string, uninstall bool) int {
 		}
 	}
 	return 0
+}
+
+// runInstallerAction resolves the default options and runs one installer
+// entry point, reporting any failure against label. Install, Uninstall and
+// Upgrade share a signature, so this is the whole body of all three
+// subcommands past argument parsing.
+func runInstallerAction(label string, dryRun bool, action func(installer.Options, bool, io.Writer) error) bool {
+	opts, err := installer.DefaultOptions()
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "format-dispatch %s: %v\n", label, err)
+		return false
+	}
+	if err := action(opts, dryRun, os.Stdout); err != nil {
+		fmt.Fprintf(os.Stderr, "format-dispatch %s: %v\n", label, err)
+		return false
+	}
+	return true
 }
 
 // parseDryRun reads a subcommand's only accepted argument. It reports the
@@ -213,13 +224,7 @@ func runUpgrade(args []string) int {
 		return 1
 	}
 
-	opts, err := installer.DefaultOptions()
-	if err != nil {
-		fmt.Fprintf(os.Stderr, "format-dispatch %s: %v\n", label, err)
-		return 1
-	}
-	if err := installer.Upgrade(opts, dryRun, os.Stdout); err != nil {
-		fmt.Fprintf(os.Stderr, "format-dispatch %s: %v\n", label, err)
+	if !runInstallerAction(label, dryRun, installer.Upgrade) {
 		return 1
 	}
 	return 0

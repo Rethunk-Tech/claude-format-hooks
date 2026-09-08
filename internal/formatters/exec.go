@@ -59,3 +59,13 @@ func truncate(out []byte, maxLines, maxChars int) string {
 	}
 	return string(joined[:cut])
 }
+
+// runExternalResult runs an external formatter and shapes the outcome as a
+// Result: a failure carries its diagnostic, success carries nothing. Every
+// tool that neither skips nor inspects the output ends this way.
+func runExternalResult(ctx context.Context, dir, name string, args []string) Result {
+	if ok, diagnostic := runExternal(ctx, dir, name, args); !ok {
+		return Result{Diagnostic: diagnostic}
+	}
+	return Result{}
+}

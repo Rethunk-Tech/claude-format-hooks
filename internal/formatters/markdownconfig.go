@@ -99,7 +99,9 @@ func writeIfMissing(path string, content []byte) error {
 		return err
 	}
 
-	tmp, err := os.CreateTemp(dir, ".markdownlint-defaults-*.jsonc")
+	// Named after the destination: this helper also materializes ~/.sqlfluff,
+	// and a markdownlint-named scratch file in $HOME would be baffling.
+	tmp, err := os.CreateTemp(dir, filepath.Base(path)+".*.tmp")
 	if err != nil {
 		return err
 	}

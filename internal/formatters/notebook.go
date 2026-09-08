@@ -17,7 +17,7 @@ func (notebookFormatter) Name() string { return "ruff/black-notebook" }
 
 func (notebookFormatter) Format(ctx context.Context, projectRoot, abs string) Result {
 	if _, err := lookPath("ruff"); err == nil {
-		return runNotebookTool(ctx, projectRoot, "ruff", []string{"format", "--", abs})
+		return runExternalResult(ctx, projectRoot, "ruff", []string{"format", "--", abs})
 	}
 	if _, err := lookPath("black"); err == nil {
 		ok, diagnostic, raw := runExternalOutput(ctx, projectRoot, "black", []string{"--quiet", "--", abs})
@@ -30,14 +30,6 @@ func (notebookFormatter) Format(ctx context.Context, projectRoot, abs string) Re
 		return Result{Diagnostic: diagnostic}
 	}
 	return Result{Skipped: true}
-}
-
-func runNotebookTool(ctx context.Context, dir, name string, args []string) Result {
-	ok, diagnostic := runExternal(ctx, dir, name, args)
-	if !ok {
-		return Result{Diagnostic: diagnostic}
-	}
-	return Result{}
 }
 
 // blackNotebookSupportMissingMarkers appear only when black cannot handle
