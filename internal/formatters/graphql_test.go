@@ -15,105 +15,75 @@ func TestGraphQLRouterName(t *testing.T) {
 	qt.Check(t, qt.Equals(NewGraphQLRouter(config.Default()).Name(), "prettier"))
 }
 
-func TestGraphQLRouterUsesPrettierWithoutBiomeConfig(t *testing.T) {
-	isolateDiskCache(t)
-	dir := t.TempDir()
-	marker := filepath.Join(dir, "marker")
-	t.Setenv("GRAPHQL_MARKER", marker)
-	writeGraphQLTools(t)
+func TestGraphQLRouterPicksAFormatter(t *testing.T) {
+	biome := graphqlTestTool{name: "biome", marker: "biome"}
+	prettier := graphqlTestTool{name: "prettier", marker: "prettier"}
 
-	abs := filepath.Join(dir, "schema.graphql")
-	qt.Assert(t, qt.IsNil(os.WriteFile(abs, []byte("type Query { hello: String }"), 0o600)))
+	tests := []struct {
+		name        string
+		tools       []graphqlTestTool
+		biomeConfig bool
+		ext         string
+		disabled    []string
+		want        string
+	}{
+		{
+			name: "no biome config leaves prettier in charge",
+			ext:  ".graphql",
+			want: "prettier",
+		},
+		{
+			name:        "a biome config selects biome",
+			tools:       []graphqlTestTool{biome},
+			biomeConfig: true,
+			ext:         ".gql",
+			want:        "biome",
+		},
+		{
+			name:        "no biome launcher falls back to prettier",
+			tools:       []graphqlTestTool{prettier},
+			biomeConfig: true,
+			ext:         ".graphql",
+			want:        "prettier",
+		},
+		{
+			name:        "bunx stands in for a missing biome binary",
+			tools:       []graphqlTestTool{{name: "bunx", marker: "biome"}},
+			biomeConfig: true,
+			ext:         ".graphql",
+			want:        "biome",
+		},
+		{
+			name:        "disabling biome leaves prettier in charge",
+			biomeConfig: true,
+			ext:         ".graphql",
+			disabled:    []string{"BIOME"},
+			want:        "prettier",
+		},
+	}
 
-	res := NewGraphQLRouter(config.Default()).Format(t.Context(), dir, abs)
-	qt.Assert(t, qt.IsNil(res.Err))
-	qt.Check(t, qt.IsFalse(res.Skipped))
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			isolateDiskCache(t)
+			dir := t.TempDir()
+			marker := filepath.Join(dir, "marker")
+			t.Setenv("GRAPHQL_MARKER", marker)
+			writeGraphQLTools(t, tc.tools...)
+			if tc.biomeConfig {
+				qt.Assert(t, qt.IsNil(os.WriteFile(filepath.Join(dir, "biome.json"), []byte("{}\n"), 0o600)))
+			}
 
-	got, err := os.ReadFile(marker)
-	qt.Assert(t, qt.IsNil(err))
-	qt.Check(t, qt.Equals(string(got), "prettier"))
-}
+			abs := filepath.Join(dir, "schema"+tc.ext)
+			qt.Assert(t, qt.IsNil(os.WriteFile(abs, []byte("type Query { hello: String }"), 0o600)))
 
-func TestGraphQLRouterUsesBiomeWhenConfigured(t *testing.T) {
-	isolateDiskCache(t)
-	dir := t.TempDir()
-	marker := filepath.Join(dir, "marker")
-	t.Setenv("GRAPHQL_MARKER", marker)
-	writeGraphQLTools(t, graphqlTestTool{name: "biome", marker: "biome"})
-	qt.Assert(t, qt.IsNil(os.WriteFile(filepath.Join(dir, "biome.json"), []byte("{}\n"), 0o600)))
-
-	abs := filepath.Join(dir, "schema.gql")
-	qt.Assert(t, qt.IsNil(os.WriteFile(abs, []byte("type Query { hello: String }"), 0o600)))
-
-	res := NewGraphQLRouter(config.Default()).Format(t.Context(), dir, abs)
-	qt.Assert(t, qt.IsNil(res.Err))
-	qt.Check(t, qt.IsFalse(res.Skipped))
-
-	got, err := os.ReadFile(marker)
-	qt.Assert(t, qt.IsNil(err))
-	qt.Check(t, qt.Equals(string(got), "biome"))
-}
-
-func TestGraphQLRouterFallsBackToPrettierWithoutLaunchers(t *testing.T) {
-	isolateDiskCache(t)
-	dir := t.TempDir()
-	marker := filepath.Join(dir, "marker")
-	t.Setenv("GRAPHQL_MARKER", marker)
-	writeGraphQLTools(t, graphqlTestTool{name: "prettier", marker: "prettier"})
-	qt.Assert(t, qt.IsNil(os.WriteFile(filepath.Join(dir, "biome.json"), []byte("{}\n"), 0o600)))
-
-	abs := filepath.Join(dir, "schema.graphql")
-	qt.Assert(t, qt.IsNil(os.WriteFile(abs, []byte("type Query { hello: String }"), 0o600)))
-
-	res := NewGraphQLRouter(config.Default()).Format(t.Context(), dir, abs)
-	qt.Check(t, qt.IsNil(res.Err))
-	qt.Check(t, qt.IsFalse(res.Skipped))
-
-	got, err := os.ReadFile(marker)
-	qt.Assert(t, qt.IsNil(err))
-	qt.Check(t, qt.Equals(string(got), "prettier"))
-}
-
-func TestGraphQLRouterUsesBunxBiomeWithoutPathBiome(t *testing.T) {
-	isolateDiskCache(t)
-	dir := t.TempDir()
-	marker := filepath.Join(dir, "marker")
-	t.Setenv("GRAPHQL_MARKER", marker)
-	writeGraphQLTools(t, graphqlTestTool{name: "bunx", marker: "biome"})
-	qt.Assert(t, qt.IsNil(os.WriteFile(filepath.Join(dir, "biome.json"), []byte("{}\n"), 0o600)))
-
-	abs := filepath.Join(dir, "schema.graphql")
-	qt.Assert(t, qt.IsNil(os.WriteFile(abs, []byte("type Query { hello: String }"), 0o600)))
-
-	res := NewGraphQLRouter(config.Default()).Format(t.Context(), dir, abs)
-	qt.Assert(t, qt.IsNil(res.Err))
-	qt.Check(t, qt.IsFalse(res.Skipped))
-
-	got, err := os.ReadFile(marker)
-	qt.Assert(t, qt.IsNil(err))
-	qt.Check(t, qt.Equals(string(got), "biome"))
-}
-
-func TestGraphQLRouterSkipsBiomeWhenDisabled(t *testing.T) {
-	isolateDiskCache(t)
-	dir := t.TempDir()
-	marker := filepath.Join(dir, "marker")
-	t.Setenv("GRAPHQL_MARKER", marker)
-	writeGraphQLTools(t)
-	qt.Assert(t, qt.IsNil(os.WriteFile(filepath.Join(dir, "biome.json"), []byte("{}\n"), 0o600)))
-
-	cfg := config.Default()
-	cfg.DisabledFormatters = []string{"BIOME"}
-	abs := filepath.Join(dir, "schema.graphql")
-	qt.Assert(t, qt.IsNil(os.WriteFile(abs, []byte("type Query { hello: String }"), 0o600)))
-
-	res := NewGraphQLRouter(cfg).Format(t.Context(), dir, abs)
-	qt.Assert(t, qt.IsNil(res.Err))
-	qt.Check(t, qt.IsFalse(res.Skipped))
-
-	got, err := os.ReadFile(marker)
-	qt.Assert(t, qt.IsNil(err))
-	qt.Check(t, qt.Equals(string(got), "prettier"))
+			cfg := config.Default()
+			cfg.DisabledFormatters = tc.disabled
+			res := NewGraphQLRouter(cfg).Format(t.Context(), dir, abs)
+			qt.Assert(t, qt.IsNil(res.Err))
+			qt.Check(t, qt.IsFalse(res.Skipped))
+			qt.Check(t, qt.Equals(string(readSource(t, marker)), tc.want))
+		})
+	}
 }
 
 type graphqlTestTool struct {

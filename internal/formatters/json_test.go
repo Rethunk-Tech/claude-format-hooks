@@ -27,26 +27,9 @@ func TestJSONFormatterIdempotent(t *testing.T) {
 
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
-			dir := t.TempDir()
-			path := filepath.Join(dir, "t.json")
-			qt.Assert(t, qt.IsNil(os.WriteFile(path, []byte(tc.src), 0o600)))
+			dir, path := sourceFile(t, "t.json", tc.src)
 
-			f := NewJSON(config.Default())
-			ctx := t.Context()
-
-			f.Format(ctx, dir, path)
-			first, err := os.ReadFile(path)
-			qt.Assert(t, qt.IsNil(err))
-
-			f.Format(ctx, dir, path)
-			second, err := os.ReadFile(path)
-			qt.Assert(t, qt.IsNil(err))
-
-			qt.Check(t, qt.DeepEquals(first, second), qt.Commentf("not idempotent"))
-			qt.Check(t, qt.IsTrue(len(first) > 0 && first[len(first)-1] == '\n'),
-				qt.Commentf("output must end with exactly one newline, got %q", first))
-			qt.Check(t, qt.IsFalse(len(first) >= 2 && first[len(first)-2] == '\n'),
-				qt.Commentf("output has a trailing blank line, got %q", first))
+			assertSingleTrailingNewline(t, assertIdempotent(t, NewJSON(config.Default()), dir, path))
 		})
 	}
 }
@@ -54,10 +37,7 @@ func TestJSONFormatterIdempotent(t *testing.T) {
 func TestJSONFormatterReadErrorIsNotSkipped(t *testing.T) {
 	// A directory always fails os.ReadFile without being IsNotExist,
 	// distinguishing this from the "not valid JSON" Skipped path.
-	dir := t.TempDir()
-	res := NewJSON(config.Default()).Format(t.Context(), dir, dir)
-	qt.Check(t, qt.IsNotNil(res.Err))
-	qt.Check(t, qt.IsFalse(res.Skipped))
+	assertDirectoryIsAReadError(t, NewJSON(config.Default()))
 }
 
 func TestJSONFormatterPreservesKeyOrder(t *testing.T) {
@@ -68,8 +48,7 @@ func TestJSONFormatterPreservesKeyOrder(t *testing.T) {
 
 	NewJSON(config.Default()).Format(t.Context(), dir, path)
 
-	out, err := os.ReadFile(path)
-	qt.Assert(t, qt.IsNil(err))
+	out := readSource(t, path)
 	want := "{\n  \"zebra\": 1,\n  \"apple\": 2\n}\n"
 	qt.Check(t, qt.Equals(string(out), want), qt.Commentf("key order not preserved"))
 }
@@ -82,15 +61,12 @@ func TestJSONRouterName(t *testing.T) {
 // reformatted in-process with no external tool involved.
 func TestJSONRouterUsesNativeWithoutBiomeConfig(t *testing.T) {
 	isolateDiskCache(t)
-	dir := t.TempDir()
-	path := filepath.Join(dir, "t.json")
-	qt.Assert(t, qt.IsNil(os.WriteFile(path, []byte(`{"a":1}`), 0o600)))
+	dir, path := sourceFile(t, "t.json", `{"a":1}`)
 
 	res := NewJSONRouter(config.Default()).Format(t.Context(), dir, path)
 	qt.Assert(t, qt.IsFalse(res.Skipped))
 
-	got, err := os.ReadFile(path)
-	qt.Assert(t, qt.IsNil(err))
+	got := readSource(t, path)
 	qt.Check(t, qt.Equals(string(got), "{\n  \"a\": 1\n}\n"))
 }
 
@@ -108,8 +84,7 @@ func TestJSONRouterFallsBackToNativeWithoutBunx(t *testing.T) {
 	res := NewJSONRouter(config.Default()).Format(t.Context(), dir, path)
 	qt.Assert(t, qt.IsFalse(res.Skipped))
 
-	got, err := os.ReadFile(path)
-	qt.Assert(t, qt.IsNil(err))
+	got := readSource(t, path)
 	qt.Check(t, qt.Equals(string(got), "{\n  \"a\": 1\n}\n"))
 }
 
@@ -125,8 +100,7 @@ func TestJSONRouterUsesPathBiomeWithoutBunx(t *testing.T) {
 	res := NewJSONRouter(config.Default()).Format(t.Context(), dir, path)
 	qt.Assert(t, qt.IsFalse(res.Skipped))
 
-	got, err := os.ReadFile(path)
-	qt.Assert(t, qt.IsNil(err))
+	got := readSource(t, path)
 	qt.Check(t, qt.Equals(string(got), src), qt.Commentf("PATH biome should handle the file without bunx"))
 }
 
@@ -143,8 +117,7 @@ func TestJSONRouterSkipsDisabledBiome(t *testing.T) {
 	res := NewJSONRouter(cfg).Format(t.Context(), dir, path)
 	qt.Assert(t, qt.IsFalse(res.Skipped))
 
-	got, err := os.ReadFile(path)
-	qt.Assert(t, qt.IsNil(err))
+	got := readSource(t, path)
 	qt.Check(t, qt.Equals(string(got), "{\n  \"a\": 1\n}\n"),
 		qt.Commentf("disabled biome should fall back to native JSON formatting"))
 }

@@ -24,31 +24,15 @@ func TestGoFormatterIdempotent(t *testing.T) {
 
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
-			dir := t.TempDir()
-			path := filepath.Join(dir, "t.go")
-			qt.Assert(t, qt.IsNil(os.WriteFile(path, []byte(tc.src), 0o600)))
+			dir, path := sourceFile(t, "t.go", tc.src)
 
-			f := NewGo()
-			ctx := t.Context()
-
-			f.Format(ctx, dir, path)
-			first, err := os.ReadFile(path)
-			qt.Assert(t, qt.IsNil(err))
-
-			f.Format(ctx, dir, path)
-			second, err := os.ReadFile(path)
-			qt.Assert(t, qt.IsNil(err))
-
-			qt.Check(t, qt.DeepEquals(first, second), qt.Commentf("not idempotent"))
+			assertIdempotent(t, NewGo(), dir, path)
 		})
 	}
 }
 
 func TestGoFormatterReadErrorIsNotSkipped(t *testing.T) {
-	dir := t.TempDir()
-	res := NewGo().Format(t.Context(), dir, dir)
-	qt.Check(t, qt.IsNotNil(res.Err))
-	qt.Check(t, qt.IsFalse(res.Skipped))
+	assertDirectoryIsAReadError(t, NewGo())
 }
 
 func TestGoFormatterReformatsIndentation(t *testing.T) {
@@ -60,8 +44,7 @@ func TestGoFormatterReformatsIndentation(t *testing.T) {
 	res := NewGo().Format(t.Context(), dir, path)
 	qt.Check(t, qt.IsNil(res.Err))
 
-	out, err := os.ReadFile(path)
-	qt.Assert(t, qt.IsNil(err))
+	out := readSource(t, path)
 	qt.Check(t, qt.StringContains(string(out), "\tprintln(\"hi\")"),
 		qt.Commentf("expected tab-indented output, got %q", out))
 }
@@ -75,7 +58,6 @@ func TestGoFormatterSkipsInvalidSyntax(t *testing.T) {
 	res := NewGo().Format(t.Context(), dir, path)
 	qt.Check(t, qt.IsTrue(res.Skipped))
 
-	out, err := os.ReadFile(path)
-	qt.Assert(t, qt.IsNil(err))
+	out := readSource(t, path)
 	qt.Check(t, qt.Equals(string(out), src), qt.Commentf("malformed source must not be modified"))
 }

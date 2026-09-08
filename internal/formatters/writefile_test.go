@@ -57,9 +57,7 @@ func TestWriteFormattedFollowsSymlinkToTarget(t *testing.T) {
 	got, err := os.ReadFile(target) //nolint:gosec // path is the temp dir this test just wrote
 	qt.Assert(t, qt.IsNil(err))
 	qt.Check(t, qt.Equals(string(got), "new"))
-	info, err := os.Lstat(link)
-	qt.Assert(t, qt.IsNil(err))
-	qt.Check(t, qt.Equals(info.Mode()&os.ModeSymlink, os.ModeSymlink), qt.Commentf("the symlink node must remain intact"))
+	assertStillSymlink(t, link)
 }
 
 func TestWriteFormattedDanglingSymlinkNoOp(t *testing.T) {
@@ -80,9 +78,7 @@ func TestWriteFormattedDanglingSymlinkNoOp(t *testing.T) {
 	qt.Check(t, qt.Equals(gotTarget, target), qt.Commentf("a dangling symlink target must remain unchanged"))
 	_, err = os.Stat(target)
 	qt.Check(t, qt.IsTrue(os.IsNotExist(err)), qt.Commentf("a dangling symlink must not create its missing target"))
-	info, err := os.Lstat(link)
-	qt.Assert(t, qt.IsNil(err))
-	qt.Check(t, qt.Equals(info.Mode()&os.ModeSymlink, os.ModeSymlink), qt.Commentf("the symlink node must remain intact"))
+	assertStillSymlink(t, link)
 }
 
 func TestWriteFormattedSkipsStaleSource(t *testing.T) {
@@ -153,9 +149,7 @@ func TestWriteFormattedReturnsChmodError(t *testing.T) {
 	err := writeFormatted(filepath.Join(dir, "f"), nil, []byte("new"), 0o644)
 
 	qt.Check(t, qt.IsNotNil(err))
-	entries, readErr := os.ReadDir(dir)
-	qt.Assert(t, qt.IsNil(readErr))
-	qt.Check(t, qt.HasLen(entries, 0), qt.Commentf("failed chmod must remove the temporary file"))
+	assertDirEntryCount(t, dir, 0, "failed chmod must remove the temporary file")
 }
 
 func TestWriteFormattedReturnsCloseError(t *testing.T) {
@@ -174,9 +168,7 @@ func TestWriteFormattedReturnsCloseError(t *testing.T) {
 	err := writeFormatted(filepath.Join(dir, "f"), nil, []byte("new"), 0o644)
 
 	qt.Check(t, qt.IsNotNil(err))
-	entries, readErr := os.ReadDir(dir)
-	qt.Assert(t, qt.IsNil(readErr))
-	qt.Check(t, qt.HasLen(entries, 0), qt.Commentf("failed close must remove the temporary file"))
+	assertDirEntryCount(t, dir, 0, "failed close must remove the temporary file")
 }
 
 func TestWriteFormattedReturnsReadFileErrorForDirectoryTarget(t *testing.T) {
@@ -187,9 +179,7 @@ func TestWriteFormattedReturnsReadFileErrorForDirectoryTarget(t *testing.T) {
 	err := writeFormatted(target, []byte("old"), []byte("new"), 0o644)
 
 	qt.Check(t, qt.IsNotNil(err))
-	entries, readErr := os.ReadDir(dir)
-	qt.Assert(t, qt.IsNil(readErr))
-	qt.Check(t, qt.Equals(len(entries), 1), qt.Commentf("a failed read must remove the temporary file"))
+	assertDirEntryCount(t, dir, 1, "a failed read must remove the temporary file")
 }
 
 func TestWriteFormattedIgnoresMissingTargetAfterFormatting(t *testing.T) {
@@ -209,9 +199,7 @@ func TestWriteFormattedReturnsRenameErrorForDirectoryTarget(t *testing.T) {
 	err := writeFormatted(target, nil, []byte("new"), 0o644)
 
 	qt.Check(t, qt.IsNotNil(err))
-	entries, readErr := os.ReadDir(dir)
-	qt.Assert(t, qt.IsNil(readErr))
-	qt.Check(t, qt.Equals(len(entries), 1), qt.Commentf("a failed rename must remove the temporary file"))
+	assertDirEntryCount(t, dir, 1, "a failed rename must remove the temporary file")
 }
 
 func TestWriteIfMissingReturnsCreateTempError(t *testing.T) {

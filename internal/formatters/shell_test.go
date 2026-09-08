@@ -28,31 +28,15 @@ func TestShellFormatterIdempotent(t *testing.T) {
 
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
-			dir := t.TempDir()
-			path := filepath.Join(dir, "t.sh")
-			qt.Assert(t, qt.IsNil(os.WriteFile(path, []byte(tc.src), 0o600)))
+			dir, path := sourceFile(t, "t.sh", tc.src)
 
-			f := NewShell(config.Default())
-			ctx := t.Context()
-
-			f.Format(ctx, dir, path)
-			first, err := os.ReadFile(path)
-			qt.Assert(t, qt.IsNil(err))
-
-			f.Format(ctx, dir, path)
-			second, err := os.ReadFile(path)
-			qt.Assert(t, qt.IsNil(err))
-
-			qt.Check(t, qt.DeepEquals(first, second), qt.Commentf("not idempotent"))
+			assertIdempotent(t, NewShell(config.Default()), dir, path)
 		})
 	}
 }
 
 func TestShellFormatterReadErrorIsNotSkipped(t *testing.T) {
-	dir := t.TempDir()
-	res := NewShell(config.Default()).Format(t.Context(), dir, dir)
-	qt.Check(t, qt.IsNotNil(res.Err))
-	qt.Check(t, qt.IsFalse(res.Skipped))
+	assertDirectoryIsAReadError(t, NewShell(config.Default()))
 }
 
 func TestShellFormatterUsesTabsWhenConfigured(t *testing.T) {
@@ -66,8 +50,7 @@ func TestShellFormatterUsesTabsWhenConfigured(t *testing.T) {
 
 	NewShell(cfg).Format(t.Context(), dir, path)
 
-	out, err := os.ReadFile(path)
-	qt.Assert(t, qt.IsNil(err))
+	out := readSource(t, path)
 	want := "#!/bin/sh\nif true; then\n\techo hi\nfi\n"
 	qt.Check(t, qt.Equals(string(out), want))
 }
@@ -78,9 +61,7 @@ func TestShellFormatterClampsNonPositiveIndentSize(t *testing.T) {
 
 	for _, size := range []int{0, -1, -4} {
 		t.Run(fmt.Sprintf("indentSize=%d", size), func(t *testing.T) {
-			dir := t.TempDir()
-			path := filepath.Join(dir, "t.sh")
-			qt.Assert(t, qt.IsNil(os.WriteFile(path, []byte(src), 0o600)))
+			dir, path := sourceFile(t, "t.sh", src)
 
 			cfg := config.Default()
 			cfg.Shell.IndentSize = size
@@ -88,8 +69,7 @@ func TestShellFormatterClampsNonPositiveIndentSize(t *testing.T) {
 			result := NewShell(cfg).Format(t.Context(), dir, path)
 			qt.Assert(t, qt.IsNil(result.Err))
 
-			out, err := os.ReadFile(path)
-			qt.Assert(t, qt.IsNil(err))
+			out := readSource(t, path)
 			qt.Check(t, qt.Equals(string(out), want), qt.Commentf("a non-positive indentSize should clamp to 1 space, not wrap to a huge uint"))
 		})
 	}
