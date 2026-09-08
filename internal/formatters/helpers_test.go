@@ -99,3 +99,12 @@ func assertArgv(t *testing.T, argvPath, want string) {
 	t.Helper()
 	qt.Check(t, qt.Equals(string(readSource(t, argvPath)), want))
 }
+
+// biomeProject is sourceFile plus a biome.json, so the directory reads as a
+// Biome project to the routers.
+func biomeProject(t *testing.T, name, src string) (dir, path string) {
+	t.Helper()
+	dir, path = sourceFile(t, name, src)
+	qt.Assert(t, qt.IsNil(os.WriteFile(filepath.Join(dir, "biome.json"), []byte("{}\n"), 0o600)))
+	return dir, path
+}

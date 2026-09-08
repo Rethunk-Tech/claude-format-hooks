@@ -66,9 +66,7 @@ func TestSQLFluffFormatMaterializesUserConfig(t *testing.T) {
 
 	res := NewSQLFluff().Format(t.Context(), dir, abs)
 
-	qt.Check(t, qt.IsFalse(res.Skipped))
-	qt.Check(t, qt.IsNil(res.Err))
-	qt.Check(t, qt.Equals(res.Diagnostic, ""))
+	assertFormatted(t, res)
 	written, err := os.ReadFile(filepath.Join(home, userSQLFluffConfigFile)) //nolint:gosec // path is the temp home this test just configured
 	qt.Assert(t, qt.IsNil(err))
 	qt.Check(t, qt.DeepEquals(written, sqlfluffDefaults))
@@ -92,9 +90,7 @@ func TestSQLFluffFormatPreservesExistingUserConfig(t *testing.T) {
 
 	res := NewSQLFluff().Format(t.Context(), dir, abs)
 
-	qt.Check(t, qt.IsFalse(res.Skipped))
-	qt.Check(t, qt.IsNil(res.Err))
-	qt.Check(t, qt.Equals(res.Diagnostic, ""))
+	assertFormatted(t, res)
 	written, err := os.ReadFile(configPath) //nolint:gosec // path is the temp home this test just configured
 	qt.Assert(t, qt.IsNil(err))
 	qt.Check(t, qt.DeepEquals(written, existing))

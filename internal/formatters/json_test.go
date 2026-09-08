@@ -76,10 +76,7 @@ func TestJSONRouterUsesNativeWithoutBiomeConfig(t *testing.T) {
 func TestJSONRouterFallsBackToNativeWithoutBunx(t *testing.T) {
 	isolateDiskCache(t)
 	clearPath(t)
-	dir := t.TempDir()
-	qt.Assert(t, qt.IsNil(os.WriteFile(filepath.Join(dir, "biome.json"), []byte("{}\n"), 0o600)))
-	path := filepath.Join(dir, "t.json")
-	qt.Assert(t, qt.IsNil(os.WriteFile(path, []byte(`{"a":1}`), 0o600)))
+	dir, path := biomeProject(t, "t.json", `{"a":1}`)
 
 	res := NewJSONRouter(config.Default()).Format(t.Context(), dir, path)
 	qt.Assert(t, qt.IsFalse(res.Skipped))

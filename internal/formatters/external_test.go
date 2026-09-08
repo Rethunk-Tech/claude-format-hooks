@@ -102,9 +102,7 @@ func TestPathFormattersRunWithoutBunx(t *testing.T) {
 			writeFakeTool(t, tc.name, "exit 0")
 			abs := filepath.Join(dir, tc.file)
 			res := tc.new().Format(t.Context(), dir, abs)
-			qt.Check(t, qt.IsFalse(res.Skipped))
-			qt.Check(t, qt.IsNil(res.Err))
-			qt.Check(t, qt.Equals(res.Diagnostic, ""))
+			assertFormatted(t, res)
 		})
 	}
 }
@@ -323,9 +321,7 @@ func TestTerraformFormatterFallsBackToTofu(t *testing.T) {
 	writeFakeTool(t, "tofu", "exit 0")
 	res := NewTerraform().Format(t.Context(), dir, abs)
 
-	qt.Check(t, qt.IsFalse(res.Skipped))
-	qt.Check(t, qt.IsNil(res.Err))
-	qt.Check(t, qt.Equals(res.Diagnostic, ""))
+	assertFormatted(t, res)
 }
 
 func TestTerraformFormatterPrefersTerraformOverTofu(t *testing.T) {
@@ -340,9 +336,7 @@ func TestTerraformFormatterPrefersTerraformOverTofu(t *testing.T) {
 
 	res := NewTerraform().Format(t.Context(), dir, abs)
 
-	qt.Check(t, qt.IsFalse(res.Skipped))
-	qt.Check(t, qt.IsNil(res.Err))
-	qt.Check(t, qt.Equals(res.Diagnostic, ""))
+	assertFormatted(t, res)
 }
 
 func TestCachedFindUpwardMatchesFindUpward(t *testing.T) {
