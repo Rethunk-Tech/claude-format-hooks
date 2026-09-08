@@ -203,6 +203,11 @@ func TestInSkippedDir(t *testing.T) {
 		{"dist/bundle.js", true},
 		{"build/out.css", true},
 		{"target/debug/build/foo/out/generated.rs", true},
+		{"out/index.html", true},
+		{".turbo/daemon/log.json", true},
+		{".swc/plugins/cache.json", true},
+		{".cache/tool/state.json", true},
+		{".gradle/caches/modules-2/foo.json", true},
 		{".orchestrate/contracts-wave1.md", true},
 		{".playwright-mcp/trace.zip", true},
 		{"coverage/lcov.info", true},
@@ -221,6 +226,7 @@ func TestInSkippedDir(t *testing.T) {
 		{"node_modules_extra/foo.js", false},
 		{"src/vendored/foo.ts", false},
 		{"target_extra/generated.go", false},
+		{"outbound/handler.ts", false},
 	}
 	for _, tc := range cases {
 		qt.Check(t, qt.Equals(InSkippedDir(tc.path), tc.want), qt.Commentf("path=%q", tc.path))
