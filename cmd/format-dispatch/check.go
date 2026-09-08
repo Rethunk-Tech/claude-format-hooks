@@ -206,6 +206,27 @@ func copyBeside(abs string, content []byte) (path string, cleanup func(), err er
 	return path, func() { _ = os.Remove(path) }, nil //nolint:gosec // removes only the temp copy created immediately above
 }
 
+// inVendored reports whether abs sits under a vendored directory.
+// dispatch.InVendoredDir matches path SEGMENTS, so abs must first be made
+// relative to a root -- handing it an absolute path would let an unrelated
+// ancestor named "build" or "vendor" silently exclude the whole run. The
+// project root wins, then the working directory, then fallbackRoot for when
+// os.Getwd failed. A path that cannot be made relative at all (a different
+// Windows volume, say) is judged on its own base name.
+func inVendored(abs, projectRoot, vendorRoot, fallbackRoot string) bool {
+	relRoot := vendorRoot
+	if projectRoot != "" {
+		relRoot = projectRoot
+	} else if relRoot == "" {
+		relRoot = fallbackRoot
+	}
+	rel, err := filepath.Rel(relRoot, abs)
+	if err != nil {
+		rel = filepath.Base(abs)
+	}
+	return dispatch.InVendoredDir(rel)
+}
+
 // collectCheckTargets expands the given paths into a sorted, deduplicated
 // file list, walking directories and applying the same vendored-directory
 // exclusion the hook uses. Sorting keeps output stable so a CI diff of two
@@ -235,17 +256,7 @@ func collectCheckTargets(paths []string) ([]string, error) {
 		if projectRoot != "" && !within(abs, projectRoot) {
 			return
 		}
-		relRoot := vendorRoot
-		if projectRoot != "" {
-			relRoot = projectRoot
-		} else if relRoot == "" {
-			relRoot = root
-		}
-		rel, err := filepath.Rel(relRoot, abs)
-		if err != nil {
-			rel = filepath.Base(abs)
-		}
-		if dispatch.InVendoredDir(rel) {
+		if inVendored(abs, projectRoot, vendorRoot, root) {
 			return
 		}
 		seen[abs] = true
@@ -267,12 +278,7 @@ func collectCheckTargets(paths []string) ([]string, error) {
 		if projectRoot != "" && !within(absDir, projectRoot) {
 			continue
 		}
-		relRoot := vendorRoot
-		if projectRoot != "" {
-			relRoot = projectRoot
-		}
-		rel, relErr := filepath.Rel(relRoot, absDir)
-		if relErr == nil && dispatch.InVendoredDir(rel) {
+		if inVendored(absDir, projectRoot, vendorRoot, filepath.Dir(absDir)) {
 			continue
 		}
 		err = checkWalkDir(p, func(path string, d fs.DirEntry, err error) error { //nolint:gosec // walking an operator-supplied directory is the entire contract

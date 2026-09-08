@@ -638,6 +638,26 @@ func TestCollectCheckTargetsSkipsDirectOutsideAndVendoredFiles(t *testing.T) {
 	qt.Check(t, qt.DeepEquals(targets, []string{}))
 }
 
+func TestCollectCheckTargetsSkipsVendoredDirWithoutAWorkingDirectory(t *testing.T) {
+	if filepath.Separator == '\\' {
+		t.Skip("removing the current directory is not portable")
+	}
+	t.Setenv("CLAUDE_PROJECT_DIR", "")
+	outside := t.TempDir()
+	vendored := filepath.Join(outside, "node_modules")
+	writeFile(t, filepath.Join(vendored, "pkg", "f.json"), unformattedJSON)
+
+	workingDir := t.TempDir()
+	t.Chdir(workingDir)
+	skipIfCwdSurvivesRemoval(t, workingDir)
+
+	// With no project root and no usable cwd there is nothing to make the
+	// path relative to, so the directory is judged on its own base name.
+	got, err := collectCheckTargets([]string{vendored})
+	qt.Assert(t, qt.IsNil(err))
+	qt.Check(t, qt.HasLen(got, 0), qt.Commentf("a vendored directory must be skipped even with no relative root"))
+}
+
 func TestCollectCheckTargetsSkipsVendoredDirectoryRoot(t *testing.T) {
 	projectRoot := t.TempDir()
 	vendored := filepath.Join(projectRoot, "node_modules")
