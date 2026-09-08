@@ -244,53 +244,112 @@ func TestCheckResolvesTerraformMultiDotExtensions(t *testing.T) {
 	}
 }
 
-func TestCheckHonorsProjectConfigDisablesFormatter(t *testing.T) {
-	projectRoot := t.TempDir()
-	path := writeCheckFile(t, projectRoot, "bad.json", unformattedJSON)
-	writeCheckFile(t, projectRoot, projectConfigFile, `{"disabled": [".json"]}`)
-	configPath := filepath.Join(t.TempDir(), "claude-format-hooks.json")
-	writeFile(t, configPath, `{}`)
+func TestCheckHonorsDisableConfig(t *testing.T) {
+	const unformattedTS = "const value={answer:42}\n"
+	const unformattedJSONC = `{"a":1}`
 
-	t.Setenv("CLAUDE_PROJECT_DIR", projectRoot)
-	t.Setenv("CLAUDE_FORMAT_HOOKS_CONFIG", configPath)
+	tests := []struct {
+		name          string
+		files         map[string]string
+		projectConfig string
+		userConfig    string
+		target        string
+		checkRoot     bool
+		wantExit      int
+		wantReported  bool
+	}{
+		{
+			name:          "project disables an extension",
+			files:         map[string]string{"bad.json": unformattedJSON},
+			projectConfig: `{"disabled": [".json"]}`,
+			target:        "bad.json",
+			checkRoot:     true,
+		},
+		{
+			name:          "project disables a formatter by name",
+			files:         map[string]string{"bad.ts": unformattedTS},
+			projectConfig: `{"disabledFormatters":["BIOME"]}`,
+			target:        "bad.ts",
+		},
+		{
+			name:          "project disabling biome leaves the native JSON check on",
+			files:         map[string]string{"bad.json": unformattedJSON, "biome.json": "{}\n"},
+			projectConfig: `{"disabledFormatters":["biome"]}`,
+			target:        "bad.json",
+			wantExit:      1,
+			wantReported:  true,
+		},
+		{
+			name:          "project disabling biome skips JSONC entirely",
+			files:         map[string]string{"bad.jsonc": unformattedJSONC},
+			projectConfig: `{"disabledFormatters":["biome"]}`,
+			target:        "bad.jsonc",
+		},
+		{
+			name:       "user disables an extension",
+			files:      map[string]string{"bad.json": unformattedJSON},
+			userConfig: `{"disabled": [".json"]}`,
+			target:     "bad.json",
+			checkRoot:  true,
+		},
+		{
+			name:       "user disables a formatter by name",
+			files:      map[string]string{"bad.ts": unformattedTS},
+			userConfig: `{"disabledFormatters":["biome"]}`,
+			target:     "bad.ts",
+			checkRoot:  true,
+		},
+		{
+			name:         "user disabling biome leaves the native JSON check on",
+			files:        map[string]string{"bad.json": unformattedJSON, "biome.json": "{}\n"},
+			userConfig:   `{"disabledFormatters":["biome"]}`,
+			target:       "bad.json",
+			wantExit:     1,
+			wantReported: true,
+		},
+		{
+			name:       "user disables the json formatter",
+			files:      map[string]string{"bad.json": unformattedJSON},
+			userConfig: `{"disabledFormatters":["json"]}`,
+			target:     "bad.json",
+		},
+	}
 
-	var out, errOut bytes.Buffer
-	qt.Check(t, qt.Equals(runCheck([]string{projectRoot}, &out, &errOut), 0))
-	qt.Check(t, qt.Equals(readFile(t, path), unformattedJSON),
-		qt.Commentf("project-disabled extension must not be reported for formatting"))
-}
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			projectRoot := t.TempDir()
+			for name, content := range tc.files {
+				writeCheckFile(t, projectRoot, name, content)
+			}
+			if tc.projectConfig != "" {
+				writeCheckFile(t, projectRoot, projectConfigFile, tc.projectConfig)
+			}
+			userConfig := tc.userConfig
+			if userConfig == "" {
+				userConfig = `{}`
+			}
+			configPath := filepath.Join(t.TempDir(), "claude-format-hooks.json")
+			writeFile(t, configPath, userConfig)
 
-func TestCheckHonorsProjectConfigDisablesFormatterByName(t *testing.T) {
-	projectRoot := t.TempDir()
-	path := writeCheckFile(t, projectRoot, "bad.ts", "const value={answer:42}\n")
-	writeCheckFile(t, projectRoot, projectConfigFile, `{"disabledFormatters":["BIOME"]}`)
-	configPath := filepath.Join(t.TempDir(), "claude-format-hooks.json")
-	writeFile(t, configPath, `{}`)
+			t.Setenv("CLAUDE_PROJECT_DIR", projectRoot)
+			t.Setenv("CLAUDE_FORMAT_HOOKS_CONFIG", configPath)
 
-	t.Setenv("CLAUDE_PROJECT_DIR", projectRoot)
-	t.Setenv("CLAUDE_FORMAT_HOOKS_CONFIG", configPath)
+			target := filepath.Join(projectRoot, tc.target)
+			arg := target
+			if tc.checkRoot {
+				arg = projectRoot
+			}
 
-	var out, errOut bytes.Buffer
-	qt.Check(t, qt.Equals(runCheck([]string{path}, &out, &errOut), 0))
-	qt.Check(t, qt.Equals(readFile(t, path), "const value={answer:42}\n"),
-		qt.Commentf("project-disabled formatter must not be reported for formatting"))
-}
-
-func TestCheckHonorsProjectConfigDisablesBiomeForJSONRouter(t *testing.T) {
-	projectRoot := t.TempDir()
-	path := writeCheckFile(t, projectRoot, "bad.json", unformattedJSON)
-	writeCheckFile(t, projectRoot, "biome.json", "{}\n")
-	writeCheckFile(t, projectRoot, projectConfigFile, `{"disabledFormatters":["biome"]}`)
-	configPath := filepath.Join(t.TempDir(), "claude-format-hooks.json")
-	writeFile(t, configPath, `{}`)
-
-	t.Setenv("CLAUDE_PROJECT_DIR", projectRoot)
-	t.Setenv("CLAUDE_FORMAT_HOOKS_CONFIG", configPath)
-
-	var out, errOut bytes.Buffer
-	qt.Check(t, qt.Equals(runCheck([]string{path}, &out, &errOut), 1))
-	qt.Check(t, qt.StringContains(out.String(), path),
-		qt.Commentf("project-disabled biome must still check native JSON formatting"))
+			var out, errOut bytes.Buffer
+			qt.Assert(t, qt.Equals(runCheck([]string{arg}, &out, &errOut), tc.wantExit))
+			if tc.wantReported {
+				qt.Check(t, qt.StringContains(out.String(), target))
+				return
+			}
+			qt.Check(t, qt.Equals(readFile(t, target), tc.files[tc.target]),
+				qt.Commentf("a disabled formatter must leave the file unreported and untouched"))
+		})
+	}
 }
 
 func TestCheckHonorsProjectConfigDisablesBiomeForGraphQLRouter(t *testing.T) {
@@ -406,83 +465,6 @@ func TestRegistryForCheckDoesNotCacheWhenPredicateFalse(t *testing.T) {
 			qt.Check(t, qt.Equals(len(cache), 0))
 		})
 	}
-}
-
-func TestCheckHonorsProjectConfigDisablesBiomeForJSONC(t *testing.T) {
-	projectRoot := t.TempDir()
-	path := writeCheckFile(t, projectRoot, "bad.jsonc", `{"a":1}`)
-	writeCheckFile(t, projectRoot, projectConfigFile, `{"disabledFormatters":["biome"]}`)
-	configPath := filepath.Join(t.TempDir(), "claude-format-hooks.json")
-	writeFile(t, configPath, `{}`)
-
-	t.Setenv("CLAUDE_PROJECT_DIR", projectRoot)
-	t.Setenv("CLAUDE_FORMAT_HOOKS_CONFIG", configPath)
-
-	var out, errOut bytes.Buffer
-	qt.Check(t, qt.Equals(runCheck([]string{path}, &out, &errOut), 0))
-	qt.Check(t, qt.Equals(readFile(t, path), `{"a":1}`),
-		qt.Commentf("project-disabled biome must not report JSONC formatting"))
-}
-
-func TestCheckHonorsUserConfigDisablesFormatter(t *testing.T) {
-	projectRoot := t.TempDir()
-	path := writeCheckFile(t, projectRoot, "bad.json", unformattedJSON)
-	configPath := filepath.Join(t.TempDir(), "claude-format-hooks.json")
-	writeFile(t, configPath, `{"disabled": [".json"]}`)
-
-	t.Setenv("CLAUDE_PROJECT_DIR", projectRoot)
-	t.Setenv("CLAUDE_FORMAT_HOOKS_CONFIG", configPath)
-
-	var out, errOut bytes.Buffer
-	qt.Check(t, qt.Equals(runCheck([]string{projectRoot}, &out, &errOut), 0))
-	qt.Check(t, qt.Equals(readFile(t, path), unformattedJSON),
-		qt.Commentf("user-disabled extension must not be reported for formatting"))
-}
-
-func TestCheckHonorsUserConfigDisablesFormatterByName(t *testing.T) {
-	projectRoot := t.TempDir()
-	path := writeCheckFile(t, projectRoot, "bad.ts", "const value={answer:42}\n")
-	configPath := filepath.Join(t.TempDir(), "claude-format-hooks.json")
-	writeFile(t, configPath, `{"disabledFormatters":["biome"]}`)
-
-	t.Setenv("CLAUDE_PROJECT_DIR", projectRoot)
-	t.Setenv("CLAUDE_FORMAT_HOOKS_CONFIG", configPath)
-
-	var out, errOut bytes.Buffer
-	qt.Check(t, qt.Equals(runCheck([]string{projectRoot}, &out, &errOut), 0))
-	qt.Check(t, qt.Equals(readFile(t, path), "const value={answer:42}\n"),
-		qt.Commentf("user-disabled formatter must not be reported for formatting"))
-}
-
-func TestCheckHonorsUserConfigDisablesBiomeForJSONRouter(t *testing.T) {
-	projectRoot := t.TempDir()
-	path := writeCheckFile(t, projectRoot, "bad.json", unformattedJSON)
-	writeCheckFile(t, projectRoot, "biome.json", "{}\n")
-	configPath := filepath.Join(t.TempDir(), "claude-format-hooks.json")
-	writeFile(t, configPath, `{"disabledFormatters":["biome"]}`)
-
-	t.Setenv("CLAUDE_PROJECT_DIR", projectRoot)
-	t.Setenv("CLAUDE_FORMAT_HOOKS_CONFIG", configPath)
-
-	var out, errOut bytes.Buffer
-	qt.Check(t, qt.Equals(runCheck([]string{path}, &out, &errOut), 1))
-	qt.Check(t, qt.StringContains(out.String(), path),
-		qt.Commentf("disabling biome must keep native JSON checking enabled"))
-}
-
-func TestCheckHonorsUserConfigDisablesJSONFormatter(t *testing.T) {
-	projectRoot := t.TempDir()
-	path := writeCheckFile(t, projectRoot, "bad.json", unformattedJSON)
-	configPath := filepath.Join(t.TempDir(), "claude-format-hooks.json")
-	writeFile(t, configPath, `{"disabledFormatters":["json"]}`)
-
-	t.Setenv("CLAUDE_PROJECT_DIR", projectRoot)
-	t.Setenv("CLAUDE_FORMAT_HOOKS_CONFIG", configPath)
-
-	var out, errOut bytes.Buffer
-	qt.Check(t, qt.Equals(runCheck([]string{path}, &out, &errOut), 0))
-	qt.Check(t, qt.Equals(readFile(t, path), unformattedJSON),
-		qt.Commentf("disabling json must skip JSON checks"))
 }
 
 func TestCheckUserDisableMixedWithEnabledExtension(t *testing.T) {
