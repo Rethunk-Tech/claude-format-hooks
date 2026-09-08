@@ -23,9 +23,11 @@ import (
 // prunedNamespaces records the namespaces this process has already swept.
 // prune costs an os.ReadDir of the whole cache directory, and that directory
 // grows one entry per file formatted, so sweeping on every Get made a read
-// scale with the session's history: measured at 206us against a 2.8us
-// exec.LookPath once ~2000 entries had accumulated. One sweep per namespace
-// per process keeps the collection without putting it on the read path.
+// scale with the session's history: on a six-entry $PATH, a cached miss
+// measured 206us against a 2.8us bare exec.LookPath once ~2000 entries had
+// accumulated. A longer $PATH narrows the gap (19us bare at forty entries),
+// so the penalty is the sweep, not the lookup. One sweep per namespace per
+// process keeps the collection without putting it on the read path.
 var prunedNamespaces sync.Map
 
 // Dir resolves the directory cache entries are stored under:
@@ -117,7 +119,7 @@ func pruneOnce(dir, namespacePrefix string, maxAge time.Duration) {
 	prune(dir, namespacePrefix, maxAge)
 }
 
-// prune removes expired entries in key's namespace. Cache cleanup is best
+// prune removes expired entries under namespacePrefix. Cache cleanup is best
 // effort: a failed read or remove must never block the uncached operation.
 func prune(dir, namespacePrefix string, maxAge time.Duration) {
 	if namespacePrefix == "" {

@@ -2,7 +2,7 @@
 
 <div align="center">
 
-[![Go 1.26+](https://img.shields.io/badge/go-1.26+-blue.svg)](go.mod)
+[![Go 1.27+](https://img.shields.io/badge/go-1.27+-blue.svg)](go.mod)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 [![CI](https://github.com/Rethunk-Tech/claude-format-hooks/actions/workflows/ci.yml/badge.svg)](https://github.com/Rethunk-Tech/claude-format-hooks/actions/workflows/ci.yml)
 

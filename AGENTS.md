@@ -6,7 +6,7 @@ Operators: [HUMANS.md](HUMANS.md).
 
 ## Stack
 
-Go 1.26+. CI ([`.github/workflows/ci.yml`](.github/workflows/ci.yml)): build,
+Go 1.27+. CI ([`.github/workflows/ci.yml`](.github/workflows/ci.yml)): build,
 vet, gofmt, test (75% coverage floor), golangci-lint, govulncheck on
 `ubuntu-latest`/`macos-latest`/`windows-latest`. Tag `v*` triggers
 [`.github/workflows/release.yml`](.github/workflows/release.yml) cross-compile
@@ -44,6 +44,7 @@ Go (`go/format.Source`). External tools invoked via `bunx` or system `PATH`.
 - Silent on success; truncated stderr diagnostic on formatter failure.
 - Hook path always exits 0 (`--check` is the CI exception).
 - Unsupported extension: instant no-op — no stat, exec, or config read.
+  An extensionless file is first peeked at for a shell shebang.
 - Missing external tools cached briefly (`internal/diskcache`); self-heals within TTL.
 - Skips `node_modules/`, `.git/`, `vendor/`, `.venv/`, and peers; files outside `$CLAUDE_PROJECT_DIR`.
 - No formatter requires project config to exist first.

@@ -251,9 +251,10 @@ func run(stdin io.Reader) int {
 		return 0
 	}
 
-	// Instant no-op path for an extension no formatter ever handles: no
-	// filesystem access at all, not even a config load — KnownExtension
-	// needs no Registry to answer.
+	// Instant no-op path for an extension no formatter ever handles:
+	// KnownExtension needs no Registry to answer, so nothing is read. An
+	// extensionless file is the one exception -- resolving it means peeking
+	// at its shebang, which opens the file.
 	ext := dispatch.ResolveExtension(path)
 	if ext == "" {
 		if shebangExt, ok := shellShebangExt(path); ok {

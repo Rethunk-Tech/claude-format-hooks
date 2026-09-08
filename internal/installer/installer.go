@@ -151,10 +151,10 @@ func renderHooks[T any](top, hooks jsonObject, event string, entries []T) ([]byt
 }
 
 // Wire reads the settings JSON at settingsPath and returns the document
-// before and after wiring in our PostToolUse hook. Idempotent: a prior
-// entry pointing at binPath is removed before the new entry is appended. Every other top-level key,
-// every other hooks.* event, and every other PostToolUse entry is
-// preserved untouched, in its original order.
+// before and after wiring in our PostToolUse hook. Idempotent: a prior entry
+// pointing at binPath is removed before the new entry is appended. Every
+// other top-level key, hooks.* event, and PostToolUse entry survives with its
+// value byte-for-byte, though rewriting sorts the object's keys.
 func Wire(settingsPath, binPath string) (before, after []byte, err error) {
 	before, top, hooks, entries, err := parseSettings(settingsPath)
 	if err != nil {
@@ -184,7 +184,8 @@ func Wire(settingsPath, binPath string) (before, after []byte, err error) {
 // before and after removing the PostToolUse entry pointing at binPath. A
 // settings file with no such entry round-trips unchanged (aside from
 // re-serialization). Every other top-level key, hooks.* event, and
-// PostToolUse entry is preserved untouched, in its original order.
+// PostToolUse entry survives with its value byte-for-byte, though rewriting
+// sorts the object's keys.
 func Unwire(settingsPath, binPath string) (before, after []byte, err error) {
 	before, top, hooks, entries, err := parseSettings(settingsPath)
 	if err != nil {
