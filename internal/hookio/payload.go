@@ -19,6 +19,10 @@ type Payload struct {
 	ToolResponse struct {
 		FilePath string `json:"filePath"`
 	} `json:"tool_response"`
+	// tool_result is not in the documented PostToolUse envelope, which uses
+	// tool_response. It was added as a fix against an observed payload, so
+	// it stays until a capture shows it is never sent; the camelCase spelling
+	// is deliberate and pinned by a test.
 	ToolResult struct {
 		FilePath string `json:"filePath"`
 	} `json:"tool_result"`
