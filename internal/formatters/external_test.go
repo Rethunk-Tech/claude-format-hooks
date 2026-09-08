@@ -124,7 +124,7 @@ func TestBunxFormatterSuccessAndFailure(t *testing.T) {
 	t.Run("failure with no output falls back to the process error", func(t *testing.T) {
 		writeFakeTool(t, "bunx", "exit 1")
 		res := NewPrettier().Format(t.Context(), dir, abs)
-		qt.Check(t, qt.Not(qt.Equals(res.Diagnostic, "")))
+		assertDiagnostic(t, res)
 	})
 }
 
@@ -152,9 +152,7 @@ func TestBiomeFormatSuccess(t *testing.T) {
 	dir := t.TempDir()
 	abs := filepath.Join(dir, "f.ts")
 	res := NewBiome().Format(t.Context(), dir, abs)
-	qt.Check(t, qt.IsNil(res.Err))
-	qt.Check(t, qt.Equals(res.Diagnostic, ""))
-	qt.Check(t, qt.IsFalse(res.Skipped))
+	assertFormatted(t, res)
 }
 
 func TestBiomeFormatFailureTruncatesDiagnostic(t *testing.T) {
@@ -187,7 +185,7 @@ func TestSQLFluffFormatSuccessAndFailure(t *testing.T) {
 		// really runs, so this means it died and must stay visible.
 		writeFakeTool(t, "sqlfluff", "exit 1")
 		res := NewSQLFluff().Format(t.Context(), dir, abs)
-		qt.Check(t, qt.Not(qt.Equals(res.Diagnostic, "")))
+		assertDiagnostic(t, res)
 	})
 
 	t.Run("unfixable violations are not a failure", func(t *testing.T) {
@@ -199,7 +197,7 @@ func TestSQLFluffFormatSuccessAndFailure(t *testing.T) {
 	t.Run("unparsable input is a failure", func(t *testing.T) {
 		writeFakeTool(t, "sqlfluff", "echo '  [1 templating/parsing errors found]'; exit 1")
 		res := NewSQLFluff().Format(t.Context(), dir, abs)
-		qt.Check(t, qt.Not(qt.Equals(res.Diagnostic, "")))
+		assertDiagnostic(t, res)
 	})
 }
 
@@ -275,7 +273,7 @@ func TestRustFormatterSuccessAndFailure(t *testing.T) {
 	t.Run("failure with no output falls back to the process error", func(t *testing.T) {
 		writeFakeTool(t, "rustfmt", "exit 1")
 		res := NewRust().Format(t.Context(), dir, abs)
-		qt.Check(t, qt.Not(qt.Equals(res.Diagnostic, "")))
+		assertDiagnostic(t, res)
 	})
 }
 

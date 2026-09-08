@@ -78,3 +78,24 @@ func assertStillSymlink(t *testing.T, link string) {
 	qt.Check(t, qt.Equals(info.Mode()&os.ModeSymlink, os.ModeSymlink),
 		qt.Commentf("the symlink node must remain intact"))
 }
+
+// assertFormatted checks a formatter reported plain success: no error, no
+// diagnostic, and not skipped.
+func assertFormatted(t *testing.T, res Result) {
+	t.Helper()
+	qt.Check(t, qt.IsNil(res.Err))
+	qt.Check(t, qt.Equals(res.Diagnostic, ""))
+	qt.Check(t, qt.IsFalse(res.Skipped))
+}
+
+// assertDiagnostic checks a formatter surfaced a failure to the operator.
+func assertDiagnostic(t *testing.T, res Result) {
+	t.Helper()
+	qt.Check(t, qt.Not(qt.Equals(res.Diagnostic, "")))
+}
+
+// assertArgv checks the argument vector a fake tool recorded.
+func assertArgv(t *testing.T, argvPath, want string) {
+	t.Helper()
+	qt.Check(t, qt.Equals(string(readSource(t, argvPath)), want))
+}

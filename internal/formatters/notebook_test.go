@@ -24,9 +24,7 @@ func TestNotebookFormatterPrefersRuffOverBlack(t *testing.T) {
 	fileDir := t.TempDir()
 	res := NewNotebook().Format(t.Context(), fileDir, filepath.Join(fileDir, "f.ipynb"))
 
-	qt.Check(t, qt.IsNil(res.Err))
-	qt.Check(t, qt.Equals(res.Diagnostic, ""))
-	qt.Check(t, qt.IsFalse(res.Skipped))
+	assertFormatted(t, res)
 }
 
 func TestNotebookFormatterFallsBackToBlack(t *testing.T) {
@@ -36,9 +34,7 @@ func TestNotebookFormatterFallsBackToBlack(t *testing.T) {
 
 	res := NewNotebook().Format(t.Context(), dir, filepath.Join(dir, "f.ipynb"))
 
-	qt.Check(t, qt.IsNil(res.Err))
-	qt.Check(t, qt.Equals(res.Diagnostic, ""))
-	qt.Check(t, qt.IsFalse(res.Skipped))
+	assertFormatted(t, res)
 }
 
 func TestNotebookFormatterSkipsWhenBothMissing(t *testing.T) {
@@ -100,5 +96,5 @@ func TestNotebookFormatterReportsUnrelatedNotebookDiagnostic(t *testing.T) {
 	res := NewNotebook().Format(t.Context(), dir, filepath.Join(dir, "f.ipynb"))
 
 	qt.Check(t, qt.IsFalse(res.Skipped))
-	qt.Check(t, qt.Not(qt.Equals(res.Diagnostic, "")))
+	assertDiagnostic(t, res)
 }

@@ -22,7 +22,7 @@ func TestProtoFormatterReportsFailure(t *testing.T) {
 
 	writeFakeTool(t, "buf", "echo 'syntax error'; exit 1")
 	res := NewProto().Format(t.Context(), dir, abs)
-	qt.Check(t, qt.Not(qt.Equals(res.Diagnostic, "")))
+	assertDiagnostic(t, res)
 }
 
 func TestProtoFormatterSucceedsSilently(t *testing.T) {
