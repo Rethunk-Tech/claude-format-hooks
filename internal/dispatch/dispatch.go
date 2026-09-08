@@ -7,7 +7,6 @@ import (
 	"maps"
 	"path/filepath"
 	"slices"
-	"sort"
 	"strings"
 
 	"github.com/Rethunk-Tech/claude-format-hooks/internal/config"
@@ -143,11 +142,11 @@ var knownExtensions, registeredSuffixes = func() (map[string]bool, []string) {
 		exts[ext] = true
 		suffixes = append(suffixes, ext)
 	}
-	sort.Slice(suffixes, func(i, j int) bool {
-		if len(suffixes[i]) != len(suffixes[j]) {
-			return len(suffixes[i]) > len(suffixes[j])
+	slices.SortFunc(suffixes, func(a, b string) int {
+		if len(a) != len(b) {
+			return len(b) - len(a)
 		}
-		return suffixes[i] < suffixes[j]
+		return strings.Compare(a, b)
 	})
 	return exts, suffixes
 }()
@@ -175,9 +174,6 @@ func InVendoredDir(relPath string) bool {
 // already have confirmed Supported(ext) and !InVendoredDir(...);
 // Dispatch does not re-check either.
 func (r *Registry) Dispatch(ctx context.Context, projectRoot, abs, ext string) formatters.Result {
-	if r == nil {
-		return formatters.Result{Skipped: true}
-	}
 	f := r.byExt[strings.ToLower(ext)]
 	if f == nil {
 		return formatters.Result{Skipped: true}

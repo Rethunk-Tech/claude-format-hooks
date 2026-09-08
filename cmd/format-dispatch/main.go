@@ -255,18 +255,13 @@ func run(stdin io.Reader) int {
 	// KnownExtension needs no Registry to answer, so nothing is read. An
 	// extensionless file is the one exception -- resolving it means peeking
 	// at its shebang, which opens the file.
-	ext := dispatch.ResolveExtension(path)
-	if ext == "" {
-		if shebangExt, ok := shellShebangExt(path); ok {
-			ext = shebangExt
-		}
-	}
+	ext := resolveDispatchExt(path)
 	if !dispatch.KnownExtension(ext) {
 		logOutcome = "skip: unsupported extension"
 		return 0
 	}
 
-	registry, userCfg := buildRegistry()
+	registry, userCfg := buildRegistry(os.Stderr)
 	if !registry.Supported(ext) {
 		logOutcome = "skip: disabled by config"
 		return 0
@@ -317,13 +312,26 @@ func run(stdin io.Reader) int {
 // buildRegistry loads the user-level config and builds the formatter
 // registry from it. A malformed config must never turn this into a
 // blocking hook — it falls back to defaults and says why on stderr.
-func buildRegistry() (*dispatch.Registry, config.Config) {
+func buildRegistry(errOut io.Writer) (*dispatch.Registry, config.Config) {
 	cfg, err := config.Load(configPath())
 	if err != nil {
-		fmt.Fprintf(os.Stderr, "format-dispatch: config: %v (using defaults)\n", err)
+		_, _ = fmt.Fprintf(errOut, "format-dispatch: config: %v (using defaults)\n", err)
 		cfg = config.Default()
 	}
 	return dispatch.NewRegistry(cfg), cfg
+}
+
+// resolveDispatchExt returns the extension a path dispatches under, peeking
+// at a shebang only when the name carries no extension of its own. The hook
+// and --check must agree on this or they disagree about what a file is.
+func resolveDispatchExt(path string) string {
+	ext := dispatch.ResolveExtension(path)
+	if ext == "" {
+		if shebangExt, ok := shellShebangExt(path); ok {
+			return shebangExt
+		}
+	}
+	return ext
 }
 
 // projectRootEnv returns $CLAUDE_PROJECT_DIR as an absolute path, or "" if

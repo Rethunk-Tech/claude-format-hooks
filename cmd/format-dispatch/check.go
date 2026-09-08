@@ -54,35 +54,19 @@ func runCheck(args []string, out, errOut io.Writer) int {
 		return 2
 	}
 	var wouldChange []string
+	// Built on the first supported file, not up front: a run over files no
+	// formatter handles must stay silent, even about a malformed config.
 	var registry *dispatch.Registry
 	var cfg config.Config
-	var cfgLoaded bool
 	for _, abs := range files {
-		ext := dispatch.ResolveExtension(abs)
-		if ext == "" {
-			if shebangExt, ok := shellShebangExt(abs); ok {
-				ext = shebangExt
-			}
-		}
+		ext := resolveDispatchExt(abs)
 		if !dispatch.KnownExtension(ext) {
 			continue
 		}
-		if !cfgLoaded {
-			var loadErr error
-			cfg, loadErr = config.Load(configPath())
-			if loadErr != nil {
-				_, _ = fmt.Fprintf(errOut, "format-dispatch: config: %v (using defaults)\n", loadErr)
-				cfg = config.Default()
-			}
-			cfgLoaded = true
-		}
-		if cfg.IsDisabled(ext) {
-			continue
-		}
 		if registry == nil {
-			registry = dispatch.NewRegistry(cfg)
+			registry, cfg = buildRegistry(errOut)
 		}
-		if !registry.Supported(ext) {
+		if cfg.IsDisabled(ext) || !registry.Supported(ext) {
 			continue
 		}
 		projectRoot := checkProjectRoot(args, abs)
