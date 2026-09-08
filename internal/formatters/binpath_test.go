@@ -30,7 +30,7 @@ func TestLookPathCachesMissAndPersistsAMarker(t *testing.T) {
 
 	dir, ok := diskcache.Dir()
 	qt.Assert(t, qt.IsTrue(ok))
-	_, statErr := os.Stat(filepath.Join(dir, "missing-still-missing-tool"))
+	_, statErr := os.Stat(filepath.Join(dir, diskcache.Key("missing", "still-missing-tool")))
 	qt.Check(t, qt.IsNil(statErr), qt.Commentf("a miss should persist a marker to disk"))
 }
 

@@ -24,7 +24,7 @@ const binPathCacheTTL = 30 * time.Second
 // since-upgraded binary under a stale path.
 func lookPath(name string) (string, error) {
 	dir, hasCache := diskcache.Dir()
-	key := "missing-" + name
+	key := diskcache.Key("missing", name)
 
 	if hasCache {
 		if _, missing := diskcache.Get(dir, key, binPathCacheTTL); missing {
