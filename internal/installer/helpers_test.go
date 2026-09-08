@@ -164,3 +164,46 @@ func cursorVersion(t *testing.T, raw []byte) (int, bool) {
 	qt.Assert(t, qt.IsNil(json.Unmarshal(rawVersion, &version)))
 	return version, true
 }
+
+// assertHooksGoneVersionKept checks an unwired Cursor document dropped its
+// hooks container outright while keeping the version it came with.
+func assertHooksGoneVersionKept(t *testing.T, raw []byte) {
+	t.Helper()
+	var top map[string]json.RawMessage
+	qt.Assert(t, qt.IsNil(json.Unmarshal(raw, &top)))
+	_, ok := top["hooks"]
+	qt.Check(t, qt.IsFalse(ok), qt.Commentf("an emptied hooks container must be dropped"))
+
+	version, ok := cursorVersion(t, raw)
+	qt.Assert(t, qt.IsTrue(ok))
+	qt.Check(t, qt.Equals(version, 1))
+}
+
+// wireInstalled wires the hook into settingsPath and persists the result --
+// the starting state for anything testing a second pass over it.
+func wireInstalled(t *testing.T, settingsPath string) []byte {
+	t.Helper()
+	_, wired, err := Wire(settingsPath, binPath)
+	qt.Assert(t, qt.IsNil(err))
+	qt.Assert(t, qt.IsNil(os.WriteFile(settingsPath, wired, 0o600)))
+	return wired
+}
+
+// wireCursorInstalled is wireInstalled for Cursor's hooks.json.
+func wireCursorInstalled(t *testing.T, cursorPath string) []byte {
+	t.Helper()
+	_, wired, err := WireCursor(cursorPath, binPath)
+	qt.Assert(t, qt.IsNil(err))
+	qt.Assert(t, qt.IsNil(os.WriteFile(cursorPath, wired, 0o600)))
+	return wired
+}
+
+// settingsHooks decodes the hooks object out of a rendered settings document.
+func settingsHooks(t *testing.T, raw []byte) map[string]json.RawMessage {
+	t.Helper()
+	var top map[string]json.RawMessage
+	qt.Assert(t, qt.IsNil(json.Unmarshal(raw, &top)))
+	var hooks map[string]json.RawMessage
+	qt.Assert(t, qt.IsNil(json.Unmarshal(top["hooks"], &hooks)))
+	return hooks
+}

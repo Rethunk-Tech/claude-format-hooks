@@ -92,10 +92,7 @@ func settingsHasHooks(t *testing.T, raw []byte) bool {
 
 func settingsPostToolUse(t *testing.T, raw []byte) []PostToolUseEntry {
 	t.Helper()
-	var top map[string]json.RawMessage
-	qt.Assert(t, qt.IsNil(json.Unmarshal(raw, &top)))
-	var hooks map[string]json.RawMessage
-	qt.Assert(t, qt.IsNil(json.Unmarshal(top["hooks"], &hooks)))
+	hooks := settingsHooks(t, raw)
 	var entries []PostToolUseEntry
 	qt.Assert(t, qt.IsNil(json.Unmarshal(hooks["PostToolUse"], &entries)))
 	return entries
@@ -193,12 +190,7 @@ func TestUnwireExeRemovesLegacyBareBasename(t *testing.T) {
 }
 
 func TestWirePreservesUnrelatedTopLevelKeys(t *testing.T) {
-	dir := t.TempDir()
-	settingsPath := filepath.Join(dir, "settings.json")
-	// A deliberately non-alphabetical order, mirroring a real operator's
-	// hand-curated settings.json.
-	existing := `{"env":{},"permissions":{},"model":"opus","hooks":{},"statusLine":{}}`
-	qt.Assert(t, qt.IsNil(os.WriteFile(settingsPath, []byte(existing), 0o600)))
+	settingsPath := settingsFile(t, `{"env":{},"permissions":{},"model":"opus","hooks":{},"statusLine":{}}`)
 
 	_, after, err := Wire(settingsPath, binPath)
 	qt.Assert(t, qt.IsNil(err))
@@ -231,9 +223,7 @@ func keysInOrder(t *testing.T, raw []byte) []string {
 }
 
 func TestWirePreservesUnrelatedHooks(t *testing.T) {
-	dir := t.TempDir()
-	settingsPath := filepath.Join(dir, "settings.json")
-	existing := `{
+	settingsPath := settingsFile(t, `{
 		"hooks": {
 			"PreToolUse": [
 				{"matcher": "Bash", "hooks": [{"type": "command", "command": "guard.sh"}]}
@@ -242,16 +232,12 @@ func TestWirePreservesUnrelatedHooks(t *testing.T) {
 				{"matcher": "Bash", "hooks": [{"type": "command", "command": "log.sh"}]}
 			]
 		}
-	}`
-	qt.Assert(t, qt.IsNil(os.WriteFile(settingsPath, []byte(existing), 0o600)))
+	}`)
 
 	_, after, err := Wire(settingsPath, binPath)
 	qt.Assert(t, qt.IsNil(err))
 
-	var top map[string]json.RawMessage
-	qt.Assert(t, qt.IsNil(json.Unmarshal(after, &top)))
-	var hooks map[string]json.RawMessage
-	qt.Assert(t, qt.IsNil(json.Unmarshal(top["hooks"], &hooks)))
+	hooks := settingsHooks(t, after)
 	_, hasPreToolUse := hooks["PreToolUse"]
 	qt.Check(t, qt.IsTrue(hasPreToolUse))
 
@@ -265,9 +251,7 @@ func TestWirePreservesUnrelatedHooks(t *testing.T) {
 func TestUnwireRemovesOwnEntry(t *testing.T) {
 	settingsPath := settingsFile(t, `{"theme":"dark"}`)
 
-	_, wired, err := Wire(settingsPath, binPath)
-	qt.Assert(t, qt.IsNil(err))
-	qt.Assert(t, qt.IsNil(os.WriteFile(settingsPath, wired, 0o600)))
+	wired := wireInstalled(t, settingsPath)
 
 	before, after, err := Unwire(settingsPath, binPath)
 	qt.Assert(t, qt.IsNil(err))
@@ -315,34 +299,23 @@ func TestUnwireNoOwnEntryIsIdempotent(t *testing.T) {
 func TestUninstallDryRunDoesNotWrite(t *testing.T) {
 	dir := t.TempDir()
 	settingsPath := filepath.Join(dir, "settings.json")
-	_, wired, err := Wire(settingsPath, binPath)
-	qt.Assert(t, qt.IsNil(err))
-	qt.Assert(t, qt.IsNil(os.WriteFile(settingsPath, wired, 0o600)))
+	wired := wireInstalled(t, settingsPath)
 	cursorPath := filepath.Join(dir, "hooks.json")
-	_, cursorWired, err := WireCursor(cursorPath, binPath)
-	qt.Assert(t, qt.IsNil(err))
-	qt.Assert(t, qt.IsNil(os.WriteFile(cursorPath, cursorWired, 0o600)))
+	cursorWired := wireCursorInstalled(t, cursorPath)
 
 	var out strings.Builder
 	opts := Options{BinPath: binPath, SettingsPath: settingsPath, CursorHooksPath: cursorPath}
 	qt.Assert(t, qt.IsNil(Uninstall(opts, true, &out)))
 
-	raw, err := os.ReadFile(settingsPath)
-	qt.Assert(t, qt.IsNil(err))
-	qt.Check(t, qt.DeepEquals(raw, wired))
-	cursorRaw, err := os.ReadFile(cursorPath)
-	qt.Assert(t, qt.IsNil(err))
-	qt.Check(t, qt.DeepEquals(cursorRaw, cursorWired))
+	qt.Check(t, qt.DeepEquals(readFile(t, settingsPath), wired))
+	qt.Check(t, qt.DeepEquals(readFile(t, cursorPath), cursorWired))
 	qt.Check(t, qt.StringContains(out.String(), "dry-run"))
 	qt.Check(t, qt.StringContains(out.String(), cursorPath))
 }
 
 func TestUninstallWritesSettings(t *testing.T) {
-	dir := t.TempDir()
-	settingsPath := filepath.Join(dir, "settings.json")
-	_, wired, err := Wire(settingsPath, binPath)
-	qt.Assert(t, qt.IsNil(err))
-	qt.Assert(t, qt.IsNil(os.WriteFile(settingsPath, wired, 0o600)))
+	settingsPath := settingsFile(t, "")
+	wireInstalled(t, settingsPath)
 
 	var out strings.Builder
 	qt.Assert(t, qt.IsNil(Uninstall(Options{BinPath: binPath, SettingsPath: settingsPath}, false, &out)))
@@ -365,11 +338,8 @@ func TestUninstallPropagatesUnwireError(t *testing.T) {
 }
 
 func TestInstallNoOpWhenAlreadyWired(t *testing.T) {
-	dir := t.TempDir()
-	settingsPath := filepath.Join(dir, "settings.json")
-	_, wired, err := Wire(settingsPath, binPath)
-	qt.Assert(t, qt.IsNil(err))
-	qt.Assert(t, qt.IsNil(os.WriteFile(settingsPath, wired, 0o600)))
+	settingsPath := settingsFile(t, "")
+	wireInstalled(t, settingsPath)
 
 	var out strings.Builder
 	qt.Assert(t, qt.IsNil(Install(Options{BinPath: binPath, SettingsPath: settingsPath}, false, &out)))
@@ -377,10 +347,8 @@ func TestInstallNoOpWhenAlreadyWired(t *testing.T) {
 }
 
 func TestInstallBacksUpExistingSettings(t *testing.T) {
-	dir := t.TempDir()
-	settingsPath := filepath.Join(dir, "settings.json")
 	original := []byte(`{"theme":"dark"}`)
-	qt.Assert(t, qt.IsNil(os.WriteFile(settingsPath, original, 0o600)))
+	settingsPath := settingsFile(t, string(original))
 
 	var out strings.Builder
 	qt.Assert(t, qt.IsNil(Install(Options{BinPath: binPath, SettingsPath: settingsPath}, false, &out)))
