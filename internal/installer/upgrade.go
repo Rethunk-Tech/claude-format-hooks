@@ -74,7 +74,7 @@ func upgradeWithConfig(opts Options, dryRun bool, out io.Writer, cfg upgradeConf
 		return fmt.Errorf("runtime target is incomplete")
 	}
 
-	assetName := fmt.Sprintf("format-dispatch-%s-%s", cfg.goos, cfg.goarch)
+	assetName := fmt.Sprintf("%s-%s-%s", hookBinaryName, cfg.goos, cfg.goarch)
 	if cfg.goos == "windows" {
 		assetName += ".exe"
 	}

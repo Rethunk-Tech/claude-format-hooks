@@ -5,6 +5,10 @@ import (
 	"runtime"
 )
 
+// hookBinaryName is the executable's name without any platform suffix. It
+// also prefixes the release asset names --upgrade downloads.
+const hookBinaryName = "format-dispatch"
+
 // HookBinaryBaseName returns the installed hook executable's platform-native
 // basename.
 func HookBinaryBaseName() string {
@@ -13,9 +17,9 @@ func HookBinaryBaseName() string {
 
 func hookBinaryBaseName(goos string) string {
 	if goos == "windows" {
-		return "format-dispatch.exe"
+		return hookBinaryName + ".exe"
 	}
-	return "format-dispatch"
+	return hookBinaryName
 }
 
 // HookBinaryPath returns the installed hook executable path under binDir.

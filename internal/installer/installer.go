@@ -211,7 +211,7 @@ func hasBin(e PostToolUseEntry, binPath string) bool {
 
 func isHookBinaryCommand(command string) bool {
 	switch filepath.Base(command) {
-	case "format-dispatch", "format-dispatch.exe":
+	case hookBinaryName, hookBinaryName + ".exe":
 		return true
 	default:
 		return false
