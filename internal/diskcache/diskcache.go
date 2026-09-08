@@ -55,23 +55,36 @@ func Key(namespace string, parts ...string) string {
 func Get(dir, key string, maxAge time.Duration) (value string, ok bool) {
 	prune(dir, cacheNamespacePrefix(key), maxAge)
 
-	raw, err := os.ReadFile(filepath.Join(dir, key)) //nolint:gosec // dir/key are our own fixed cache location, never user input
+	path := filepath.Join(dir, key)
+	raw, err := os.ReadFile(path) //nolint:gosec // dir/key are our own fixed cache location, never user input
 	if err != nil {
 		return "", false
 	}
+	value, stamped, ok := parseEntry(raw)
+	if !ok {
+		return "", false
+	}
+	if time.Since(stamped) >= maxAge {
+		_ = os.Remove(path)
+		return "", false
+	}
+	return value, true
+}
+
+// parseEntry splits a cache entry into its value and timestamp, reporting
+// ok=false for an entry it cannot read. Callers set policy from there: a
+// read treats it as a miss, while the sweep leaves it alone rather than
+// removing a file it does not understand.
+func parseEntry(raw []byte) (value string, stamped time.Time, ok bool) {
 	i := strings.IndexByte(string(raw), '\n')
 	if i < 0 {
-		return "", false
+		return "", time.Time{}, false
 	}
 	ts, err := strconv.ParseInt(string(raw[:i]), 10, 64)
 	if err != nil {
-		return "", false
+		return "", time.Time{}, false
 	}
-	if time.Since(time.Unix(ts, 0)) >= maxAge {
-		_ = os.Remove(filepath.Join(dir, key))
-		return "", false
-	}
-	return string(raw[i+1:]), true
+	return string(raw[i+1:]), time.Unix(ts, 0), true
 }
 
 func cacheNamespacePrefix(key string) string {
@@ -116,12 +129,8 @@ func cacheEntryExpired(path string, maxAge time.Duration) bool {
 	if err != nil {
 		return false
 	}
-	i := strings.IndexByte(string(raw), '\n')
-	if i < 0 {
-		return false
-	}
-	ts, err := strconv.ParseInt(string(raw[:i]), 10, 64)
-	return err == nil && time.Since(time.Unix(ts, 0)) >= maxAge
+	_, stamped, ok := parseEntry(raw)
+	return ok && time.Since(stamped) >= maxAge
 }
 
 // Set records value under key within dir, timestamped now. A failure to
