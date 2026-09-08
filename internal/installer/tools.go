@@ -118,7 +118,7 @@ func applyBunGlobalOverrides(ctx context.Context, out io.Writer) error {
 	if err != nil {
 		return err
 	}
-	if err := os.WriteFile(manifest, append(updated, '\n'), 0o600); err != nil {
+	if err := writeAtomic(manifest, append(updated, '\n'), 0o600); err != nil {
 		return err
 	}
 
