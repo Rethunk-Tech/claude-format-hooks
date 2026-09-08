@@ -12,14 +12,11 @@ import (
 	"os"
 	"path/filepath"
 	"slices"
-	"strings"
 )
 
 const (
-	matcherAll   = "Write|Edit|MultiEdit|NotebookEdit"
-	matcherOld   = "Write|Edit"
-	oldBiomeMark = "biome check --write"
-	statusMsg    = "format-dispatch..."
+	matcherAll = "Write|Edit|MultiEdit|NotebookEdit"
+	statusMsg  = "format-dispatch..."
 	// hookTimeout is the seconds Claude Code allows this hook before killing
 	// it. Formatting one file is sub-500ms work and the external tools are
 	// provisioned at install time rather than fetched on demand, so a
@@ -152,9 +149,7 @@ func renderHooks[T any](top, hooks *orderedMap, event string, entries []T) ([]by
 
 // Wire reads the settings JSON at settingsPath and returns the document
 // before and after wiring in our PostToolUse hook. Idempotent: a prior
-// entry pointing at binPath, or the legacy inline biome-only hook
-// (matcher "Write|Edit" running a "biome check --write" command), is
-// removed before the new entry is appended. Every other top-level key,
+// entry pointing at binPath is removed before the new entry is appended. Every other top-level key,
 // every other hooks.* event, and every other PostToolUse entry is
 // preserved untouched, in its original order.
 func Wire(settingsPath, binPath string) (before, after []byte, err error) {
@@ -163,7 +158,7 @@ func Wire(settingsPath, binPath string) (before, after []byte, err error) {
 		return nil, nil, err
 	}
 
-	kept := slices.DeleteFunc(entries, func(e PostToolUseEntry) bool { return !keepEntry(e, binPath) })
+	kept := slices.DeleteFunc(entries, func(e PostToolUseEntry) bool { return hasBin(e, binPath) })
 	kept = append(kept, PostToolUseEntry{
 		Matcher: matcherAll,
 		Hooks: []HookCommand{{
@@ -216,19 +211,6 @@ func isHookBinaryCommand(command string) bool {
 	default:
 		return false
 	}
-}
-
-// keepEntry reports whether an existing PostToolUse entry should survive
-// Wire's rewrite: it must not already be a stale copy of our own binary,
-// and it must not be the legacy inline biome-only hook Wire replaces.
-func keepEntry(e PostToolUseEntry, binPath string) bool {
-	if hasBin(e, binPath) {
-		return false
-	}
-	if e.Matcher != matcherOld {
-		return true
-	}
-	return !slices.ContainsFunc(e.Hooks, func(h HookCommand) bool { return strings.Contains(h.Command, oldBiomeMark) })
 }
 
 // Install wires the PostToolUse hook into opts.SettingsPath. If dryRun,

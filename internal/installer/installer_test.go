@@ -218,30 +218,6 @@ func TestUnwireExeRemovesLegacyBareBasename(t *testing.T) {
 	qt.Check(t, qt.Equals(settingsHasHooks(t, after), false))
 }
 
-func TestWireReplacesOldBiomeOnlyHook(t *testing.T) {
-	dir := t.TempDir()
-	settingsPath := filepath.Join(dir, "settings.json")
-	old := `{
-		"hooks": {
-			"PostToolUse": [
-				{
-					"matcher": "Write|Edit",
-					"hooks": [{"type": "command", "command": "biome check --write \"$FILE\""}]
-				}
-			]
-		}
-	}`
-	qt.Assert(t, qt.IsNil(os.WriteFile(settingsPath, []byte(old), 0o600)))
-
-	_, after, err := Wire(settingsPath, binPath)
-	qt.Assert(t, qt.IsNil(err))
-
-	entries := settingsPostToolUse(t, after)
-	qt.Assert(t, qt.HasLen(entries, 1))
-	qt.Check(t, qt.Equals(entries[0].Matcher, "Write|Edit|MultiEdit|NotebookEdit"))
-	qt.Check(t, qt.Equals(entries[0].Hooks[0].Command, binPath))
-}
-
 func TestWirePreservesTopLevelKeyOrder(t *testing.T) {
 	dir := t.TempDir()
 	settingsPath := filepath.Join(dir, "settings.json")
