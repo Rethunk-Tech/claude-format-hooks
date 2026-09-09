@@ -469,7 +469,7 @@ func TestRunExtensionlessNonShellFilesAreNoop(t *testing.T) {
 		name string
 		src  string
 	}{
-		{"non-shell shebang", "#!/usr/bin/env python\nprint('hello')\n"},
+		{"unrecognized interpreter", "#!/usr/bin/env perl\nprint 1;\n"},
 		{"no shebang", "plain text\n"},
 	}
 	for _, tc := range cases {
@@ -481,6 +481,33 @@ func TestRunExtensionlessNonShellFilesAreNoop(t *testing.T) {
 			t.Setenv("CLAUDE_PROJECT_DIR", projectRoot)
 			qt.Check(t, qt.Equals(run(strings.NewReader(payload(abs))), 0))
 			qt.Check(t, qt.Equals(readFile(t, abs), tc.src))
+		})
+	}
+}
+
+// A shebang naming an interpreter the registry has a formatter for routes
+// to that formatter, not just shell. Asserted against the dispatch log
+// rather than the file contents so it holds on a machine without ruff,
+// rubocop, or biome installed.
+func TestRunDispatchesNonShellShebangs(t *testing.T) {
+	cases := []struct {
+		name, src, formatter string
+	}{
+		{"python", "#!/usr/bin/env python3\nprint('hello')\n", "ruff/black"},
+		{"ruby", "#!/usr/bin/env ruby\nputs 1\n", "rubocop"},
+		{"node", "#!/usr/bin/env node\nconsole.log(1)\n", "biome"},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			projectRoot := t.TempDir()
+			abs := filepath.Join(projectRoot, "script")
+			writeFile(t, abs, tc.src)
+			logPath := filepath.Join(t.TempDir(), "format-dispatch.log")
+
+			t.Setenv("CLAUDE_PROJECT_DIR", projectRoot)
+			t.Setenv("CLAUDE_FORMAT_HOOKS_LOG", logPath)
+			qt.Check(t, qt.Equals(run(strings.NewReader(payload(abs))), 0))
+			qt.Check(t, qt.StringContains(readFile(t, logPath), `formatter="`+tc.formatter+`"`))
 		})
 	}
 }

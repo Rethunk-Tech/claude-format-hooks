@@ -8,7 +8,7 @@ import (
 
 const shebangPeekLimit = 256
 
-func shellShebangExt(path string) (string, bool) {
+func shebangExt(path string) (string, bool) {
 	f, err := os.Open(path) //nolint:gosec // path is the hook/check target by design
 	if err != nil {
 		return "", false
@@ -38,9 +38,18 @@ func shellShebangExt(path string) (string, bool) {
 		interpreter = fields[1]
 	}
 
-	switch filepath.Base(interpreter) {
-	case "bash", "sh", "zsh", "dash":
+	// python3.12 and similar version suffixes are the norm in shebangs, so
+	// match on prefix for the interpreters that carry one.
+	base := filepath.Base(interpreter)
+	switch {
+	case base == "bash", base == "sh", base == "zsh", base == "dash":
 		return ".sh", true
+	case strings.HasPrefix(base, "python"):
+		return ".py", true
+	case base == "ruby":
+		return ".rb", true
+	case base == "node", base == "bun":
+		return ".js", true
 	default:
 		return "", false
 	}

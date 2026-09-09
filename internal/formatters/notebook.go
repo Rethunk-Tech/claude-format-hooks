@@ -15,6 +15,8 @@ func NewNotebook() Formatter { return notebookFormatter{} }
 
 func (notebookFormatter) Name() string { return "ruff/black-notebook" }
 
+func (notebookFormatter) Tools() []string { return []string{"ruff", "black"} }
+
 func (notebookFormatter) Format(ctx context.Context, projectRoot, abs string) Result {
 	if _, err := lookPath("ruff"); err == nil {
 		return runExternalResult(ctx, projectRoot, "ruff", []string{"format", "--", abs})

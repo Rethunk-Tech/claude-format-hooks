@@ -16,6 +16,8 @@ func NewProto() Formatter { return protoFormatter{} }
 
 func (protoFormatter) Name() string { return "buf" }
 
+func (protoFormatter) Tools() []string { return []string{"buf"} }
+
 func (protoFormatter) Format(ctx context.Context, projectRoot, abs string) Result {
 	if _, err := lookPath("buf"); err != nil {
 		return Result{Skipped: true}

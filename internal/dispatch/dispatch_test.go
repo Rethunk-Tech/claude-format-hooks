@@ -3,6 +3,7 @@ package dispatch
 import (
 	"os"
 	"path/filepath"
+	"slices"
 	"testing"
 
 	"github.com/go-quicktest/qt"
@@ -26,7 +27,7 @@ func TestSupported(t *testing.T) {
 	}
 
 	qt.Check(t, qt.IsTrue(r.Supported(".JSON")), qt.Commentf("case-insensitive"))
-	qt.Check(t, qt.IsFalse(r.Supported(".rb")), qt.Commentf("no formatter registered"))
+	qt.Check(t, qt.IsFalse(r.Supported(".xyz")), qt.Commentf("no formatter registered"))
 	qt.Check(t, qt.IsFalse(r.Supported("")))
 }
 
@@ -70,7 +71,7 @@ func TestKnownExtension(t *testing.T) {
 	qt.Check(t, qt.IsTrue(KnownExtension(".json")), qt.Commentf("registered by every Config, including empty"))
 	qt.Check(t, qt.IsTrue(KnownExtension(".ipynb")), qt.Commentf("notebook formatter is registered by every Config"))
 	qt.Check(t, qt.IsTrue(KnownExtension(".JSON")), qt.Commentf("case-insensitive"))
-	qt.Check(t, qt.IsFalse(KnownExtension(".rb")), qt.Commentf("no formatter registered"))
+	qt.Check(t, qt.IsFalse(KnownExtension(".xyz")), qt.Commentf("no formatter registered"))
 	qt.Check(t, qt.IsFalse(KnownExtension("")))
 }
 
@@ -231,4 +232,41 @@ func TestInSkippedDir(t *testing.T) {
 	for _, tc := range cases {
 		qt.Check(t, qt.Equals(InSkippedDir(tc.path), tc.want), qt.Commentf("path=%q", tc.path))
 	}
+}
+
+// The registry is the only place an extension becomes supported, so a
+// formatter added without its extensions wired here is dead code. These
+// are the extensions added alongside the systemFormatter languages, the
+// prettier plugin types, and Cursor's rule files.
+func TestRegistryCoversAddedLanguages(t *testing.T) {
+	r := NewRegistry(config.Config{})
+	for ext, want := range map[string]string{
+		".c":       "clang-format",
+		".hpp":     "clang-format",
+		".mm":      "clang-format",
+		".java":    "google-java-format",
+		".kt":      "ktlint",
+		".swift":   "swift-format",
+		".rb":      "rubocop",
+		".gemspec": "rubocop",
+		".php":     "php-cs-fixer",
+		".nix":     "nixfmt",
+		".lua":     "stylua",
+		".vue":     "prettier",
+		".svelte":  "prettier",
+		".astro":   "prettier",
+		".mdc":     "markdownlint-cli2",
+	} {
+		qt.Check(t, qt.IsTrue(r.Supported(ext)), qt.Commentf("%s", ext))
+		qt.Check(t, qt.Equals(r.Name(ext), want), qt.Commentf("%s", ext))
+	}
+}
+
+// AllKnownExtensions is what --doctor subtracts the enabled set from, so it
+// must report the full superset regardless of the config in play.
+func TestAllKnownExtensionsIsConfigIndependent(t *testing.T) {
+	all := AllKnownExtensions()
+	qt.Check(t, qt.IsTrue(slices.Contains(all, ".rs")))
+	qt.Check(t, qt.IsTrue(slices.IsSorted(all)))
+	qt.Check(t, qt.Not(qt.HasLen(all, 0)))
 }

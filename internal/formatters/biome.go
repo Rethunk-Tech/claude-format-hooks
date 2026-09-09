@@ -48,6 +48,8 @@ func biomeUsable(projectRoot, abs string, disabled bool) bool {
 
 func (biomeFormatter) Name() string { return "biome" }
 
+func (biomeFormatter) Tools() []string { return []string{"biome", "bunx"} }
+
 func (biomeFormatter) Format(ctx context.Context, projectRoot, abs string) Result {
 	cfgDir := cachedFindUpward(filepath.Dir(abs), projectRoot, biomeConfigNames...)
 	if cfgDir == "" {

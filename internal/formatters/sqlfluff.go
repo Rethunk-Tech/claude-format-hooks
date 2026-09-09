@@ -31,6 +31,8 @@ func NewSQLFluff() Formatter { return sqlfluffFormatter{} }
 
 func (sqlfluffFormatter) Name() string { return "sqlfluff" }
 
+func (sqlfluffFormatter) Tools() []string { return []string{"sqlfluff"} }
+
 // sqlfluffParseFailureMarkers appear in `sqlfluff fix` output only when the
 // file could not be parsed. Matching two independent markers rather than
 // one keeps a wording change in either from silently reclassifying parse

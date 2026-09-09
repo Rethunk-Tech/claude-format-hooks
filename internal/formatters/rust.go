@@ -13,6 +13,8 @@ func NewRust() Formatter { return rustFormatter{} }
 
 func (rustFormatter) Name() string { return "rustfmt" }
 
+func (rustFormatter) Tools() []string { return []string{"rustfmt"} }
+
 func (rustFormatter) Format(ctx context.Context, projectRoot, abs string) Result {
 	if _, err := lookPath("rustfmt"); err != nil {
 		return Result{Skipped: true}

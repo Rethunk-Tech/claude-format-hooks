@@ -4,6 +4,7 @@ package dispatch
 
 import (
 	"context"
+	"iter"
 	"maps"
 	"path/filepath"
 	"slices"
@@ -37,6 +38,14 @@ func NewRegistry(cfg config.Config) *Registry {
 	rust := formatters.NewRust()
 	terraform := formatters.NewTerraform()
 	proto := formatters.NewProto()
+	clang := formatters.NewClangFormat()
+	java := formatters.NewJava()
+	kotlin := formatters.NewKotlin()
+	swift := formatters.NewSwift()
+	ruby := formatters.NewRuby()
+	php := formatters.NewPHP()
+	nix := formatters.NewNix()
+	lua := formatters.NewLua()
 
 	all := map[string]formatters.Formatter{
 		".json": json,
@@ -65,6 +74,9 @@ func NewRegistry(cfg config.Config) *Registry {
 		".md":       markdown,
 		".mdx":      markdown,
 		".markdown": markdown,
+		// Cursor rule files: YAML frontmatter over markdown, which
+		// markdownlint-cli2 already handles.
+		".mdc": markdown,
 
 		".toml": toml,
 
@@ -73,8 +85,13 @@ func NewRegistry(cfg config.Config) *Registry {
 		".html": prettier,
 		// biome's CSS parser doesn't support the SCSS/Less supersets;
 		// prettier does natively.
-		".scss":    prettier,
-		".less":    prettier,
+		".scss": prettier,
+		".less": prettier,
+		// .vue is a prettier core parser; .svelte and .astro need the
+		// project's own prettier plugin, and skip cleanly without one.
+		".vue":     prettier,
+		".svelte":  prettier,
+		".astro":   prettier,
 		".graphql": graphql,
 		".gql":     graphql,
 
@@ -90,6 +107,33 @@ func NewRegistry(cfg config.Config) *Registry {
 		".tfmock.hcl":  terraform,
 		".tfquery.hcl": terraform,
 		".proto":       proto,
+
+		// clang-format parses C, C++, and Objective-C from one binary.
+		".c":   clang,
+		".h":   clang,
+		".cc":  clang,
+		".cpp": clang,
+		".cxx": clang,
+		".hpp": clang,
+		".hh":  clang,
+		".hxx": clang,
+		".m":   clang,
+		".mm":  clang,
+
+		".java": java,
+
+		".kt":  kotlin,
+		".kts": kotlin,
+
+		".swift": swift,
+
+		".rb":      ruby,
+		".rake":    ruby,
+		".gemspec": ruby,
+
+		".php": php,
+		".nix": nix,
+		".lua": lua,
 	}
 	maps.DeleteFunc(all, func(ext string, f formatters.Formatter) bool {
 		return cfg.IsDisabled(ext) || cfg.IsFormatterDisabled(f.Name())
@@ -170,6 +214,17 @@ var knownExtensions, registeredSuffixes = func() (map[string]bool, []string) {
 // subprocess.
 func KnownExtension(ext string) bool {
 	return knownExtensions[strings.ToLower(ext)]
+}
+
+// All yields each enabled extension and the formatter registered for it,
+// for callers that report on the registry rather than dispatch through it.
+func (r *Registry) All() iter.Seq2[string, formatters.Formatter] { return maps.All(r.byExt) }
+
+// AllKnownExtensions returns every extension any formatter registers,
+// sorted and independent of user or project config -- the superset a
+// Registry's enabled set is carved out of.
+func AllKnownExtensions() []string {
+	return slices.Sorted(maps.Keys(knownExtensions))
 }
 
 // InSkippedDir reports whether relPath (relative to the project root)

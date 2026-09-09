@@ -15,6 +15,8 @@ func NewPython() Formatter { return pythonFormatter{} }
 
 func (pythonFormatter) Name() string { return "ruff/black" }
 
+func (pythonFormatter) Tools() []string { return []string{"ruff", "black"} }
+
 func (pythonFormatter) Format(ctx context.Context, projectRoot, abs string) Result {
 	if _, err := lookPath("ruff"); err == nil {
 		return runExternalResult(ctx, projectRoot, "ruff", []string{"format", "--", abs})

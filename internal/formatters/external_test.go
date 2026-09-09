@@ -392,3 +392,44 @@ func TestFindUpward(t *testing.T) {
 	qt.Check(t, qt.Equals(findUpward(sub, root, "biome.json", "biome.jsonc"), filepath.Join(root, "a")))
 	qt.Check(t, qt.Equals(findUpward(root, root, "nope.json"), ""))
 }
+
+// Prettier is the formatter for .svelte and .astro, but only via a plugin
+// the project installs itself. Without one prettier exits non-zero saying
+// it has no parser -- reporting that as a failed format would put a
+// diagnostic on every single write of those files, so it must skip.
+func TestPrettierSkipsWhenNoParserInferred(t *testing.T) {
+	isolateDiskCache(t)
+	dir, path := sourceFile(t, "a.svelte", "<div/>\n")
+	writeFakeTool(t, "prettier", "echo '[error] No parser could be inferred for file' >&2; exit 2")
+
+	res := NewPrettier().Format(t.Context(), dir, path)
+	qt.Check(t, qt.IsTrue(res.Skipped))
+	qt.Check(t, qt.Equals(res.Diagnostic, ""))
+}
+
+// Any other prettier failure is still a real one.
+func TestPrettierReportsOtherFailures(t *testing.T) {
+	isolateDiskCache(t)
+	dir, path := sourceFile(t, "a.yaml", "a: 1\n")
+	writeFakeTool(t, "prettier", "echo '[error] unexpected token' >&2; exit 2")
+
+	res := NewPrettier().Format(t.Context(), dir, path)
+	qt.Check(t, qt.IsFalse(res.Skipped))
+	assertDiagnostic(t, res)
+}
+
+// Tools is what --doctor reads to tell "no formatter for this type" from
+// "the formatter's tool isn't installed"; a formatter that looks up a
+// binary and does not report it reads as native and lies about why files
+// are being skipped.
+func TestEveryExternalFormatterReportsItsTools(t *testing.T) {
+	for _, f := range []Formatter{
+		NewProto(), NewBiome(), NewMarkdown(), NewTOML(), NewPrettier(),
+		NewSQLFluff(), NewPython(), NewNotebook(), NewRust(), NewTerraform(),
+		NewGraphQLRouter(config.Default()),
+	} {
+		p, ok := f.(Prober)
+		qt.Assert(t, qt.IsTrue(ok), qt.Commentf("%s has no Tools()", f.Name()))
+		qt.Check(t, qt.Not(qt.HasLen(p.Tools(), 0)), qt.Commentf("%s", f.Name()))
+	}
+}

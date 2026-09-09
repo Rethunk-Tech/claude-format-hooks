@@ -16,6 +16,8 @@ func NewTerraform() Formatter { return terraformFormatter{} }
 
 func (terraformFormatter) Name() string { return "terraform" }
 
+func (terraformFormatter) Tools() []string { return []string{"terraform", "tofu"} }
+
 func (terraformFormatter) Format(ctx context.Context, projectRoot, abs string) Result {
 	bin := "terraform"
 	if _, err := lookPath(bin); err != nil {

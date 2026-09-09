@@ -32,6 +32,10 @@ func NewGraphQLRouter(cfg config.Config) Formatter {
 // Name returns "prettier", the fallback formatter and registry identity.
 func (graphqlRouter) Name() string { return "prettier" }
 
+// Tools lists both delegates: the router picks biome or prettier per file,
+// so either one being present is enough for GraphQL to be formatted.
+func (graphqlRouter) Tools() []string { return []string{"biome", "prettier", "bunx"} }
+
 func (r graphqlRouter) Format(ctx context.Context, projectRoot, abs string) Result {
 	if biomeUsable(projectRoot, abs, r.biomeDisabled) {
 		return r.biome.Format(ctx, projectRoot, abs)

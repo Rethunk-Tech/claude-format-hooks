@@ -27,3 +27,13 @@ type Formatter interface {
 	// (the value of $CLAUDE_PROJECT_DIR, or cwd as a fallback).
 	Format(ctx context.Context, projectRoot, abs string) Result
 }
+
+// Prober reports the external binaries a formatter looks for, in the order
+// it tries them; it runs if any one of them resolves. It is an optional
+// interface rather than part of Formatter because a native formatter has
+// nothing to report: --doctor treats a formatter without one as always
+// usable. Implementations live beside their formatter's lookPath calls so
+// the two cannot drift apart unnoticed.
+type Prober interface {
+	Tools() []string
+}
