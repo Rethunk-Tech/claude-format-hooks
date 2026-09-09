@@ -7,61 +7,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-### Changed
-
-- `--check` formats and compares files `runtime.NumCPU()` at a time
-  instead of one after another. Measured on a 32-thread machine: 2267
-  files in 9.1s wall against roughly 4 minutes of CPU, and 55 files in
-  0.257s against 3.53s serial. Output stays byte-identical between runs
-  -- results are tallied in job order, not completion order -- and the
-  per-file timeout is unchanged, having produced no timeouts across
-  those runs.
-
-### Security
-
-- `--upgrade` runs `gh attestation verify --signer-workflow` when the
-  GitHub CLI is installed and authenticated, which verifies the DSSE
-  signature, the Fulcio certificate chain and the Rekor inclusion proof.
-  It costs no Go dependencies -- the same trade this project already makes
-  for every formatter it shells out to. gh needs a token even for a public
-  repository, so an absent or unauthenticated gh falls back to the
-  attestation binding below rather than failing the upgrade, and
-  `--upgrade` reports which applied.
-- `--upgrade` now binds a release attestation to the release workflow, not
-  just to the repository. It accepted any provenance attestation on the
-  repository for the right digest, so an attestation minted by any other
-  workflow would have passed; it now decodes the in-toto statement from the
-  bundle's DSSE envelope and requires the subject digest, the repository and
-  `.github/workflows/release.yml` to all match. Standard library only. The
-  signature chain itself is still unverified -- see the note in
-  `internal/installer/upgrade.go` for the measurement behind that.
-
-### Fixed
-
-- Generated files carrying a source extension are no longer formatted.
-  The skip list matched directory segments only, so a `package-lock.json`
-  was reformatted into churn its package manager reverts, and an
-  `app.min.js` was expanded into readable source -- a corrupted build
-  artifact. Built-in globs cover `*.min.js`/`*.min.css`, `*-lock.json`,
-  `*-lock.yaml` and `npm-shrinkwrap.json`; a `skipFiles` config key adds
-  more at either level, alongside `skipDirs`.
-
-- `--upgrade` refreshes the globally-provisioned bunx formatters
-  (biome, prettier, taplo, markdownlint-cli2) as well as the binary.
-  Provisioning ran only from `--install`, and `install.sh --upgrade`
-  returns before reaching it, so an operator who only ever upgraded kept
-  install-day versions of those tools behind a current binary.
-- `internal/diskcache` writes entries through a temp file and a rename.
-  Concurrent `Set` calls on one key, now routine under a parallel
-  `--check`, could otherwise be read back as a partial entry: safe,
-  since a malformed entry parses as a miss, but it defeats the cache.
-- `--check` no longer counts files it never examined as passing. The
-  summary reported the number of files walked, so a tree of unsupported
-  types, opted-out types, or types whose formatter is not installed
-  reported "N file(s) already formatted" and exited 0 -- in CI, a green
-  formatting gate over files nothing looked at. It now reports what it
-  checked and what it skipped, with the formatters that declined for want
-  of a binary named so they can be installed. Exit codes are unchanged.
+## [0.5.0] - 2026-09-09
 
 ### Added
 
@@ -109,6 +55,62 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `.mdc` (Cursor rule files) formats as markdown.
 - The extensionless-file shebang peek recognizes python, ruby, node, and
   bun interpreters in addition to shells.
+
+### Changed
+
+- `--check` formats and compares files `runtime.NumCPU()` at a time
+  instead of one after another. Measured on a 32-thread machine: 2267
+  files in 9.1s wall against roughly 4 minutes of CPU, and 55 files in
+  0.257s against 3.53s serial. Output stays byte-identical between runs
+  -- results are tallied in job order, not completion order -- and the
+  per-file timeout is unchanged, having produced no timeouts across
+  those runs.
+
+### Fixed
+
+- Generated files carrying a source extension are no longer formatted.
+  The skip list matched directory segments only, so a `package-lock.json`
+  was reformatted into churn its package manager reverts, and an
+  `app.min.js` was expanded into readable source -- a corrupted build
+  artifact. Built-in globs cover `*.min.js`/`*.min.css`, `*-lock.json`,
+  `*-lock.yaml` and `npm-shrinkwrap.json`; a `skipFiles` config key adds
+  more at either level, alongside `skipDirs`.
+
+- `--upgrade` refreshes the globally-provisioned bunx formatters
+  (biome, prettier, taplo, markdownlint-cli2) as well as the binary.
+  Provisioning ran only from `--install`, and `install.sh --upgrade`
+  returns before reaching it, so an operator who only ever upgraded kept
+  install-day versions of those tools behind a current binary.
+- `internal/diskcache` writes entries through a temp file and a rename.
+  Concurrent `Set` calls on one key, now routine under a parallel
+  `--check`, could otherwise be read back as a partial entry: safe,
+  since a malformed entry parses as a miss, but it defeats the cache.
+- `--check` no longer counts files it never examined as passing. The
+  summary reported the number of files walked, so a tree of unsupported
+  types, opted-out types, or types whose formatter is not installed
+  reported "N file(s) already formatted" and exited 0 -- in CI, a green
+  formatting gate over files nothing looked at. It now reports what it
+  checked and what it skipped, with the formatters that declined for want
+  of a binary named so they can be installed. Exit codes are unchanged.
+
+### Security
+
+- `--upgrade` runs `gh attestation verify --signer-workflow` when the
+  GitHub CLI is installed and authenticated, which verifies the DSSE
+  signature, the Fulcio certificate chain and the Rekor inclusion proof.
+  It costs no Go dependencies -- the same trade this project already makes
+  for every formatter it shells out to. gh needs a token even for a public
+  repository, so an absent or unauthenticated gh falls back to the
+  attestation binding below rather than failing the upgrade, and
+  `--upgrade` reports which applied.
+- `--upgrade` now binds a release attestation to the release workflow, not
+  just to the repository. It accepted any provenance attestation on the
+  repository for the right digest, so an attestation minted by any other
+  workflow would have passed; it now decodes the in-toto statement from the
+  bundle's DSSE envelope and requires the subject digest, the repository and
+  `.github/workflows/release.yml` to all match. Standard library only. The
+  signature chain itself is still unverified -- see the note in
+  `internal/installer/upgrade.go` for the measurement behind that.
 
 ## [0.4.0] - 2026-09-07
 
@@ -533,7 +535,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 Initial release.
 
-[Unreleased]: https://github.com/Rethunk-Tech/claude-format-hooks/compare/v0.4.0...HEAD
+[Unreleased]: https://github.com/Rethunk-Tech/claude-format-hooks/compare/v0.5.0...HEAD
+[0.5.0]: https://github.com/Rethunk-Tech/claude-format-hooks/compare/v0.4.0...v0.5.0
 [0.4.0]: https://github.com/Rethunk-Tech/claude-format-hooks/compare/v0.3.0...v0.4.0
 [0.3.0]: https://github.com/Rethunk-Tech/claude-format-hooks/compare/v0.2.0...v0.3.0
 [0.2.0]: https://github.com/Rethunk-Tech/claude-format-hooks/compare/v0.1.0...v0.2.0
