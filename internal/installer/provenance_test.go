@@ -5,6 +5,13 @@ import (
 	"encoding/base64"
 	"encoding/hex"
 	"encoding/json"
+	"fmt"
+	"io"
+	"net/http"
+	"net/http/httptest"
+	"os"
+	"path/filepath"
+	"runtime"
 	"strings"
 	"testing"
 
@@ -122,4 +129,101 @@ func TestVerifyProvenanceIgnoresDigestCase(t *testing.T) {
 	upper := strings.ToUpper(hex.EncodeToString(sum[:]))
 	body := attestationBody(t, upper, "https://github.com/"+releaseRepository, releaseWorkflowPath)
 	qt.Check(t, qt.IsNil(verifyProvenanceBody(body, binary)))
+}
+
+// gh's verdict is only trusted when gh could actually run. An absent or
+// unauthenticated gh is an ordinary state -- `gh attestation verify` needs
+// a token even for a public repository -- and must degrade to the inline
+// binding rather than refuse a good upgrade.
+func TestVerifyWithGHTreatsAbsentGHAsUnavailable(t *testing.T) {
+	t.Setenv("PATH", t.TempDir())
+	available, err := verifyWithGH(filepath.Join(t.TempDir(), "bin"), io.Discard)
+	qt.Check(t, qt.IsFalse(available))
+	qt.Check(t, qt.IsNil(err))
+}
+
+// fakeGH puts a gh on PATH whose `auth status` and `attestation verify`
+// exit codes the test controls.
+func fakeGH(t *testing.T, authExit, verifyExit int) {
+	t.Helper()
+	if runtime.GOOS == "windows" {
+		t.Skip("fake shell-script tools are POSIX-shell only")
+	}
+	dir := t.TempDir()
+	script := fmt.Sprintf(`#!/bin/sh
+case "$1" in
+  auth) exit %d ;;
+  attestation) echo "gh says so"; exit %d ;;
+esac
+exit 1
+`, authExit, verifyExit)
+	qt.Assert(t, qt.IsNil(os.WriteFile(filepath.Join(dir, "gh"), []byte(script), 0o755)))
+	t.Setenv("PATH", dir)
+}
+
+func TestVerifyWithGH(t *testing.T) {
+	cases := []struct {
+		name          string
+		authExit      int
+		verifyExit    int
+		wantAvailable bool
+		wantErr       bool
+	}{
+		{name: "authenticated and verified", wantAvailable: true},
+		{name: "authenticated and refused", verifyExit: 1, wantAvailable: true, wantErr: true},
+		// gh exits 4 when it has no token, even for a public repository.
+		{name: "unauthenticated", authExit: 4, wantAvailable: false},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			fakeGH(t, tc.authExit, tc.verifyExit)
+			available, err := verifyWithGH(filepath.Join(t.TempDir(), "bin"), io.Discard)
+			qt.Check(t, qt.Equals(available, tc.wantAvailable))
+			qt.Check(t, qt.Equals(err != nil, tc.wantErr))
+		})
+	}
+}
+
+// The signer pin is what makes gh's check equivalent to the inline binding
+// rather than merely "some attestation exists".
+func TestSignerWorkflowPinsTheReleaseWorkflow(t *testing.T) {
+	qt.Check(t, qt.Equals(signerWorkflow,
+		"Rethunk-Tech/claude-format-hooks/.github/workflows/release.yml"))
+}
+
+func TestWriteTempBinaryRoundTrips(t *testing.T) {
+	want := []byte("released bytes")
+	path, cleanup, err := writeTempBinary(want)
+	qt.Assert(t, qt.IsNil(err))
+	got, err := os.ReadFile(path)
+	qt.Assert(t, qt.IsNil(err))
+	qt.Check(t, qt.DeepEquals(got, want))
+
+	cleanup()
+	_, statErr := os.Stat(path)
+	qt.Check(t, qt.IsTrue(os.IsNotExist(statErr)), qt.Commentf("the staged copy must not linger"))
+}
+
+// gh always talks to github.com, so its verdict only applies when this tool
+// is pointed there too. Pointed at a mirror or a test server via
+// CLAUDE_FORMAT_HOOKS_RELEASE_API, gh would be judging a different origin's
+// bytes, and a refusal would say nothing about the ones just downloaded.
+func TestVerifyProvenanceSkipsGHForOverriddenAPI(t *testing.T) {
+	binary := []byte("the released bytes")
+	sum := sha256.Sum256(binary)
+	body := attestationBody(t, hex.EncodeToString(sum[:]),
+		"https://github.com/"+releaseRepository, releaseWorkflowPath)
+
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		_, _ = w.Write(body)
+	}))
+	defer server.Close()
+
+	// A gh that refuses everything. It must never be consulted here.
+	fakeGH(t, 0, 1)
+
+	var out strings.Builder
+	qt.Check(t, qt.IsNil(verifyProvenance(server.Client(), server.URL, binary, &out)))
+	qt.Check(t, qt.Not(qt.StringContains(out.String(), "gh")),
+		qt.Commentf("gh must not be consulted for a non-github.com base URL"))
 }

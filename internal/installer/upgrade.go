@@ -144,7 +144,7 @@ func upgradeWithConfig(opts Options, dryRun bool, out io.Writer, cfg upgradeConf
 	if err := verifyReleaseChecksum(checksum, assetName, binary); err != nil {
 		return fmt.Errorf("verify %s: %w", assetName, err)
 	}
-	if err := verifyReleaseProvenance(cfg.client, cfg.apiBaseURL, binary); err != nil {
+	if err := verifyProvenance(cfg.client, cfg.apiBaseURL, binary, out); err != nil {
 		return fmt.Errorf("verify build provenance for %s: %w; refusing to install an unattested binary. "+
 			"Verify a download yourself with `gh attestation verify <file> --repo %s` and install it manually, "+
 			"or wait for a release built with provenance", assetName, err, releaseRepository)
@@ -171,27 +171,74 @@ func upgradeWithConfig(opts Options, dryRun bool, out io.Writer, cfg upgradeConf
 // instead needs the release workflow's short-lived OIDC identity, which write
 // access to release assets does not grant.
 //
-// ponytail: the trust anchor is TLS to the release API host, which this path
-// already trusts for the release metadata and asset URLs it acts on
-// (install.sh states that trust). Within that anchor this now binds the
-// attestation to these exact bytes AND to the release workflow, decoding the
-// in-toto statement out of the bundle's DSSE envelope with the standard
-// library alone.
+// verifyProvenance takes the strongest check the machine can actually
+// perform. gh, when installed and authenticated, verifies the DSSE
+// signature, the Fulcio chain and the Rekor inclusion proof with the signer
+// pinned to the release workflow; its verdict is therefore authoritative,
+// refusal included. Without gh this falls back to the inline binding below.
 //
-// Ceiling: the DSSE signature, its Fulcio certificate chain and the Rekor
-// inclusion proof are not cryptographically verified, so this trusts the API
-// to hand back an unforged bundle rather than proving it. Measured 2026-09:
-// closing that means sigstore-go, which resolves to 71 modules (gRPC,
-// protobuf, k8s.io/klog) against this module's current 7 -- a tenfold
-// dependency increase, in a binary whose entire design premise is a 1-3ms
-// cold start on every file write. Measured, not worth it. Revisit only if
-// the threat model grows to include a compromised api.github.com, at which
-// point the attestation list itself is forgeable too and the whole path
-// needs rethinking, not just this check.
+// Both run when gh is available: the inline check costs one already fetched
+// response and catches a malformed or missing attestation with a message
+// about this tool rather than about gh.
+func verifyProvenance(client *http.Client, baseURL string, binary []byte, out io.Writer) error {
+	if err := verifyReleaseProvenance(client, baseURL, binary); err != nil {
+		return err
+	}
+
+	// gh always talks to github.com. When the operator has pointed this at
+	// a mirror or a test server via CLAUDE_FORMAT_HOOKS_RELEASE_API, gh
+	// would be verifying a different origin's bytes than the ones just
+	// downloaded, and its refusal would say nothing about them.
+	if strings.TrimRight(baseURL, "/") != releaseAPIBaseURL {
+		return nil
+	}
+
+	path, cleanup, err := writeTempBinary(binary)
+	if err != nil {
+		// Staging is our own failure, not the release's. The inline binding
+		// already passed, so degrade to it rather than block the upgrade.
+		return nil
+	}
+	defer cleanup()
+
+	available, ghErr := verifyWithGH(path, out)
+	if !available {
+		_, _ = fmt.Fprintf(out, "==> note: gh unavailable or unauthenticated; "+
+			"provenance checked against the attestation API only\n")
+		return nil
+	}
+	return ghErr
+}
+
+// ponytail: this is the fallback, used when gh cannot run. It binds the
+// attestation to these exact bytes, this repository, and the release
+// workflow by decoding the in-toto statement out of the bundle's DSSE
+// envelope with the standard library alone. What it does not do is prove
+// the bundle is genuine: the anchor is TLS to the release API host, which
+// this path already trusts for the release metadata and asset URLs it acts
+// on (install.sh states that trust). verifyProvenance prefers gh, which
+// does prove it.
+//
+// Measured 2026-09-09, closing that in Go rather than through gh:
+//   - sigstore-go: 71 modules (gRPC, protobuf, k8s.io/klog) against this
+//     module's 7, and pkg/bundle alone pulls the same 71.
+//   - sigstore/protobuf-specs: 4 modules, but it only types the bundle.
+//     The statement is already parsed here with encoding/json, so it buys
+//     nothing.
+//   - go-securesystemslib/dsse: 3 modules, and genuinely light -- but it
+//     verifies an envelope against a verifier you supply, so the Fulcio
+//     chain is still yours to build. Fulcio certificates live ten minutes,
+//     so verification means validating the bundle's RFC3161 timestamp to
+//     establish the cert was valid when it signed, against embedded roots
+//     that rotate. That is hand-rolled signature verification in a
+//     formatting hook, which is the category of code not to hand-roll.
+//
+// Shelling out to gh costs nothing and does all of it, including the Rekor
+// inclusion proof, so that is the path taken.
 //
 // An earlier note here recorded the endpoint returning "bundle": null and
-// offloading to a snappy-compressed blob. Re-measured 2026-09-09: the bundle
-// now comes back inline, which is what makes the workflow binding free.
+// offloading to a snappy-compressed blob. Re-measured 2026-09-09: the
+// bundle comes back inline, which is what makes this fallback free.
 func verifyReleaseProvenance(client *http.Client, baseURL string, binary []byte) error {
 	digest := sha256.Sum256(binary)
 	url := strings.TrimRight(baseURL, "/") + "/repos/" + releaseRepository +

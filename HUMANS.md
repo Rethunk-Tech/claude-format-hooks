@@ -62,14 +62,20 @@ format-dispatch --upgrade [--dry-run]
 `--upgrade` also refreshes the globally-provisioned bunx formatters, so the
 binary and the tools it shells out to move together.
 
-`--upgrade` checks the release `.sha256` and then requires GitHub to hold a
-build-provenance attestation binding the downloaded bytes to
-`.github/workflows/release.yml` in this repository; anything else is refused
-rather than installed. The attestation's signature chain is not itself
-verified -- that would cost sigstore-go's 71 modules against this binary's
-current 7 -- so the trust anchor remains TLS to `api.github.com`, the same
-one the release metadata already rests on. `gh attestation verify` does the
-full cryptographic check when you want it. `--dry-run` prints
+`--upgrade` checks the release `.sha256`, then requires a build-provenance
+attestation binding the downloaded bytes to `.github/workflows/release.yml`
+in this repository. Anything else is refused rather than installed.
+
+With the GitHub CLI installed and authenticated, it also runs
+`gh attestation verify --signer-workflow` over the download, which is the
+full cryptographic check: DSSE signature, Fulcio certificate chain, and
+Rekor transparency-log inclusion. That verdict decides the upgrade.
+
+Without `gh` -- it needs a token even for a public repository -- the
+attestation check stands alone, trusting TLS to `api.github.com`, the same
+anchor the release metadata already rests on. `--upgrade` says which of the
+two applied. Pointing `CLAUDE_FORMAT_HOOKS_RELEASE_API` elsewhere skips the
+`gh` step, since `gh` would be judging a different origin's bytes. `--dry-run` prints
 the planned asset and path without going near the network.
 
 **Config:** `~/.claude/claude-format-hooks.json` (`$CLAUDE_FORMAT_HOOKS_CONFIG`);

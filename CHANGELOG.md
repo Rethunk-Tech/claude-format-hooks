@@ -19,6 +19,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Security
 
+- `--upgrade` runs `gh attestation verify --signer-workflow` when the
+  GitHub CLI is installed and authenticated, which verifies the DSSE
+  signature, the Fulcio certificate chain and the Rekor inclusion proof.
+  It costs no Go dependencies -- the same trade this project already makes
+  for every formatter it shells out to. gh needs a token even for a public
+  repository, so an absent or unauthenticated gh falls back to the
+  attestation binding below rather than failing the upgrade, and
+  `--upgrade` reports which applied.
 - `--upgrade` now binds a release attestation to the release workflow, not
   just to the repository. It accepted any provenance attestation on the
   repository for the right digest, so an attestation minted by any other
