@@ -33,17 +33,41 @@ type Payload struct {
 // tool_input.file_path, tool_input.notebook_path, then Cursor afterFileEdit's
 // top-level file_path.
 func (p Payload) FilePath() string {
+	path, _ := p.resolve()
+	return path
+}
+
+// IsClaude reports whether the path came from a field only the Claude
+// PostToolUse envelope defines, rather than Cursor's top-level file_path.
+// Only that contract defines a JSON channel on stdout back to the model, so
+// a caller must ask before writing one: Cursor's afterFileEdit does not
+// read it, and writing it there would put a stray JSON line into whatever
+// Cursor does with the hook's stdout.
+//
+// It shares resolve with FilePath rather than repeating the switch, so the
+// two can never disagree about which envelope a payload came from.
+func (p Payload) IsClaude() bool {
+	_, claude := p.resolve()
+	return claude
+}
+
+// resolve answers both questions at once: which path, and whether the field
+// it came from is Claude's. An empty payload reports Cursor, which is the
+// safe direction -- callers return early on an empty path, and a payload
+// this package cannot recognize must not be assumed to speak a protocol it
+// might not.
+func (p Payload) resolve() (path string, claude bool) {
 	switch {
 	case p.ToolResponse.FilePath != "":
-		return p.ToolResponse.FilePath
+		return p.ToolResponse.FilePath, true
 	case p.ToolResult.FilePath != "":
-		return p.ToolResult.FilePath
+		return p.ToolResult.FilePath, true
 	case p.ToolInput.FilePath != "":
-		return p.ToolInput.FilePath
+		return p.ToolInput.FilePath, true
 	case p.ToolInput.NotebookPath != "":
-		return p.ToolInput.NotebookPath
+		return p.ToolInput.NotebookPath, true
 	default:
-		return p.CursorFilePath
+		return p.CursorFilePath, false
 	}
 }
 

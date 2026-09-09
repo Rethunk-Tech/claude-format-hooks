@@ -44,7 +44,10 @@ formatter reads as native.
 
 ## Invariants
 
-- Silent on success; truncated stderr diagnostic on formatter failure.
+- Silent on success; truncated stderr diagnostic on formatter failure,
+  plus one `hookSpecificOutput.additionalContext` JSON line on stdout so
+  the model sees it (Claude payloads only -- Cursor does not define that
+  channel). Nothing else may write to stdout on the hook path.
 - Hook path always exits 0 (`--check` is the CI exception).
 - Unsupported extension: instant no-op — no stat, exec, or config read.
   An extensionless file is first peeked at for a shebang naming a

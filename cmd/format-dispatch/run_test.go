@@ -13,6 +13,7 @@ import (
 	"path/filepath"
 	"runtime"
 	"runtime/debug"
+	"strconv"
 	"strings"
 	"sync/atomic"
 	"testing"
@@ -875,4 +876,99 @@ func TestProvisionAfterRefreshesToolsUnlessDryRun(t *testing.T) {
 		qt.Check(t, qt.StringContains(got, "@biomejs/biome"))
 		qt.Check(t, qt.StringContains(got, "prettier"))
 	})
+}
+
+// fakeFormatterTool puts an executable named name on a PATH holding only a
+// fresh temp dir, so the hook path resolves it instead of a real formatter.
+func fakeFormatterTool(t *testing.T, name, body string) {
+	t.Helper()
+	if runtime.GOOS == "windows" {
+		t.Skip("fake shell-script tools are POSIX-shell only")
+	}
+	dir := t.TempDir()
+	qt.Assert(t, qt.IsNil(os.WriteFile(filepath.Join(dir, name), []byte("#!/bin/sh\n"+body+"\n"), 0o755)))
+	t.Setenv("PATH", dir)
+	t.Setenv("CLAUDE_FORMAT_HOOKS_CACHE", t.TempDir())
+}
+
+// A formatter diagnostic about a file the model just wrote has to reach the
+// model that wrote it. stderr on a zero exit reaches only the transcript,
+// so the PostToolUse JSON channel on stdout is the one that carries it.
+func TestRunSurfacesDiagnosticsToTheModel(t *testing.T) {
+	projectRoot := t.TempDir()
+	abs := filepath.Join(projectRoot, "a.lua")
+	writeFile(t, abs, "local x = 1\n")
+	fakeFormatterTool(t, "stylua", "echo 'unexpected symbol near <eof>' >&2; exit 1")
+	t.Setenv("CLAUDE_PROJECT_DIR", projectRoot)
+
+	var stderr string
+	stdout := captureStdout(t, func() {
+		stderr = captureStderr(t, func() {
+			qt.Check(t, qt.Equals(run(strings.NewReader(payload(abs))), 0))
+		})
+	})
+
+	// Exactly one JSON object, and it parses as the documented shape.
+	lines := strings.Split(strings.TrimRight(stdout, "\n"), "\n")
+	qt.Assert(t, qt.HasLen(lines, 1))
+	var got hookOutput
+	qt.Assert(t, qt.IsNil(json.Unmarshal([]byte(lines[0]), &got)))
+	qt.Check(t, qt.Equals(got.HookSpecificOutput.HookEventName, "PostToolUse"))
+	qt.Check(t, qt.StringContains(got.HookSpecificOutput.AdditionalContext, "unexpected symbol"))
+	qt.Check(t, qt.StringContains(got.HookSpecificOutput.AdditionalContext, abs),
+		qt.Commentf("the model needs to know which file is broken"))
+	// The operator still reads the same failure on stderr.
+	qt.Check(t, qt.StringContains(stderr, "unexpected symbol"))
+}
+
+// Cursor's afterFileEdit does not define this channel, so writing it there
+// would put a stray JSON line into stdout for a contract that never asked
+// for one.
+func TestRunEmitsNoModelContextForCursorPayloads(t *testing.T) {
+	projectRoot := t.TempDir()
+	abs := filepath.Join(projectRoot, "a.lua")
+	writeFile(t, abs, "local x = 1\n")
+	fakeFormatterTool(t, "stylua", "echo 'boom' >&2; exit 1")
+	t.Setenv("CLAUDE_PROJECT_DIR", projectRoot)
+
+	cursorPayload := `{"file_path":` + strconv.Quote(abs) + `}`
+	var stderr string
+	stdout := captureStdout(t, func() {
+		stderr = captureStderr(t, func() {
+			qt.Check(t, qt.Equals(run(strings.NewReader(cursorPayload)), 0))
+		})
+	})
+
+	qt.Check(t, qt.Equals(stdout, ""))
+	qt.Check(t, qt.StringContains(stderr, "boom"), qt.Commentf("stderr is unchanged for Cursor"))
+}
+
+// Anything on stdout is protocol now, so every outcome that is not a
+// failure must write nothing at all.
+func TestRunWritesNoStdoutWhenNothingFailed(t *testing.T) {
+	cases := []struct {
+		name, file, content string
+		tool                string
+	}{
+		{name: "formatted successfully", file: "a.json", content: "{\"a\":1}\n"},
+		{name: "formatter tool absent", file: "a.lua", content: "local x = 1\n"},
+		{name: "malformed json is a skip", file: "b.json", content: "{\"a\": "},
+		{name: "unsupported extension", file: "a.xyz", content: "whatever\n"},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			projectRoot := t.TempDir()
+			abs := filepath.Join(projectRoot, tc.file)
+			writeFile(t, abs, tc.content)
+			// An empty PATH makes "tool absent" real and leaves the native
+			// formatters (JSON here) unaffected.
+			fakeFormatterTool(t, "unrelated", "exit 0")
+			t.Setenv("CLAUDE_PROJECT_DIR", projectRoot)
+
+			stdout := captureStdout(t, func() {
+				qt.Check(t, qt.Equals(run(strings.NewReader(payload(abs))), 0))
+			})
+			qt.Check(t, qt.Equals(stdout, ""))
+		})
+	}
 }

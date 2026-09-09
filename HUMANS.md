@@ -44,6 +44,10 @@ unrelated keys are preserved exactly; only their order changes, once.
 ## Usage
 
 Formats supported extensions on each Write/Edit/MultiEdit/NotebookEdit.
+When a formatter reports a real failure (a syntax error, say), the message
+goes to stderr for you and back to Claude as hook context, so the model
+learns the file it just wrote is broken. A skipped file -- unsupported type,
+missing tool -- stays silent.
 Unsupported extensions and skipped paths are no-ops — see
 [AGENTS.md § Invariants](AGENTS.md#invariants).
 

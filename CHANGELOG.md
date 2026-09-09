@@ -38,6 +38,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- Formatter failures are reported back to the model as PostToolUse
+  `hookSpecificOutput.additionalContext` on stdout, alongside the existing
+  stderr message. Claude Code only reads hook output back into the
+  conversation on exit 2 or through that field, so a diagnostic about a
+  file the model had just written previously reached nobody but the
+  transcript. Exit stays 0 -- a flaky external formatter must not look
+  like a failed edit. Skips stay silent, and Cursor payloads emit nothing,
+  since `afterFileEdit` does not define the channel.
 - A `skipDirs` config key names extra generated directories to skip, at
   either the user or the project level, added to the built-in list rather
   than replacing it. Three separate fixes have had to extend that list

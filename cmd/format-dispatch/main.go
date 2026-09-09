@@ -271,7 +271,8 @@ func run(stdin io.Reader) int {
 		return 1
 	}
 
-	logPath = hookio.Parse(raw).FilePath()
+	payload := hookio.Parse(raw)
+	logPath = payload.FilePath()
 	path := logPath
 	if path == "" {
 		logOutcome = "skip: empty payload"
@@ -332,11 +333,15 @@ func run(stdin io.Reader) int {
 
 	if result.Err != nil {
 		fmt.Fprintf(os.Stderr, "%s: %v\n", registry.Name(ext), result.Err)
+		emitModelContext(os.Stdout, payload.IsClaude(),
+			fmt.Sprintf("%s: %s: %v", registry.Name(ext), abs, result.Err))
 		logOutcome = fmt.Sprintf("error: %v", result.Err)
 		return 0
 	}
 	if result.Diagnostic != "" {
 		fmt.Fprintf(os.Stderr, "%s: fixer failed\n%s\n", registry.Name(ext), result.Diagnostic)
+		emitModelContext(os.Stdout, payload.IsClaude(),
+			fmt.Sprintf("%s could not format %s:\n%s", registry.Name(ext), abs, result.Diagnostic))
 		logOutcome = "fixer failed"
 		return 0
 	}

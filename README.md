@@ -34,7 +34,7 @@ Install, prerequisites, config, and uninstall: [HUMANS.md](HUMANS.md).
 - **`--check` for CI** — reports files needing format; distinct exit codes.
 - **`--doctor`** — every formatter, the extensions it owns, and whether its tool is installed.
 - **Real tools for everything else** — honors project config; no config-presence gate.
-- **Silent on success, always exits 0** — formatter failures go to stderr only.
+- **Silent on success, always exits 0** — failures reach both the operator and the model.
 - **One `./install.sh`** — wires Claude and Cursor hooks globally.
 
 ## Documentation
