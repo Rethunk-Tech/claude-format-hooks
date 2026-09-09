@@ -3,6 +3,7 @@ package main
 import (
 	"bytes"
 	"context"
+	"fmt"
 	"os"
 	"path/filepath"
 	"strings"
@@ -708,4 +709,29 @@ func TestCheckTallySummary(t *testing.T) {
 	t2.noTool("stylua")
 	qt.Check(t, qt.Equals(t2.summary(3),
 		"90 file(s) checked, 3 need formatting; skipped: 12 unsupported, 2 disabled, 3 no tool (ktlint, stylua)"))
+}
+
+// Files are formatted NumCPU at a time but tallied in job order, so two
+// runs over one tree must produce byte-identical output. A CI diff of two
+// runs is meaningless otherwise.
+func TestCheckOutputIsStableUnderParallelism(t *testing.T) {
+	dir := t.TempDir()
+	for i := range 40 {
+		name := fmt.Sprintf("f%02d.json", i)
+		content := formattedJSON
+		if i%3 == 0 {
+			content = unformattedJSON
+		}
+		writeCheckFile(t, dir, name, content)
+	}
+
+	var first, errOut strings.Builder
+	qt.Assert(t, qt.Equals(runCheck([]string{dir}, &first, &errOut), 1))
+
+	for range 4 {
+		var again, againErr strings.Builder
+		qt.Assert(t, qt.Equals(runCheck([]string{dir}, &again, &againErr), 1))
+		qt.Check(t, qt.Equals(again.String(), first.String()))
+	}
+	qt.Check(t, qt.StringContains(first.String(), "40 file(s) checked, 14 need formatting"))
 }

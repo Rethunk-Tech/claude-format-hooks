@@ -10,9 +10,11 @@ import (
 	"io/fs"
 	"os"
 	"path/filepath"
+	"runtime"
 	"slices"
 	"sort"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/Rethunk-Tech/claude-format-hooks/internal/config"
@@ -52,13 +54,13 @@ func runCheck(args []string, out, errOut io.Writer) int {
 		_, _ = fmt.Fprintf(errOut, "format-dispatch --check: %v\n", err)
 		return 2
 	}
-	var wouldChange []string
 	var tally checkTally
 	rootCandidates := checkRootCandidates(args)
 	// Built on the first supported file, not up front: a run over files no
 	// formatter handles must stay silent, even about a malformed config.
 	var registry *dispatch.Registry
 	var cfg config.Config
+	var jobs []checkJob
 	for _, abs := range files {
 		ext := resolveDispatchExt(abs)
 		if !dispatch.KnownExtension(ext) {
@@ -72,30 +74,28 @@ func runCheck(args []string, out, errOut io.Writer) int {
 			tally.disabled++
 			continue
 		}
-		projectRoot := checkProjectRoot(rootCandidates, abs)
-		registryForFile := registry
-		if disabled, projectCfg, err := projectDisables(projectRoot, ext, registry.Name(ext)); err != nil {
-			_, _ = fmt.Fprintf(errOut, "format-dispatch --check: project config: %v (ignoring)\n", err)
-		} else if disabled {
-			tally.disabled++
-			continue
-		} else {
-			registryForFile = registryWithProjectConfig(registry, cfg, ext, projectCfg)
-		}
-		fileCtx, fileCancel := context.WithTimeoutCause(ctx, formatterTimeout, errFormatterTimeout)
-		changed, skipped, err := wouldReformat(fileCtx, registryForFile, projectRoot, abs, ext)
-		fileCancel()
-		if err != nil {
-			_, _ = fmt.Fprintf(errOut, "format-dispatch --check: %s: %v\n", abs, err)
+		jobs = append(jobs, checkJob{abs: abs, ext: ext})
+	}
+
+	outcomes := runCheckJobs(ctx, jobs, registry, cfg, rootCandidates, errOut)
+
+	// Tallied in job order, not completion order, so two runs over one tree
+	// produce identical output.
+	var wouldChange []string
+	for i, o := range outcomes {
+		switch {
+		case o.err != nil:
+			_, _ = fmt.Fprintf(errOut, "format-dispatch --check: %s: %v\n", jobs[i].abs, o.err)
 			return 2
-		}
-		if skipped {
-			tally.noTool(registryForFile.Name(ext))
-			continue
-		}
-		tally.checked++
-		if changed {
-			wouldChange = append(wouldChange, abs)
+		case o.disabled:
+			tally.disabled++
+		case o.skipped:
+			tally.noTool(o.formatter)
+		default:
+			tally.checked++
+			if o.changed {
+				wouldChange = append(wouldChange, jobs[i].abs)
+			}
 		}
 	}
 
@@ -107,6 +107,99 @@ func runCheck(args []string, out, errOut io.Writer) int {
 		return 0
 	}
 	return 1
+}
+
+// checkJob is one file that survived classification: a known, enabled
+// extension whose formatter still has to be run to answer the question.
+type checkJob struct {
+	abs string
+	ext string
+}
+
+// checkOutcome is what running one job produced. Every field is filled by
+// exactly one goroutine and read only after the pool drains.
+type checkOutcome struct {
+	changed   bool
+	skipped   bool
+	disabled  bool
+	formatter string
+	err       error
+}
+
+// runCheckJobs formats and compares every job, NumCPU at a time. The work
+// is one subprocess per file with the CPU otherwise idle -- measured at
+// 64ms per file serially, around 0.8 of the machine's cores -- so the pool
+// is what keeps a large tree inside checkTimeout.
+//
+// Results are written to a preallocated slice by index rather than
+// collected from a channel: the caller tallies in job order, so output does
+// not depend on which worker finished first.
+func runCheckJobs(
+	ctx context.Context,
+	jobs []checkJob,
+	registry *dispatch.Registry,
+	cfg config.Config,
+	rootCandidates []string,
+	errOut io.Writer,
+) []checkOutcome {
+	outcomes := make([]checkOutcome, len(jobs))
+	if len(jobs) == 0 {
+		return outcomes
+	}
+
+	workers := min(runtime.NumCPU(), len(jobs))
+	// errOut is shared; a malformed project config found by two workers at
+	// once would otherwise interleave mid-line.
+	var errMu sync.Mutex
+	var wg sync.WaitGroup
+	sem := make(chan struct{}, workers)
+
+	for i, job := range jobs {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			sem <- struct{}{}
+			defer func() { <-sem }()
+			outcomes[i] = runCheckJob(ctx, job, registry, cfg, rootCandidates, errOut, &errMu)
+		}()
+	}
+	wg.Wait()
+	return outcomes
+}
+
+// runCheckJob is the per-file body: resolve this file's project root and
+// its project-level opt-outs, then format a copy and compare.
+func runCheckJob(
+	ctx context.Context,
+	job checkJob,
+	registry *dispatch.Registry,
+	cfg config.Config,
+	rootCandidates []string,
+	errOut io.Writer,
+	errMu *sync.Mutex,
+) checkOutcome {
+	projectRoot := checkProjectRoot(rootCandidates, job.abs)
+	registryForFile := registry
+	if disabled, projectCfg, err := projectDisables(projectRoot, job.ext, registry.Name(job.ext)); err != nil {
+		errMu.Lock()
+		_, _ = fmt.Fprintf(errOut, "format-dispatch --check: project config: %v (ignoring)\n", err)
+		errMu.Unlock()
+	} else if disabled {
+		return checkOutcome{disabled: true}
+	} else {
+		registryForFile = registryWithProjectConfig(registry, cfg, job.ext, projectCfg)
+	}
+
+	fileCtx, cancel := context.WithTimeoutCause(ctx, formatterTimeout, errFormatterTimeout)
+	defer cancel()
+
+	changed, skipped, err := wouldReformat(fileCtx, registryForFile, projectRoot, job.abs, job.ext)
+	return checkOutcome{
+		changed:   changed,
+		skipped:   skipped,
+		formatter: registryForFile.Name(job.ext),
+		err:       err,
+	}
 }
 
 // checkTally counts what --check actually did, which is not the same as the
@@ -256,7 +349,7 @@ func copyBeside(abs string, content []byte) (path string, cleanup func(), err er
 	if err := os.WriteFile(path, content, 0o600); err != nil { //nolint:gosec // a sibling of the file the operator asked to check, by design
 		return "", nil, err
 	}
-	return path, func() { _ = os.Remove(path) }, nil //nolint:gosec // removes only the temp copy created immediately above
+	return path, func() { _ = os.Remove(path) }, nil
 }
 
 // inSkipped reports whether abs sits under a skipped directory.

@@ -7,8 +7,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+
+- `--check` formats and compares files `runtime.NumCPU()` at a time
+  instead of one after another. Measured on a 32-thread machine: 2267
+  files in 9.1s wall against roughly 4 minutes of CPU, and 55 files in
+  0.257s against 3.53s serial. Output stays byte-identical between runs
+  -- results are tallied in job order, not completion order -- and the
+  per-file timeout is unchanged, having produced no timeouts across
+  those runs.
+
 ### Fixed
 
+- `internal/diskcache` writes entries through a temp file and a rename.
+  Concurrent `Set` calls on one key, now routine under a parallel
+  `--check`, could otherwise be read back as a partial entry: safe,
+  since a malformed entry parses as a miss, but it defeats the cache.
 - `--check` no longer counts files it never examined as passing. The
   summary reported the number of files walked, so a tree of unsupported
   types, opted-out types, or types whose formatter is not installed

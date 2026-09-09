@@ -5,6 +5,8 @@ import (
 	"path/filepath"
 	"runtime"
 	"strconv"
+	"strings"
+	"sync"
 	"testing"
 	"time"
 
@@ -273,4 +275,49 @@ func TestSetSwallowsWriteFailure(t *testing.T) {
 	parent := filepath.Join(t.TempDir(), "not-a-dir")
 	qt.Assert(t, qt.IsNil(os.WriteFile(parent, []byte("x"), 0o600)))
 	Set(filepath.Join(parent, "sub"), "k", "value")
+}
+
+// --check formats many files at once, so the same key gets Set from
+// several workers concurrently. Every reader must see a complete entry --
+// a torn write parses as a miss, which is safe but silently defeats the
+// cache it was written to fill.
+func TestSetIsAtomicUnderConcurrency(t *testing.T) {
+	dir := t.TempDir()
+	key := Key("ns", "concurrent")
+	const value = "a value long enough that a partial write would be visible in a read"
+
+	var wg sync.WaitGroup
+	for range 32 {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			for range 20 {
+				Set(dir, key, value)
+				if got, ok := Get(dir, key, time.Minute); ok && got != value {
+					t.Errorf("torn read: %q", got)
+				}
+			}
+		}()
+	}
+	wg.Wait()
+
+	got, ok := Get(dir, key, time.Minute)
+	qt.Check(t, qt.IsTrue(ok))
+	qt.Check(t, qt.Equals(got, value))
+}
+
+// The temp files Set renames from must not survive, or the cache
+// directory grows an orphan per write and prune never reaps them (their
+// dotted names are outside its namespace sweep).
+func TestSetLeavesNoTempFiles(t *testing.T) {
+	dir := t.TempDir()
+	for i := range 5 {
+		Set(dir, Key("ns", strconv.Itoa(i)), "v")
+	}
+	entries, err := os.ReadDir(dir)
+	qt.Assert(t, qt.IsNil(err))
+	qt.Check(t, qt.HasLen(entries, 5))
+	for _, e := range entries {
+		qt.Check(t, qt.IsFalse(strings.HasPrefix(e.Name(), ".")), qt.Commentf("%s", e.Name()))
+	}
 }

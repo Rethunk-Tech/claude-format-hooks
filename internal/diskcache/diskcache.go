@@ -165,7 +165,32 @@ func Set(dir, key, value string) {
 		return
 	}
 	data := strconv.FormatInt(time.Now().Unix(), 10) + "\n" + value
-	_ = os.WriteFile(filepath.Join(dir, key), []byte(data), 0o600)
+
+	// Written through a temp file and renamed rather than straight to the
+	// key: --check formats many files at once, so two processes or two of
+	// its workers can Set the same key concurrently. A partial write would
+	// be read back as a malformed entry -- which parseEntry rejects, so the
+	// cost is a recomputed miss rather than a wrong answer, but rename is
+	// one syscall and removes the case entirely. CreateTemp already makes
+	// the file 0600, and its dotted name keeps it out of prune's
+	// namespace-prefix sweep.
+	tmp, err := os.CreateTemp(dir, "."+key+"-*")
+	if err != nil {
+		return
+	}
+	tmpName := tmp.Name()
+	if _, err := tmp.Write([]byte(data)); err != nil {
+		_ = tmp.Close()
+		_ = os.Remove(tmpName)
+		return
+	}
+	if err := tmp.Close(); err != nil {
+		_ = os.Remove(tmpName)
+		return
+	}
+	if err := os.Rename(tmpName, filepath.Join(dir, key)); err != nil {
+		_ = os.Remove(tmpName)
+	}
 }
 
 // Remove deletes any cached entry for key within dir.
