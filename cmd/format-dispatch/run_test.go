@@ -795,3 +795,49 @@ func TestRunPrintsDiagnosticOnFormatterFailure(t *testing.T) {
 	qt.Check(t, qt.StringContains(stderr, "line 1"))
 	qt.Check(t, qt.IsFalse(strings.Contains(stderr, "line 11")), qt.Commentf("want output truncated to 10 lines"))
 }
+
+// A project naming its own generated directory must be able to stop the
+// hook without waiting for a release that adds the segment to the
+// built-in list.
+func TestRunHonorsConfiguredSkipDirs(t *testing.T) {
+	cases := []struct {
+		name    string
+		user    string
+		project string
+	}{
+		{name: "user config", user: `{"skipDirs":["generated"]}`, project: `{}`},
+		{name: "project config", user: `{}`, project: `{"skipDirs":["generated"]}`},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			projectRoot := t.TempDir()
+			src := "{\"a\":1}\n"
+			abs := filepath.Join(projectRoot, "generated", "api.json")
+			writeFile(t, abs, src)
+			writeFile(t, filepath.Join(projectRoot, ".claude-format-hooks.json"), tc.project)
+			userCfg := filepath.Join(t.TempDir(), "claude-format-hooks.json")
+			writeFile(t, userCfg, tc.user)
+
+			t.Setenv("CLAUDE_PROJECT_DIR", projectRoot)
+			t.Setenv("CLAUDE_FORMAT_HOOKS_CONFIG", userCfg)
+			qt.Check(t, qt.Equals(run(strings.NewReader(payload(abs))), 0))
+			qt.Check(t, qt.Equals(readFile(t, abs), src),
+				qt.Commentf("a configured skip dir must not be formatted"))
+		})
+	}
+}
+
+// Without the config the same file is formatted, so the test above is
+// proving the config and not some unrelated skip.
+func TestRunFormatsTheSameFileWithoutSkipDirs(t *testing.T) {
+	projectRoot := t.TempDir()
+	abs := filepath.Join(projectRoot, "generated", "api.json")
+	writeFile(t, abs, "{\"a\":1}\n")
+	userCfg := filepath.Join(t.TempDir(), "claude-format-hooks.json")
+	writeFile(t, userCfg, `{}`)
+
+	t.Setenv("CLAUDE_PROJECT_DIR", projectRoot)
+	t.Setenv("CLAUDE_FORMAT_HOOKS_CONFIG", userCfg)
+	qt.Check(t, qt.Equals(run(strings.NewReader(payload(abs))), 0))
+	qt.Check(t, qt.Equals(readFile(t, abs), "{\n  \"a\": 1\n}\n"))
+}

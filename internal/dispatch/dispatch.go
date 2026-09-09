@@ -228,10 +228,21 @@ func AllKnownExtensions() []string {
 }
 
 // InSkippedDir reports whether relPath (relative to the project root)
-// passes through a directory that should never be auto-formatted.
-func InSkippedDir(relPath string) bool {
+// passes through a directory that should never be auto-formatted. extra
+// names additional segments from config, on top of the built-in list:
+// three separate fixes have had to extend skipDirs for a generated
+// directory nobody had hit yet, and a config key is what stops the next
+// one needing a release.
+func InSkippedDir(relPath string, extra []string) bool {
 	segs := strings.Split(filepath.ToSlash(relPath), "/")
-	return slices.ContainsFunc(segs, func(seg string) bool { return skipDirs[seg] })
+	return slices.ContainsFunc(segs, func(seg string) bool {
+		if skipDirs[seg] {
+			return true
+		}
+		return slices.ContainsFunc(extra, func(e string) bool {
+			return strings.EqualFold(strings.TrimSpace(e), seg)
+		})
+	})
 }
 
 // Dispatch routes abs to the formatter registered for ext.

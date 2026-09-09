@@ -60,7 +60,8 @@ workflow did not attest is refused rather than installed. `--dry-run` prints
 the planned asset and path without going near the network.
 
 **Config:** `~/.claude/claude-format-hooks.json` (`$CLAUDE_FORMAT_HOOKS_CONFIG`);
-project `.claude-format-hooks.json` for `disabled` / `disabledFormatters`;
+project `.claude-format-hooks.json` for `disabled` / `disabledFormatters` /
+`skipDirs` (extra generated-directory names, added to the built-in list);
 `.editorconfig` wins indent. Markdown base:
 `~/.claude/claude-format-hooks.markdownlint-cli2.jsonc` (created on first use).
 SQL: `~/.sqlfluff` bootstrap on first `.sql` write.

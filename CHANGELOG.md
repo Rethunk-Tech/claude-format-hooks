@@ -33,6 +33,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- A `skipDirs` config key names extra generated directories to skip, at
+  either the user or the project level, added to the built-in list rather
+  than replacing it. Three separate fixes have had to extend that list
+  for a directory nobody had hit yet; a project can now name its own
+  without waiting for a release.
 - `--doctor` reports every formatter in the resolved registry, the
   extensions it owns, whether its external tool is reachable, and which
   extensions the operator's config disabled. A missing tool is a silent

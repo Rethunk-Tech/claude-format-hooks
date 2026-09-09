@@ -165,7 +165,7 @@ func TestResolveTarget(t *testing.T) {
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
 			path, wantAbs, wantRoot, wantSkip := tc.setup(t)
-			abs, projectRoot, skipReason := resolveTarget(path)
+			abs, projectRoot, skipReason := resolveTarget(path, nil)
 			qt.Check(t, qt.Equals(abs, wantAbs))
 			qt.Check(t, qt.Equals(projectRoot, wantRoot))
 			qt.Check(t, qt.Equals(skipReason, wantSkip))

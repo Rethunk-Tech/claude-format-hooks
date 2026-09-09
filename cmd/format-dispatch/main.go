@@ -276,7 +276,7 @@ func run(stdin io.Reader) int {
 	}
 	logFormatter = registry.Name(ext)
 
-	abs, projectRoot, skipReason := resolveTarget(path)
+	abs, projectRoot, skipReason := resolveTarget(path, userCfg.SkipDirs)
 	if skipReason != "" {
 		logOutcome = skipReason
 		return 0
@@ -285,13 +285,25 @@ func run(stdin io.Reader) int {
 	// A project can opt a specific formatter out for itself (e.g. it
 	// already runs its own pre-commit prettier with different rules)
 	// without every operator changing their global config.
-	if disabled, projectCfg, err := projectDisables(projectRoot, ext, registry.Name(ext)); err != nil {
+	disabled, projectCfg, err := projectDisables(projectRoot, ext, registry.Name(ext))
+	switch {
+	case err != nil:
 		fmt.Fprintf(os.Stderr, "format-dispatch: project config: %v (ignoring)\n", err)
-	} else if disabled {
+	case disabled:
 		logOutcome = "skip: disabled by project config"
 		return 0
-	} else {
+	default:
 		registry = registryWithProjectConfig(registry, userCfg, ext, projectCfg)
+	}
+
+	// The project's own skipDirs can only be honored here: resolveTarget
+	// runs before the project config is read, and reading it earlier just
+	// to move this check would not make it any cheaper -- projectDisables
+	// loads that same file either way.
+	if rel, relErr := filepath.Rel(projectRoot, abs); relErr == nil &&
+		dispatch.InSkippedDir(rel, projectCfg.SkipDirs) {
+		logOutcome = "skip: non-source directory (project config)"
+		return 0
 	}
 
 	ctx, cancel := context.WithTimeoutCause(context.Background(), formatterTimeout, errFormatterTimeout)
@@ -363,7 +375,7 @@ func projectRootEnv() string {
 // and exclusion from skipped directories. skipReason is empty on
 // success; otherwise it's why run() should skip this file, suitable for
 // the invocation log as-is.
-func resolveTarget(path string) (abs, projectRoot, skipReason string) {
+func resolveTarget(path string, extraSkip []string) (abs, projectRoot, skipReason string) {
 	abs = path
 	if !filepath.IsAbs(abs) {
 		if a, err := filepath.Abs(abs); err == nil {
@@ -391,7 +403,7 @@ func resolveTarget(path string) (abs, projectRoot, skipReason string) {
 	if err != nil {
 		return abs, projectRoot, "skip: relative path error"
 	}
-	if dispatch.InSkippedDir(rel) {
+	if dispatch.InSkippedDir(rel, extraSkip) {
 		return abs, projectRoot, "skip: non-source directory"
 	}
 	return abs, projectRoot, ""

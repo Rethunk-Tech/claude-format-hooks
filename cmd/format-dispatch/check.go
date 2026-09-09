@@ -49,13 +49,13 @@ func runCheck(args []string, out, errOut io.Writer) int {
 	ctx, cancel := context.WithTimeout(context.Background(), checkTimeout)
 	defer cancel()
 
-	files, err := collectCheckTargets(args)
+	rootCandidates := checkRootCandidates(args)
+	files, err := collectCheckTargets(args, checkSkipDirs(rootCandidates))
 	if err != nil {
 		_, _ = fmt.Fprintf(errOut, "format-dispatch --check: %v\n", err)
 		return 2
 	}
 	var tally checkTally
-	rootCandidates := checkRootCandidates(args)
 	// Built on the first supported file, not up front: a run over files no
 	// formatter handles must stay silent, even about a malformed config.
 	var registry *dispatch.Registry
@@ -359,7 +359,7 @@ func copyBeside(abs string, content []byte) (path string, cleanup func(), err er
 // project root wins, then the working directory, then fallbackRoot for when
 // os.Getwd failed. A path that cannot be made relative at all (a different
 // Windows volume, say) is judged on its own base name.
-func inSkipped(abs, projectRoot, workingRoot, fallbackRoot string) bool {
+func inSkipped(abs, projectRoot, workingRoot, fallbackRoot string, extraSkip []string) bool {
 	relRoot := workingRoot
 	if projectRoot != "" {
 		relRoot = projectRoot
@@ -370,14 +370,32 @@ func inSkipped(abs, projectRoot, workingRoot, fallbackRoot string) bool {
 	if err != nil {
 		rel = filepath.Base(abs)
 	}
-	return dispatch.InSkippedDir(rel)
+	return dispatch.InSkippedDir(rel, extraSkip)
+}
+
+// checkSkipDirs is the extra skip list --check honors while collecting
+// targets. Collection runs before the lazy registry build, so this reads
+// the user and per-root project configs directly and ignores a malformed
+// one: a run over a tree no formatter handles must stay silent, even about
+// a broken config.
+func checkSkipDirs(rootCandidates []string) []string {
+	var extra []string
+	if cfg, err := config.Load(configPath()); err == nil {
+		extra = append(extra, cfg.SkipDirs...)
+	}
+	for _, root := range rootCandidates {
+		if cfg, err := config.Load(filepath.Join(root, projectConfigFile)); err == nil {
+			extra = append(extra, cfg.SkipDirs...)
+		}
+	}
+	return extra
 }
 
 // collectCheckTargets expands the given paths into a sorted, deduplicated
 // file list, walking directories and applying the same skipped-directory
 // exclusion the hook uses. Sorting keeps output stable so a CI diff of two
 // runs is meaningful.
-func collectCheckTargets(paths []string) ([]string, error) {
+func collectCheckTargets(paths []string, extraSkip []string) ([]string, error) {
 	seen := map[string]bool{}
 	projectRoot := projectRootEnv()
 	workingRoot, err := os.Getwd()
@@ -402,7 +420,7 @@ func collectCheckTargets(paths []string) ([]string, error) {
 		if projectRoot != "" && !within(abs, projectRoot) {
 			return
 		}
-		if inSkipped(abs, projectRoot, workingRoot, root) {
+		if inSkipped(abs, projectRoot, workingRoot, root, extraSkip) {
 			return
 		}
 		seen[abs] = true
@@ -424,7 +442,7 @@ func collectCheckTargets(paths []string) ([]string, error) {
 		if projectRoot != "" && !within(absDir, projectRoot) {
 			continue
 		}
-		if inSkipped(absDir, projectRoot, workingRoot, filepath.Dir(absDir)) {
+		if inSkipped(absDir, projectRoot, workingRoot, filepath.Dir(absDir), extraSkip) {
 			continue
 		}
 		err = filepath.WalkDir(p, func(path string, d fs.DirEntry, err error) error { //nolint:gosec // walking an operator-supplied directory is the entire contract
@@ -438,7 +456,7 @@ func collectCheckTargets(paths []string) ([]string, error) {
 			if d.IsDir() {
 				// Prune rather than filter per-file: skipping a non-source
 				// tree at its root avoids walking node_modules at all.
-				if rel != "." && dispatch.InSkippedDir(rel) {
+				if rel != "." && dispatch.InSkippedDir(rel, extraSkip) {
 					return fs.SkipDir
 				}
 				return nil

@@ -230,7 +230,7 @@ func TestInSkippedDir(t *testing.T) {
 		{"outbound/handler.ts", false},
 	}
 	for _, tc := range cases {
-		qt.Check(t, qt.Equals(InSkippedDir(tc.path), tc.want), qt.Commentf("path=%q", tc.path))
+		qt.Check(t, qt.Equals(InSkippedDir(tc.path, nil), tc.want), qt.Commentf("path=%q", tc.path))
 	}
 }
 
@@ -269,4 +269,19 @@ func TestAllKnownExtensionsIsConfigIndependent(t *testing.T) {
 	qt.Check(t, qt.IsTrue(slices.Contains(all, ".rs")))
 	qt.Check(t, qt.IsTrue(slices.IsSorted(all)))
 	qt.Check(t, qt.Not(qt.HasLen(all, 0)))
+}
+
+// The built-in skip list has needed three separate fixes for generated
+// directories nobody had hit yet. Config-supplied segments are what stops
+// the next one needing a release, and they compose with the built-ins
+// rather than replacing them.
+func TestInSkippedDirHonorsConfiguredSegments(t *testing.T) {
+	extra := []string{"generated", "  Bazel-Out  "}
+
+	qt.Check(t, qt.IsTrue(InSkippedDir("src/generated/api.ts", extra)))
+	qt.Check(t, qt.IsTrue(InSkippedDir("bazel-out/x.go", extra)), qt.Commentf("trimmed and case-insensitive, like the other config lists"))
+	qt.Check(t, qt.IsTrue(InSkippedDir("node_modules/x.js", extra)), qt.Commentf("built-ins still apply"))
+	qt.Check(t, qt.IsFalse(InSkippedDir("src/app.ts", extra)))
+	// A segment must match whole, not as a substring of a real directory.
+	qt.Check(t, qt.IsFalse(InSkippedDir("src/generated-docs/a.md", extra)))
 }

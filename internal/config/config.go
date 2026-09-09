@@ -48,12 +48,14 @@ type Shell struct {
 // ~/.claude/claude-format-hooks.json (or wherever CLAUDE_FORMAT_HOOKS_CONFIG
 // points). Disabled lists extensions (e.g. ".sql") to skip entirely, while
 // DisabledFormatters lists formatter names (e.g. "biome") for users who want
-// fewer formatters running than the default set.
+// fewer formatters running than the default set. SkipDirs names additional
+// directory segments to treat as generated, on top of the built-in list.
 type Config struct {
 	JSON               JSON     `json:"json"`
 	Shell              Shell    `json:"shell"`
 	Disabled           []string `json:"disabled"`
 	DisabledFormatters []string `json:"disabledFormatters"`
+	SkipDirs           []string `json:"skipDirs"`
 }
 
 // Default returns the built-in indent defaults (2-space, no tabs).
