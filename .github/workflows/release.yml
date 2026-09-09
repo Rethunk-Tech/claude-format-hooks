@@ -5,12 +5,17 @@ on:
     tags:
       - "v*"
 
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: false
+
 permissions:
   contents: read
 
 jobs:
   build:
     runs-on: ubuntu-latest
+    timeout-minutes: 30
     permissions:
       contents: read
       # Attestation only. id-token mints the short-lived OIDC token that
@@ -84,6 +89,7 @@ jobs:
   release:
     needs: build
     runs-on: ubuntu-latest
+    timeout-minutes: 30
     permissions:
       contents: write
     steps:
