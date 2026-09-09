@@ -64,7 +64,7 @@ Usage:
   format-dispatch --install          wire this binary into ~/.claude/settings.json (PostToolUse) and ~/.cursor/hooks.json (afterFileEdit)
   format-dispatch --uninstall        remove it from ~/.claude/settings.json and ~/.cursor/hooks.json
   format-dispatch --install --dry-run    preview the Claude and Cursor hook diffs, without writing
-  format-dispatch --upgrade          download and replace this platform's latest release binary
+  format-dispatch --upgrade          download and replace this platform's latest release binary, and refresh the bunx formatters
   format-dispatch --upgrade --dry-run    preview the binary upgrade without writing
   format-dispatch --check PATH...    report files a formatter would change, without changing them (exit 1 if any)
   format-dispatch --doctor           report each formatter, the extensions it owns, and whether its tool is installed
@@ -170,13 +170,28 @@ func runInstall(args []string, uninstall bool) int {
 
 	// Provision after the wiring, and only for a real --install: the
 	// settings.json change is what the operator asked for and must not be
-	// gated on a network round trip. --dry-run promises to write nothing,
-	// which includes not installing packages.
-	if !uninstall && !dryRun {
-		if err := installer.ProvisionTools(os.Stdout); err != nil {
-			fmt.Fprintf(os.Stderr, "format-dispatch %s: %v\n", label, err)
-			return 1
-		}
+	// gated on a network round trip.
+	if uninstall {
+		return 0
+	}
+	return provisionAfter(label, dryRun)
+}
+
+// provisionAfter installs or refreshes the bunx-dispatched formatters once
+// the subcommand's own work has succeeded. Both --install and --upgrade end
+// this way: the binary and the tools it shells out to are one toolchain,
+// and upgrading half of it is what left operators on an install-day biome
+// behind a current binary.
+//
+// A --dry-run promises to write nothing, which includes not installing
+// packages.
+func provisionAfter(label string, dryRun bool) int {
+	if dryRun {
+		return 0
+	}
+	if err := installer.ProvisionTools(os.Stdout); err != nil {
+		fmt.Fprintf(os.Stderr, "format-dispatch %s: %v\n", label, err)
+		return 1
 	}
 	return 0
 }
@@ -230,7 +245,11 @@ func runUpgrade(args []string) int {
 	if !runInstallerAction(label, dryRun, installer.Upgrade) {
 		return 1
 	}
-	return 0
+
+	// Nothing else ever refreshes the bunx-dispatched formatters, so an
+	// operator who only runs --upgrade keeps install-day versions of them
+	// behind a current binary.
+	return provisionAfter(label, dryRun)
 }
 
 // run contains all logic and always returns 0, except for a genuine

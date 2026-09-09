@@ -54,6 +54,9 @@ format-dispatch --doctor               # which formatters, extensions, and tools
 format-dispatch --upgrade [--dry-run]
 ```
 
+`--upgrade` also refreshes the globally-provisioned bunx formatters, so the
+binary and the tools it shells out to move together.
+
 `--upgrade` checks the release `.sha256` and then requires GitHub to hold a
 build-provenance attestation for the downloaded bytes; a binary the release
 workflow did not attest is refused rather than installed. `--dry-run` prints

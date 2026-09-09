@@ -19,6 +19,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- `--upgrade` refreshes the globally-provisioned bunx formatters
+  (biome, prettier, taplo, markdownlint-cli2) as well as the binary.
+  Provisioning ran only from `--install`, and `install.sh --upgrade`
+  returns before reaching it, so an operator who only ever upgraded kept
+  install-day versions of those tools behind a current binary.
 - `internal/diskcache` writes entries through a temp file and a rename.
   Concurrent `Set` calls on one key, now routine under a parallel
   `--check`, could otherwise be read back as a partial entry: safe,

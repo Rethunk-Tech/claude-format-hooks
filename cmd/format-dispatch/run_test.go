@@ -841,3 +841,38 @@ func TestRunFormatsTheSameFileWithoutSkipDirs(t *testing.T) {
 	qt.Check(t, qt.Equals(run(strings.NewReader(payload(abs))), 0))
 	qt.Check(t, qt.Equals(readFile(t, abs), "{\n  \"a\": 1\n}\n"))
 }
+
+// --install and --upgrade both end in provisionAfter: the binary and the
+// bunx formatters it shells out to are one toolchain, and only --install
+// ever refreshed them, so an operator who upgrades keeps install-day
+// versions of biome and prettier behind a current binary.
+func TestProvisionAfterRefreshesToolsUnlessDryRun(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("fake shell-script tools are POSIX-shell only")
+	}
+	argv := filepath.Join(t.TempDir(), "argv")
+
+	fakeBunRecording := func(t *testing.T) {
+		t.Helper()
+		dir := t.TempDir()
+		script := "#!/bin/sh\nprintf '%s' \"$*\" > " + argv + "\n"
+		qt.Assert(t, qt.IsNil(os.WriteFile(filepath.Join(dir, "bun"), []byte(script), 0o755)))
+		t.Setenv("PATH", dir)
+	}
+
+	t.Run("dry run installs nothing", func(t *testing.T) {
+		fakeBunRecording(t)
+		qt.Check(t, qt.Equals(provisionAfter("--upgrade", true), 0))
+		_, err := os.Stat(argv)
+		qt.Check(t, qt.IsTrue(os.IsNotExist(err)), qt.Commentf("--dry-run must not install packages"))
+	})
+
+	t.Run("real run refreshes", func(t *testing.T) {
+		fakeBunRecording(t)
+		captureStdout(t, func() { qt.Check(t, qt.Equals(provisionAfter("--upgrade", false), 0)) })
+		got := readFile(t, argv)
+		qt.Check(t, qt.StringContains(got, "add -g"))
+		qt.Check(t, qt.StringContains(got, "@biomejs/biome"))
+		qt.Check(t, qt.StringContains(got, "prettier"))
+	})
+}
