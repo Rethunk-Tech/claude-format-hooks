@@ -7,7 +7,10 @@ Operator setup and troubleshooting. Developers: [AGENTS.md](AGENTS.md).
 ### Prerequisites
 
 Go ([go.mod](go.mod)); optional `bun` (bunx formatters),
-`sqlfluff`, `ruff`/`black`, `rustfmt`, `terraform`/`tofu`, `buf`.
+`sqlfluff`, `ruff`/`black`, `rustfmt`, `terraform`/`tofu`, `buf`,
+`clang-format`, `google-java-format`, `ktlint`, `swift-format`/`swiftformat`,
+`rubocop`/`standardrb`, `php-cs-fixer`/`pint`, `nixfmt`, `stylua`.
+`format-dispatch --doctor` reports which of these are actually reachable.
 
 ```bash
 git clone git@github.com:Rethunk-Tech/claude-format-hooks.git
@@ -47,6 +50,7 @@ Unsupported extensions and skipped paths are no-ops — see
 ```bash
 format-dispatch --version
 format-dispatch --check .              # CI: exit 1 if formatting needed
+format-dispatch --doctor               # which formatters, extensions, and tools you have
 format-dispatch --upgrade [--dry-run]
 ```
 

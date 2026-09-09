@@ -28,7 +28,7 @@ Single package: `go test -race -v ./internal/formatters/...`.
 
 | Path | Role |
 | ---- | ---- |
-| [`cmd/format-dispatch/`](cmd/format-dispatch/) | Entrypoint, `--install`/`--uninstall`/`--upgrade`/`--check` |
+| [`cmd/format-dispatch/`](cmd/format-dispatch/) | Entrypoint, `--install`/`--uninstall`/`--upgrade`/`--check`/`--doctor` |
 | [`internal/hookio/`](internal/hookio/) | Stdin → file path (Claude + Cursor schemas) |
 | [`internal/diskcache/`](internal/diskcache/) | TTL disk cache shared by config + formatters |
 | [`internal/config/`](internal/config/) | Indent: defaults → user config → `.editorconfig` |
@@ -38,13 +38,17 @@ Single package: `go test -race -v ./internal/formatters/...`.
 
 Native formatters: JSON (`encoding/json.Indent`), shell (`mvdan.cc/sh/v3`),
 Go (`go/format.Source`). External tools invoked via `bunx` or system `PATH`.
+A formatter that shells out reports its candidate binaries via the optional
+`formatters.Prober` interface, which is what `--doctor` reads; without one a
+formatter reads as native.
 
 ## Invariants
 
 - Silent on success; truncated stderr diagnostic on formatter failure.
 - Hook path always exits 0 (`--check` is the CI exception).
 - Unsupported extension: instant no-op — no stat, exec, or config read.
-  An extensionless file is first peeked at for a shell shebang.
+  An extensionless file is first peeked at for a shebang naming a
+  shell, python, ruby, or node interpreter.
 - Missing external tools cached briefly (`internal/diskcache`); self-heals within TTL.
 - Skips `node_modules/`, `.git/`, `vendor/`, `.venv/`, and peers; files outside `$CLAUDE_PROJECT_DIR`.
 - No formatter requires project config to exist first.
@@ -52,5 +56,8 @@ Go (`go/format.Source`). External tools invoked via `bunx` or system `PATH`.
 ## Conventions
 
 - New formatters implement `formatters.Formatter`, register in `dispatch.NewRegistry`.
+  External ones also implement `formatters.Prober` beside their `lookPath` calls.
+  A PATH-binary-plus-in-place-flag tool needs no new type: add a constructor to
+  [`internal/formatters/system.go`](internal/formatters/system.go).
 - No drive-by refactors; match file style.
 - Build and PR workflow: [CONTRIBUTING.md](CONTRIBUTING.md).

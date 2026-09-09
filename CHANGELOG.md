@@ -7,6 +7,29 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- `--doctor` reports every formatter in the resolved registry, the
+  extensions it owns, whether its external tool is reachable, and which
+  extensions the operator's config disabled. A missing tool is a silent
+  skip on the hook path by design, which previously left no way to tell
+  an unsupported file type from a missing formatter from a disabled one.
+  Formatters declare their candidate binaries through a new optional
+  `formatters.Prober` interface implemented beside their own lookups.
+- Formatters for C/C++/Objective-C (`clang-format`), Java
+  (`google-java-format`, falling back to `clang-format`), Kotlin
+  (`ktlint`), Swift (`swift-format`/`swiftformat`), Ruby
+  (`rubocop`/`standardrb`), PHP (`php-cs-fixer`/`pint`), Nix
+  (`nixfmt`/`alejandra`/`nixpkgs-fmt`), and Lua (`stylua`), sharing one
+  `systemFormatter` for the PATH-binary-plus-in-place-flag shape.
+- `.vue`, `.svelte`, and `.astro` route to prettier. `.svelte` and
+  `.astro` need the project's own prettier plugin; without one prettier
+  reports it has no parser, which is now treated as a skip rather than a
+  formatter failure on every write.
+- `.mdc` (Cursor rule files) formats as markdown.
+- The extensionless-file shebang peek recognizes python, ruby, node, and
+  bun interpreters in addition to shells.
+
 ## [0.4.0] - 2026-09-07
 
 ### Added

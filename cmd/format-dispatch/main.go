@@ -67,6 +67,7 @@ Usage:
   format-dispatch --upgrade          download and replace this platform's latest release binary
   format-dispatch --upgrade --dry-run    preview the binary upgrade without writing
   format-dispatch --check PATH...    report files a formatter would change, without changing them (exit 1 if any)
+  format-dispatch --doctor           report each formatter, the extensions it owns, and whether its tool is installed
   format-dispatch --version          print version and build info
   format-dispatch --help             show this help
 `
@@ -93,6 +94,8 @@ func dispatchArgs(args []string) int {
 		return runUpgrade(args[1:])
 	case "--check":
 		return runCheck(args[1:], os.Stdout, os.Stderr)
+	case "--doctor":
+		return runDoctor(os.Stdout, os.Stderr)
 	case "--version":
 		fmt.Println(versionString())
 		return 0
@@ -332,7 +335,7 @@ func buildRegistry(errOut io.Writer) (*dispatch.Registry, config.Config) {
 func resolveDispatchExt(path string) string {
 	ext := dispatch.ResolveExtension(path)
 	if ext == "" {
-		if shebangExt, ok := shellShebangExt(path); ok {
+		if shebangExt, ok := shebangExt(path); ok {
 			return shebangExt
 		}
 	}

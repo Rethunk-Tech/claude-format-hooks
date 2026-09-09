@@ -32,6 +32,7 @@ Install, prerequisites, config, and uninstall: [HUMANS.md](HUMANS.md).
 
 - **Native JSON, shell, Go** — in-process; JSON preserves key order.
 - **`--check` for CI** — reports files needing format; distinct exit codes.
+- **`--doctor`** — every formatter, the extensions it owns, and whether its tool is installed.
 - **Real tools for everything else** — honors project config; no config-presence gate.
 - **Silent on success, always exits 0** — formatter failures go to stderr only.
 - **One `./install.sh`** — wires Claude and Cursor hooks globally.
