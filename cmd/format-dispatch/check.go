@@ -41,10 +41,12 @@ const checkTimeout = 15 * time.Minute
 // leave violations it declines to fix, and failing CI on them would gate
 // pushes on something no local write would ever repair.
 func runCheck(args []string, out, errOut io.Writer) int {
-	if len(args) == 0 {
+	paths, write := parseCheckArgs(args)
+	if len(paths) == 0 {
 		_, _ = fmt.Fprintf(errOut, "format-dispatch --check: no paths given\n\n%s", usage)
 		return 2
 	}
+	args = paths
 
 	ctx, cancel := context.WithTimeout(context.Background(), checkTimeout)
 	defer cancel()
@@ -77,7 +79,7 @@ func runCheck(args []string, out, errOut io.Writer) int {
 		jobs = append(jobs, checkJob{abs: abs, ext: ext})
 	}
 
-	outcomes := runCheckJobs(ctx, jobs, registry, cfg, rootCandidates, errOut)
+	outcomes := runCheckJobs(ctx, jobs, registry, cfg, rootCandidates, errOut, write)
 
 	// Tallied in job order, not completion order, so two runs over one tree
 	// produce identical output.
@@ -99,14 +101,34 @@ func runCheck(args []string, out, errOut io.Writer) int {
 		}
 	}
 
-	for _, path := range wouldChange {
-		_, _ = fmt.Fprintf(out, "would reformat: %s\n", path)
+	verb := "would reformat"
+	if write {
+		verb = "reformatted"
 	}
-	_, _ = fmt.Fprintf(out, "format-dispatch --check: %s\n", tally.summary(len(wouldChange)))
-	if len(wouldChange) == 0 {
+	for _, path := range wouldChange {
+		_, _ = fmt.Fprintf(out, "%s: %s\n", verb, path)
+	}
+	_, _ = fmt.Fprintf(out, "format-dispatch --check: %s\n", tally.summary(len(wouldChange), write))
+	// --write fixed what it found, so there is nothing left to fail over.
+	// Without it the whole point is a non-zero exit CI can gate on.
+	if write || len(wouldChange) == 0 {
 		return 0
 	}
 	return 1
+}
+
+// parseCheckArgs splits --write out of the path list. It is accepted
+// anywhere among the paths rather than only first, because "--check .
+// --write" is what people type.
+func parseCheckArgs(args []string) (paths []string, write bool) {
+	for _, a := range args {
+		if a == "--write" {
+			write = true
+			continue
+		}
+		paths = append(paths, a)
+	}
+	return paths, write
 }
 
 // checkJob is one file that survived classification: a known, enabled
@@ -141,6 +163,7 @@ func runCheckJobs(
 	cfg config.Config,
 	rootCandidates []string,
 	errOut io.Writer,
+	write bool,
 ) []checkOutcome {
 	outcomes := make([]checkOutcome, len(jobs))
 	if len(jobs) == 0 {
@@ -160,7 +183,7 @@ func runCheckJobs(
 			defer wg.Done()
 			sem <- struct{}{}
 			defer func() { <-sem }()
-			outcomes[i] = runCheckJob(ctx, job, registry, cfg, rootCandidates, errOut, &errMu)
+			outcomes[i] = runCheckJob(ctx, job, registry, cfg, rootCandidates, errOut, &errMu, write)
 		}()
 	}
 	wg.Wait()
@@ -177,6 +200,7 @@ func runCheckJob(
 	rootCandidates []string,
 	errOut io.Writer,
 	errMu *sync.Mutex,
+	write bool,
 ) checkOutcome {
 	projectRoot := checkProjectRoot(rootCandidates, job.abs)
 	registryForFile := registry
@@ -193,7 +217,7 @@ func runCheckJob(
 	fileCtx, cancel := context.WithTimeoutCause(ctx, formatterTimeout, errFormatterTimeout)
 	defer cancel()
 
-	changed, skipped, err := wouldReformat(fileCtx, registryForFile, projectRoot, job.abs, job.ext)
+	changed, skipped, err := wouldReformat(fileCtx, registryForFile, projectRoot, job.abs, job.ext, write)
 	return checkOutcome{
 		changed:   changed,
 		skipped:   skipped,
@@ -228,8 +252,12 @@ func (t *checkTally) noTool(formatter string) {
 
 // summary reads as one line: what was checked, what needs work, and what
 // was passed over and why.
-func (t *checkTally) summary(needFormatting int) string {
-	head := fmt.Sprintf("%d file(s) checked, %d need formatting", t.checked, needFormatting)
+func (t *checkTally) summary(changed int, write bool) string {
+	state := "need formatting"
+	if write {
+		state = "reformatted"
+	}
+	head := fmt.Sprintf("%d file(s) checked, %d %s", t.checked, changed, state)
 
 	var skipped []string
 	if t.unsupported > 0 {
@@ -300,7 +328,7 @@ func checkRootCandidates(paths []string) []string {
 // resolves its config by walking up from the file (biome.json, .sqlfluff, a
 // project .markdownlint-cli2.jsonc), so formatting a copy in a temp
 // directory elsewhere would silently apply the wrong rules.
-func wouldReformat(ctx context.Context, registry *dispatch.Registry, projectRoot, abs, ext string) (changed, skipped bool, err error) {
+func wouldReformat(ctx context.Context, registry *dispatch.Registry, projectRoot, abs, ext string, write bool) (changed, skipped bool, err error) {
 	original, err := os.ReadFile(abs) //nolint:gosec // abs is a path the caller asked to check, by design
 	if err != nil {
 		return false, false, err
@@ -331,7 +359,52 @@ func wouldReformat(ctx context.Context, registry *dispatch.Registry, projectRoot
 	if err != nil {
 		return false, false, err
 	}
-	return !bytes.Equal(original, formatted), false, nil
+	if bytes.Equal(original, formatted) {
+		return false, false, nil
+	}
+	if write {
+		// The scratch copy already holds exactly what the hook would have
+		// produced, config resolution and all, so applying it is a byte
+		// copy rather than a second formatter run that could resolve
+		// differently.
+		if err := replaceContents(abs, formatted); err != nil {
+			return true, false, err
+		}
+	}
+	return true, false, nil
+}
+
+// replaceContents overwrites abs with out, preserving its mode and writing
+// through a temp file in the same directory so an interrupted --write
+// leaves the original intact rather than a half-written source file.
+func replaceContents(abs string, out []byte) error {
+	mode := os.FileMode(0o644)
+	if info, err := os.Stat(abs); err == nil {
+		mode = info.Mode()
+	}
+	target, err := filepath.EvalSymlinks(abs)
+	if err != nil {
+		target = abs
+	}
+
+	tmp, err := os.CreateTemp(filepath.Dir(target), "."+filepath.Base(target)+"-write-*")
+	if err != nil {
+		return err
+	}
+	tmpName := tmp.Name()
+	defer func() { _ = os.Remove(tmpName) }()
+
+	if _, err := tmp.Write(out); err != nil {
+		_ = tmp.Close()
+		return err
+	}
+	if err := tmp.Close(); err != nil {
+		return err
+	}
+	if err := os.Chmod(tmpName, mode); err != nil {
+		return err
+	}
+	return os.Rename(tmpName, target)
 }
 
 // copyBeside writes content to a uniquely-named sibling of abs, preserving
@@ -439,7 +512,7 @@ func collectCheckTargets(paths []string, skip skipConfig) ([]string, error) {
 	}
 
 	for _, p := range paths {
-		info, err := os.Stat(p) //nolint:gosec // p is a path the operator passed to --check; inspecting it is the entire contract
+		info, err := os.Stat(p)
 		if err != nil {
 			return nil, err
 		}
@@ -457,7 +530,7 @@ func collectCheckTargets(paths []string, skip skipConfig) ([]string, error) {
 		if inSkipped(absDir, projectRoot, workingRoot, filepath.Dir(absDir), skip) {
 			continue
 		}
-		err = filepath.WalkDir(p, func(path string, d fs.DirEntry, err error) error { //nolint:gosec // walking an operator-supplied directory is the entire contract
+		err = filepath.WalkDir(p, func(path string, d fs.DirEntry, err error) error {
 			if err != nil {
 				return err
 			}

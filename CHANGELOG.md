@@ -46,6 +46,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- `--check --write` formats the files `--check` reports, in place. The
+  only write path in the binary was the stdin hook payload, so a
+  developer whose CI failed on formatting had no single command to fix
+  it. Same traversal, config resolution and skip rules as `--check`;
+  exits 0, since it fixed what it found.
 - Formatter failures are reported back to the model as PostToolUse
   `hookSpecificOutput.additionalContext` on stdout, alongside the existing
   stderr message. Claude Code only reads hook output back into the

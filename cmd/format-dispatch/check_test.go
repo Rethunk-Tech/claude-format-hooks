@@ -109,7 +109,7 @@ func TestWouldReformatComparesFormattedCopies(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			path := writeCheckFile(t, dir, tt.name+".json", tt.content)
 
-			changed, skipped, err := wouldReformat(context.Background(), registry, dir, path, ".json")
+			changed, skipped, err := wouldReformat(context.Background(), registry, dir, path, ".json", false)
 
 			qt.Assert(t, qt.IsNil(err))
 			qt.Check(t, qt.IsFalse(skipped), qt.Commentf("the native JSON formatter never skips"))
@@ -124,7 +124,7 @@ func TestWouldReformatReportsReadFileError(t *testing.T) {
 	registry := dispatch.NewRegistry(config.Default())
 	missing := filepath.Join(dir, "missing.json")
 
-	changed, _, err := wouldReformat(context.Background(), registry, dir, missing, ".json")
+	changed, _, err := wouldReformat(context.Background(), registry, dir, missing, ".json", false)
 
 	qt.Check(t, qt.Equals(changed, false))
 	if err == nil {
@@ -140,7 +140,7 @@ func TestWouldReformatReturnsContextCauseAfterDispatch(t *testing.T) {
 	cause := context.Canceled
 	cancel(cause)
 
-	changed, _, err := wouldReformat(ctx, registry, dir, path, ".json")
+	changed, _, err := wouldReformat(ctx, registry, dir, path, ".json", false)
 
 	qt.Check(t, qt.Equals(changed, false))
 	qt.Check(t, qt.Equals(err, cause))
@@ -166,7 +166,7 @@ func TestWouldReformatReportsFormattedCopyReadError(t *testing.T) {
 	t.Setenv("PATH", toolDir+string(os.PathListSeparator)+os.Getenv("PATH"))
 	registry := dispatch.NewRegistry(config.Default())
 
-	changed, _, err := wouldReformat(context.Background(), registry, projectRoot, path, ".ts")
+	changed, _, err := wouldReformat(context.Background(), registry, projectRoot, path, ".ts", false)
 
 	qt.Check(t, qt.Equals(changed, false))
 	if err == nil {
@@ -701,13 +701,13 @@ func TestCheckReportsDisabledAsSkipped(t *testing.T) {
 // what to install rather than trusting a check that never ran.
 func TestCheckTallySummary(t *testing.T) {
 	var t1 checkTally
-	qt.Check(t, qt.Equals(t1.summary(0), "0 file(s) checked, 0 need formatting"))
+	qt.Check(t, qt.Equals(t1.summary(0, false), "0 file(s) checked, 0 need formatting"))
 
 	t2 := checkTally{checked: 90, unsupported: 12, disabled: 2}
 	t2.noTool("stylua")
 	t2.noTool("ktlint")
 	t2.noTool("stylua")
-	qt.Check(t, qt.Equals(t2.summary(3),
+	qt.Check(t, qt.Equals(t2.summary(3, false),
 		"90 file(s) checked, 3 need formatting; skipped: 12 unsupported, 2 disabled, 3 no tool (ktlint, stylua)"))
 }
 
@@ -734,4 +734,75 @@ func TestCheckOutputIsStableUnderParallelism(t *testing.T) {
 		qt.Check(t, qt.Equals(again.String(), first.String()))
 	}
 	qt.Check(t, qt.StringContains(first.String(), "40 file(s) checked, 14 need formatting"))
+}
+
+// --check reported "would reformat" and nothing in the binary could apply
+// it: the only write path was the stdin hook payload. --write closes that,
+// so a failed CI check has one command to fix it.
+func TestCheckWriteFormatsInPlace(t *testing.T) {
+	dir := t.TempDir()
+	path := writeCheckFile(t, dir, "a.json", unformattedJSON)
+
+	var out, errOut strings.Builder
+	// --write is accepted after the paths, which is how people type it.
+	qt.Check(t, qt.Equals(runCheck([]string{dir, "--write"}, &out, &errOut), 0),
+		qt.Commentf("--write fixed what it found, so nothing is left to fail over"))
+	qt.Check(t, qt.StringContains(out.String(), "reformatted: "+path))
+	qt.Check(t, qt.StringContains(out.String(), "1 reformatted"))
+	qt.Check(t, qt.Equals(readFile(t, path), formattedJSON))
+
+	// A second pass has nothing to do.
+	var again, againErr strings.Builder
+	qt.Check(t, qt.Equals(runCheck([]string{dir}, &again, &againErr), 0))
+	qt.Check(t, qt.StringContains(again.String(), "0 need formatting"))
+}
+
+// Without --write the file must be untouched and the exit non-zero, which
+// is the entire point of the CI gate.
+func TestCheckWithoutWriteChangesNothing(t *testing.T) {
+	dir := t.TempDir()
+	path := writeCheckFile(t, dir, "a.json", unformattedJSON)
+
+	var out, errOut strings.Builder
+	qt.Check(t, qt.Equals(runCheck([]string{dir}, &out, &errOut), 1))
+	qt.Check(t, qt.Equals(readFile(t, path), unformattedJSON))
+}
+
+// An executable script must not lose its bit to being formatted.
+func TestCheckWritePreservesMode(t *testing.T) {
+	if filepath.Separator == '\\' {
+		t.Skip("POSIX file modes only")
+	}
+	dir := t.TempDir()
+	path := writeCheckFile(t, dir, "s.sh", "#!/bin/sh\necho    hi\n")
+	qt.Assert(t, qt.IsNil(os.Chmod(path, 0o755)))
+
+	var out, errOut strings.Builder
+	qt.Check(t, qt.Equals(runCheck([]string{dir, "--write"}, &out, &errOut), 0))
+
+	info, err := os.Stat(path)
+	qt.Assert(t, qt.IsNil(err))
+	qt.Check(t, qt.Equals(info.Mode().Perm(), os.FileMode(0o755)))
+	qt.Check(t, qt.Equals(readFile(t, path), "#!/bin/sh\necho hi\n"))
+}
+
+// --write must honor the same skip rules as everything else, or it becomes
+// the one command that corrupts a lockfile.
+func TestCheckWriteSkipsGeneratedFiles(t *testing.T) {
+	dir := t.TempDir()
+	lock := writeCheckFile(t, dir, "package-lock.json", unformattedJSON)
+
+	var out, errOut strings.Builder
+	qt.Check(t, qt.Equals(runCheck([]string{dir, "--write"}, &out, &errOut), 0))
+	qt.Check(t, qt.Equals(readFile(t, lock), unformattedJSON))
+}
+
+func TestParseCheckArgs(t *testing.T) {
+	paths, write := parseCheckArgs([]string{"a", "--write", "b"})
+	qt.Check(t, qt.DeepEquals(paths, []string{"a", "b"}))
+	qt.Check(t, qt.IsTrue(write))
+
+	paths, write = parseCheckArgs([]string{"a"})
+	qt.Check(t, qt.DeepEquals(paths, []string{"a"}))
+	qt.Check(t, qt.IsFalse(write))
 }

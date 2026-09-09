@@ -67,6 +67,7 @@ Usage:
   format-dispatch --upgrade          download and replace this platform's latest release binary, and refresh the bunx formatters
   format-dispatch --upgrade --dry-run    preview the binary upgrade without writing
   format-dispatch --check PATH...    report files a formatter would change, without changing them (exit 1 if any)
+  format-dispatch --check --write PATH...  format those files in place instead of reporting them
   format-dispatch --doctor           report each formatter, the extensions it owns, and whether its tool is installed
   format-dispatch --version          print version and build info
   format-dispatch --help             show this help
