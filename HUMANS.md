@@ -68,7 +68,8 @@ the planned asset and path without going near the network.
 
 **Config:** `~/.claude/claude-format-hooks.json` (`$CLAUDE_FORMAT_HOOKS_CONFIG`);
 project `.claude-format-hooks.json` for `disabled` / `disabledFormatters` /
-`skipDirs` (extra generated-directory names, added to the built-in list);
+`skipDirs` / `skipFiles` (extra generated directory names and filename
+globs, added to the built-in lists);
 `.editorconfig` wins indent. Markdown base:
 `~/.claude/claude-format-hooks.markdownlint-cli2.jsonc` (created on first use).
 SQL: `~/.sqlfluff` bootstrap on first `.sql` write.

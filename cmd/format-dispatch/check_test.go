@@ -534,7 +534,7 @@ func TestCollectCheckTargetsSkipsScratchFiles(t *testing.T) {
 	keep := writeCheckFile(t, dir, "keep.json", formattedJSON)
 	writeCheckFile(t, dir, ".fmtcheck-leftover-keep.json", formattedJSON)
 
-	targets, err := collectCheckTargets([]string{dir}, nil)
+	targets, err := collectCheckTargets([]string{dir}, skipConfig{})
 	qt.Assert(t, qt.IsNil(err))
 	qt.Check(t, qt.DeepEquals(targets, []string{keep}))
 }
@@ -570,7 +570,7 @@ func TestCollectCheckTargetsSkipsDirectOutsideAndVendoredFiles(t *testing.T) {
 	outside := writeCheckFile(t, outsideRoot, "outside.json", unformattedJSON)
 	t.Setenv("CLAUDE_PROJECT_DIR", projectRoot)
 
-	targets, err := collectCheckTargets([]string{vendored, outside, outsideRoot}, nil)
+	targets, err := collectCheckTargets([]string{vendored, outside, outsideRoot}, skipConfig{})
 	qt.Assert(t, qt.IsNil(err))
 	qt.Check(t, qt.DeepEquals(targets, []string{}))
 }
@@ -590,7 +590,7 @@ func TestCollectCheckTargetsSkipsVendoredDirWithoutAWorkingDirectory(t *testing.
 
 	// With no project root and no usable cwd there is nothing to make the
 	// path relative to, so the directory is judged on its own base name.
-	got, err := collectCheckTargets([]string{vendored}, nil)
+	got, err := collectCheckTargets([]string{vendored}, skipConfig{})
 	qt.Assert(t, qt.IsNil(err))
 	qt.Check(t, qt.HasLen(got, 0), qt.Commentf("a vendored directory must be skipped even with no relative root"))
 }
@@ -601,7 +601,7 @@ func TestCollectCheckTargetsSkipsVendoredDirectoryRoot(t *testing.T) {
 	writeCheckFile(t, vendored, "dep.json", unformattedJSON)
 	t.Setenv("CLAUDE_PROJECT_DIR", projectRoot)
 
-	targets, err := collectCheckTargets([]string{vendored}, nil)
+	targets, err := collectCheckTargets([]string{vendored}, skipConfig{})
 
 	qt.Assert(t, qt.IsNil(err))
 	qt.Check(t, qt.DeepEquals(targets, []string{}))
@@ -631,7 +631,7 @@ func TestCollectCheckTargetsSkipsNewVendoredCacheDirectories(t *testing.T) {
 		writeCheckFile(t, filepath.Join(projectRoot, segment), "ignored.json", unformattedJSON)
 	}
 
-	targets, err := collectCheckTargets([]string{projectRoot}, nil)
+	targets, err := collectCheckTargets([]string{projectRoot}, skipConfig{})
 	qt.Assert(t, qt.IsNil(err))
 	qt.Check(t, qt.DeepEquals(targets, []string{keep}))
 }
@@ -643,7 +643,7 @@ func TestCollectCheckTargetsSkipsScratchFilesDuringWalk(t *testing.T) {
 	writeCheckFile(t, nested, ".fmtcheck-leftover.json", formattedJSON)
 	t.Setenv("CLAUDE_PROJECT_DIR", projectRoot)
 
-	targets, err := collectCheckTargets([]string{projectRoot}, nil)
+	targets, err := collectCheckTargets([]string{projectRoot}, skipConfig{})
 
 	qt.Assert(t, qt.IsNil(err))
 	qt.Check(t, qt.DeepEquals(targets, []string{keep}))

@@ -285,3 +285,44 @@ func TestInSkippedDirHonorsConfiguredSegments(t *testing.T) {
 	// A segment must match whole, not as a substring of a real directory.
 	qt.Check(t, qt.IsFalse(InSkippedDir("src/generated-docs/a.md", extra)))
 }
+
+// The directory skip list never sees a generated file that sits in a
+// source directory under a source extension. Formatting one is not merely
+// wasted work: a lockfile is churn the package manager reverts, and a
+// minified bundle expanded into readable source is a corrupted artifact.
+func TestInSkippedFile(t *testing.T) {
+	cases := []struct {
+		name string
+		want bool
+	}{
+		{"app.min.js", true},
+		{"app.min.mjs", true},
+		{"styles.min.css", true},
+		{"package-lock.json", true},
+		{"Package-Lock.json", true},
+		{"pnpm-lock.yaml", true},
+		{"npm-shrinkwrap.json", true},
+		// Real source that merely resembles the patterns must survive.
+		{"app.js", false},
+		{"minify.js", false},
+		{"lock.json", false},
+		{"unlock.ts", false},
+		{"main.go", false},
+	}
+	for _, tc := range cases {
+		qt.Check(t, qt.Equals(InSkippedFile(tc.name, nil), tc.want), qt.Commentf("name=%q", tc.name))
+	}
+}
+
+// Config-supplied globs compose with the built-ins rather than replacing
+// them, matched the way the other config lists are.
+func TestInSkippedFileHonorsConfiguredGlobs(t *testing.T) {
+	extra := []string{"*.generated.ts", "  SCHEMA.JSON  "}
+
+	qt.Check(t, qt.IsTrue(InSkippedFile("api.generated.ts", extra)))
+	qt.Check(t, qt.IsTrue(InSkippedFile("schema.json", extra)), qt.Commentf("trimmed and case-insensitive"))
+	qt.Check(t, qt.IsTrue(InSkippedFile("app.min.js", extra)), qt.Commentf("built-ins still apply"))
+	qt.Check(t, qt.IsFalse(InSkippedFile("api.ts", extra)))
+	// A malformed glob must not match everything.
+	qt.Check(t, qt.IsFalse(InSkippedFile("api.ts", []string{"[bad"})))
+}

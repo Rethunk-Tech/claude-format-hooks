@@ -296,7 +296,7 @@ func run(stdin io.Reader) int {
 	}
 	logFormatter = registry.Name(ext)
 
-	abs, projectRoot, skipReason := resolveTarget(path, userCfg.SkipDirs)
+	abs, projectRoot, skipReason := resolveTarget(path, userCfg)
 	if skipReason != "" {
 		logOutcome = skipReason
 		return 0
@@ -323,6 +323,10 @@ func run(stdin io.Reader) int {
 	if rel, relErr := filepath.Rel(projectRoot, abs); relErr == nil &&
 		dispatch.InSkippedDir(rel, projectCfg.SkipDirs) {
 		logOutcome = "skip: non-source directory (project config)"
+		return 0
+	}
+	if dispatch.InSkippedFile(filepath.Base(abs), projectCfg.SkipFiles) {
+		logOutcome = "skip: generated file (project config)"
 		return 0
 	}
 
@@ -399,7 +403,7 @@ func projectRootEnv() string {
 // and exclusion from skipped directories. skipReason is empty on
 // success; otherwise it's why run() should skip this file, suitable for
 // the invocation log as-is.
-func resolveTarget(path string, extraSkip []string) (abs, projectRoot, skipReason string) {
+func resolveTarget(path string, cfg config.Config) (abs, projectRoot, skipReason string) {
 	abs = path
 	if !filepath.IsAbs(abs) {
 		if a, err := filepath.Abs(abs); err == nil {
@@ -427,8 +431,11 @@ func resolveTarget(path string, extraSkip []string) (abs, projectRoot, skipReaso
 	if err != nil {
 		return abs, projectRoot, "skip: relative path error"
 	}
-	if dispatch.InSkippedDir(rel, extraSkip) {
+	if dispatch.InSkippedDir(rel, cfg.SkipDirs) {
 		return abs, projectRoot, "skip: non-source directory"
+	}
+	if dispatch.InSkippedFile(filepath.Base(abs), cfg.SkipFiles) {
+		return abs, projectRoot, "skip: generated file"
 	}
 	return abs, projectRoot, ""
 }

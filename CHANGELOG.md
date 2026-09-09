@@ -19,6 +19,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- Generated files carrying a source extension are no longer formatted.
+  The skip list matched directory segments only, so a `package-lock.json`
+  was reformatted into churn its package manager reverts, and an
+  `app.min.js` was expanded into readable source -- a corrupted build
+  artifact. Built-in globs cover `*.min.js`/`*.min.css`, `*-lock.json`,
+  `*-lock.yaml` and `npm-shrinkwrap.json`; a `skipFiles` config key adds
+  more at either level, alongside `skipDirs`.
+
 - `--upgrade` refreshes the globally-provisioned bunx formatters
   (biome, prettier, taplo, markdownlint-cli2) as well as the binary.
   Provisioning ran only from `--install`, and `install.sh --upgrade`

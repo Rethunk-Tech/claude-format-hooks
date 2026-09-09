@@ -50,7 +50,7 @@ func runCheck(args []string, out, errOut io.Writer) int {
 	defer cancel()
 
 	rootCandidates := checkRootCandidates(args)
-	files, err := collectCheckTargets(args, checkSkipDirs(rootCandidates))
+	files, err := collectCheckTargets(args, checkSkipConfig(rootCandidates))
 	if err != nil {
 		_, _ = fmt.Fprintf(errOut, "format-dispatch --check: %v\n", err)
 		return 2
@@ -359,7 +359,7 @@ func copyBeside(abs string, content []byte) (path string, cleanup func(), err er
 // project root wins, then the working directory, then fallbackRoot for when
 // os.Getwd failed. A path that cannot be made relative at all (a different
 // Windows volume, say) is judged on its own base name.
-func inSkipped(abs, projectRoot, workingRoot, fallbackRoot string, extraSkip []string) bool {
+func inSkipped(abs, projectRoot, workingRoot, fallbackRoot string, skip skipConfig) bool {
 	relRoot := workingRoot
 	if projectRoot != "" {
 		relRoot = projectRoot
@@ -370,7 +370,8 @@ func inSkipped(abs, projectRoot, workingRoot, fallbackRoot string, extraSkip []s
 	if err != nil {
 		rel = filepath.Base(abs)
 	}
-	return dispatch.InSkippedDir(rel, extraSkip)
+	return dispatch.InSkippedDir(rel, skip.dirs) ||
+		dispatch.InSkippedFile(filepath.Base(abs), skip.files)
 }
 
 // checkSkipDirs is the extra skip list --check honors while collecting
@@ -378,24 +379,35 @@ func inSkipped(abs, projectRoot, workingRoot, fallbackRoot string, extraSkip []s
 // the user and per-root project configs directly and ignores a malformed
 // one: a run over a tree no formatter handles must stay silent, even about
 // a broken config.
-func checkSkipDirs(rootCandidates []string) []string {
-	var extra []string
+func checkSkipConfig(rootCandidates []string) skipConfig {
+	var skip skipConfig
+	add := func(cfg config.Config) {
+		skip.dirs = append(skip.dirs, cfg.SkipDirs...)
+		skip.files = append(skip.files, cfg.SkipFiles...)
+	}
 	if cfg, err := config.Load(configPath()); err == nil {
-		extra = append(extra, cfg.SkipDirs...)
+		add(cfg)
 	}
 	for _, root := range rootCandidates {
 		if cfg, err := config.Load(filepath.Join(root, projectConfigFile)); err == nil {
-			extra = append(extra, cfg.SkipDirs...)
+			add(cfg)
 		}
 	}
-	return extra
+	return skip
+}
+
+// skipConfig is the config-supplied half of the skip rules, carried
+// together because every site that consults one consults the other.
+type skipConfig struct {
+	dirs  []string
+	files []string
 }
 
 // collectCheckTargets expands the given paths into a sorted, deduplicated
 // file list, walking directories and applying the same skipped-directory
 // exclusion the hook uses. Sorting keeps output stable so a CI diff of two
 // runs is meaningful.
-func collectCheckTargets(paths []string, extraSkip []string) ([]string, error) {
+func collectCheckTargets(paths []string, skip skipConfig) ([]string, error) {
 	seen := map[string]bool{}
 	projectRoot := projectRootEnv()
 	workingRoot, err := os.Getwd()
@@ -420,7 +432,7 @@ func collectCheckTargets(paths []string, extraSkip []string) ([]string, error) {
 		if projectRoot != "" && !within(abs, projectRoot) {
 			return
 		}
-		if inSkipped(abs, projectRoot, workingRoot, root, extraSkip) {
+		if inSkipped(abs, projectRoot, workingRoot, root, skip) {
 			return
 		}
 		seen[abs] = true
@@ -442,7 +454,7 @@ func collectCheckTargets(paths []string, extraSkip []string) ([]string, error) {
 		if projectRoot != "" && !within(absDir, projectRoot) {
 			continue
 		}
-		if inSkipped(absDir, projectRoot, workingRoot, filepath.Dir(absDir), extraSkip) {
+		if inSkipped(absDir, projectRoot, workingRoot, filepath.Dir(absDir), skip) {
 			continue
 		}
 		err = filepath.WalkDir(p, func(path string, d fs.DirEntry, err error) error { //nolint:gosec // walking an operator-supplied directory is the entire contract
@@ -456,7 +468,7 @@ func collectCheckTargets(paths []string, extraSkip []string) ([]string, error) {
 			if d.IsDir() {
 				// Prune rather than filter per-file: skipping a non-source
 				// tree at its root avoids walking node_modules at all.
-				if rel != "." && dispatch.InSkippedDir(rel, extraSkip) {
+				if rel != "." && dispatch.InSkippedDir(rel, skip.dirs) {
 					return fs.SkipDir
 				}
 				return nil

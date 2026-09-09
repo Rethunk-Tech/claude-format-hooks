@@ -6,6 +6,7 @@ import (
 	"context"
 	"iter"
 	"maps"
+	"path"
 	"path/filepath"
 	"slices"
 	"strings"
@@ -172,6 +173,45 @@ var skipDirs = map[string]bool{
 	".mypy_cache":     true,
 	".pytest_cache":   true,
 	".tox":            true,
+}
+
+// skipFilePatterns are filename globs for files that are generated even
+// though they sit in a source directory and carry a source extension, so
+// the directory skip list never sees them. Formatting one is not merely
+// wasted: a lockfile rewritten here is churn its package manager reverts
+// on the next install, and a minified bundle expanded into readable source
+// is a corrupted build artifact.
+//
+// Deliberately short. A pattern here overrides the operator on every
+// project at once, so it holds only names whose meaning is unambiguous
+// across the ecosystem; anything arguable belongs in the skipFiles config
+// key instead.
+var skipFilePatterns = []string{
+	"*.min.js",
+	"*.min.mjs",
+	"*.min.cjs",
+	"*.min.css",
+	// Lockfiles whose extension a formatter actually claims. The rest
+	// (yarn.lock, Cargo.lock, flake.lock) carry no registered extension
+	// and never reach a formatter to begin with.
+	"*-lock.json",
+	"*-lock.yaml",
+	"*-lock.yml",
+	"npm-shrinkwrap.json",
+}
+
+// InSkippedFile reports whether name (a base name, not a path) marks the
+// file as generated, by the built-in patterns or by extra from config.
+// Patterns are matched with path.Match against the lowercased name, so a
+// case-insensitive filesystem cannot smuggle Package-Lock.json past the
+// same rule.
+func InSkippedFile(name string, extra []string) bool {
+	lower := strings.ToLower(name)
+	match := func(pattern string) bool {
+		ok, err := path.Match(strings.ToLower(strings.TrimSpace(pattern)), lower)
+		return err == nil && ok
+	}
+	return slices.ContainsFunc(skipFilePatterns, match) || slices.ContainsFunc(extra, match)
 }
 
 // Supported reports whether ext (already resolved, e.g. ".ts" or

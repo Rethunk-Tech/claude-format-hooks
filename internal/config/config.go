@@ -56,6 +56,7 @@ type Config struct {
 	Disabled           []string `json:"disabled"`
 	DisabledFormatters []string `json:"disabledFormatters"`
 	SkipDirs           []string `json:"skipDirs"`
+	SkipFiles          []string `json:"skipFiles"`
 }
 
 // Default returns the built-in indent defaults (2-space, no tabs).

@@ -972,3 +972,75 @@ func TestRunWritesNoStdoutWhenNothingFailed(t *testing.T) {
 		})
 	}
 }
+
+// End to end through the hook: a generated file keeps its bytes, and a
+// real source file beside it with the same extension still gets formatted
+// -- so the test is proving the name rule and not some unrelated skip.
+func TestRunSkipsGeneratedFiles(t *testing.T) {
+	cases := []struct {
+		name, file, content string
+		wantFormatted       bool
+	}{
+		{name: "npm lockfile", file: "package-lock.json", content: "{\"a\":1}\n"},
+		{name: "minified bundle", file: "app.min.js", content: "const a=1;\n"},
+		{name: "pnpm lockfile", file: "pnpm-lock.yaml", content: "{\"a\":1}\n"},
+		{name: "real source", file: "app.json", content: "{\"a\":1}\n", wantFormatted: true},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			projectRoot := t.TempDir()
+			abs := filepath.Join(projectRoot, tc.file)
+			writeFile(t, abs, tc.content)
+			t.Setenv("CLAUDE_PROJECT_DIR", projectRoot)
+
+			qt.Check(t, qt.Equals(run(strings.NewReader(payload(abs))), 0))
+			if tc.wantFormatted {
+				qt.Check(t, qt.Not(qt.Equals(readFile(t, abs), tc.content)),
+					qt.Commentf("a real source file must still be formatted"))
+				return
+			}
+			qt.Check(t, qt.Equals(readFile(t, abs), tc.content),
+				qt.Commentf("a generated file must keep its bytes"))
+		})
+	}
+}
+
+// A project naming its own generated files stops them without a release,
+// the same way skipDirs does for directories.
+func TestRunHonorsConfiguredSkipFiles(t *testing.T) {
+	for _, level := range []string{"user", "project"} {
+		t.Run(level, func(t *testing.T) {
+			projectRoot := t.TempDir()
+			abs := filepath.Join(projectRoot, "schema.json")
+			src := "{\"a\":1}\n"
+			writeFile(t, abs, src)
+
+			cfg := `{"skipFiles":["schema.json"]}`
+			userCfg, projectCfg := `{}`, cfg
+			if level == "user" {
+				userCfg, projectCfg = cfg, `{}`
+			}
+			writeFile(t, filepath.Join(projectRoot, ".claude-format-hooks.json"), projectCfg)
+			userPath := filepath.Join(t.TempDir(), "claude-format-hooks.json")
+			writeFile(t, userPath, userCfg)
+
+			t.Setenv("CLAUDE_PROJECT_DIR", projectRoot)
+			t.Setenv("CLAUDE_FORMAT_HOOKS_CONFIG", userPath)
+			qt.Check(t, qt.Equals(run(strings.NewReader(payload(abs))), 0))
+			qt.Check(t, qt.Equals(readFile(t, abs), src))
+		})
+	}
+}
+
+// --check must agree with the hook about what a generated file is, or CI
+// reports work on a file no write would ever perform.
+func TestCheckSkipsGeneratedFiles(t *testing.T) {
+	dir := t.TempDir()
+	writeCheckFile(t, dir, "package-lock.json", unformattedJSON)
+	writeCheckFile(t, dir, "app.min.js", "const a=1;\n")
+
+	var out, errOut strings.Builder
+	qt.Check(t, qt.Equals(runCheck([]string{dir}, &out, &errOut), 0))
+	qt.Check(t, qt.Not(qt.StringContains(out.String(), "package-lock.json")))
+	qt.Check(t, qt.StringContains(out.String(), "0 file(s) checked"))
+}

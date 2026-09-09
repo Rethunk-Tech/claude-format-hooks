@@ -54,6 +54,8 @@ formatter reads as native.
   shell, python, ruby, or node interpreter.
 - Missing external tools cached briefly (`internal/diskcache`); self-heals within TTL.
 - Skips `node_modules/`, `.git/`, `vendor/`, `.venv/`, and peers; files outside `$CLAUDE_PROJECT_DIR`.
+- Skips generated files by name (`*.min.js`, `*-lock.json`, peers) even in a
+  source directory. Config `skipDirs` / `skipFiles` extend both lists.
 - No formatter requires project config to exist first.
 
 ## Conventions
