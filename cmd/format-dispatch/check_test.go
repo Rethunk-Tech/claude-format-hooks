@@ -108,9 +108,10 @@ func TestWouldReformatComparesFormattedCopies(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			path := writeCheckFile(t, dir, tt.name+".json", tt.content)
 
-			changed, err := wouldReformat(context.Background(), registry, dir, path, ".json")
+			changed, skipped, err := wouldReformat(context.Background(), registry, dir, path, ".json")
 
 			qt.Assert(t, qt.IsNil(err))
+			qt.Check(t, qt.IsFalse(skipped), qt.Commentf("the native JSON formatter never skips"))
 			qt.Check(t, qt.Equals(changed, tt.changed))
 			qt.Check(t, qt.Equals(readFile(t, path), tt.content))
 		})
@@ -122,7 +123,7 @@ func TestWouldReformatReportsReadFileError(t *testing.T) {
 	registry := dispatch.NewRegistry(config.Default())
 	missing := filepath.Join(dir, "missing.json")
 
-	changed, err := wouldReformat(context.Background(), registry, dir, missing, ".json")
+	changed, _, err := wouldReformat(context.Background(), registry, dir, missing, ".json")
 
 	qt.Check(t, qt.Equals(changed, false))
 	if err == nil {
@@ -138,7 +139,7 @@ func TestWouldReformatReturnsContextCauseAfterDispatch(t *testing.T) {
 	cause := context.Canceled
 	cancel(cause)
 
-	changed, err := wouldReformat(ctx, registry, dir, path, ".json")
+	changed, _, err := wouldReformat(ctx, registry, dir, path, ".json")
 
 	qt.Check(t, qt.Equals(changed, false))
 	qt.Check(t, qt.Equals(err, cause))
@@ -164,7 +165,7 @@ func TestWouldReformatReportsFormattedCopyReadError(t *testing.T) {
 	t.Setenv("PATH", toolDir+string(os.PathListSeparator)+os.Getenv("PATH"))
 	registry := dispatch.NewRegistry(config.Default())
 
-	changed, err := wouldReformat(context.Background(), registry, projectRoot, path, ".ts")
+	changed, _, err := wouldReformat(context.Background(), registry, projectRoot, path, ".ts")
 
 	qt.Check(t, qt.Equals(changed, false))
 	if err == nil {
@@ -659,4 +660,52 @@ func TestCheckReportsAMissingPath(t *testing.T) {
 	var out, errOut bytes.Buffer
 	missing := filepath.Join(t.TempDir(), "nope")
 	qt.Check(t, qt.Equals(runCheck([]string{missing}, &out, &errOut), 2))
+}
+
+// The whole point of the tally: a file --check never examined must not be
+// counted as one that passed. A tree of types no formatter handles used to
+// report "N file(s) already formatted", which in CI reads as a green
+// formatting gate over files nothing looked at.
+func TestCheckDoesNotCountUnexaminedFilesAsPassing(t *testing.T) {
+	dir := t.TempDir()
+	writeCheckFile(t, dir, "a.xyz", "whatever\n")
+	writeCheckFile(t, dir, "b.zzz", "whatever\n")
+
+	var out, errOut strings.Builder
+	qt.Check(t, qt.Equals(runCheck([]string{dir}, &out, &errOut), 0))
+	got := out.String()
+
+	qt.Check(t, qt.StringContains(got, "0 file(s) checked"))
+	qt.Check(t, qt.StringContains(got, "2 unsupported"))
+	qt.Check(t, qt.Not(qt.StringContains(got, "already formatted")))
+}
+
+// A config-disabled extension is skipped, not checked, and says so.
+func TestCheckReportsDisabledAsSkipped(t *testing.T) {
+	dir := t.TempDir()
+	writeCheckFile(t, dir, "a.json", unformattedJSON)
+	cfg := filepath.Join(t.TempDir(), "config.json")
+	qt.Assert(t, qt.IsNil(os.WriteFile(cfg, []byte(`{"disabled":[".json"]}`), 0o600)))
+	t.Setenv("CLAUDE_FORMAT_HOOKS_CONFIG", cfg)
+
+	var out, errOut strings.Builder
+	qt.Check(t, qt.Equals(runCheck([]string{dir}, &out, &errOut), 0))
+	got := out.String()
+
+	qt.Check(t, qt.StringContains(got, "0 file(s) checked"))
+	qt.Check(t, qt.StringContains(got, "1 disabled"))
+}
+
+// A formatter whose binary is absent names itself, so the operator knows
+// what to install rather than trusting a check that never ran.
+func TestCheckTallySummary(t *testing.T) {
+	var t1 checkTally
+	qt.Check(t, qt.Equals(t1.summary(0), "0 file(s) checked, 0 need formatting"))
+
+	t2 := checkTally{checked: 90, unsupported: 12, disabled: 2}
+	t2.noTool("stylua")
+	t2.noTool("ktlint")
+	t2.noTool("stylua")
+	qt.Check(t, qt.Equals(t2.summary(3),
+		"90 file(s) checked, 3 need formatting; skipped: 12 unsupported, 2 disabled, 3 no tool (ktlint, stylua)"))
 }

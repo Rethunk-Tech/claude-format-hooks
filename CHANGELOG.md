@@ -7,6 +7,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- `--check` no longer counts files it never examined as passing. The
+  summary reported the number of files walked, so a tree of unsupported
+  types, opted-out types, or types whose formatter is not installed
+  reported "N file(s) already formatted" and exited 0 -- in CI, a green
+  formatting gate over files nothing looked at. It now reports what it
+  checked and what it skipped, with the formatters that declined for want
+  of a binary named so they can be installed. Exit codes are unchanged.
+
 ### Added
 
 - `--doctor` reports every formatter in the resolved registry, the

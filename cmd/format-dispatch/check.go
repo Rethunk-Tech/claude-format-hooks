@@ -10,6 +10,7 @@ import (
 	"io/fs"
 	"os"
 	"path/filepath"
+	"slices"
 	"sort"
 	"strings"
 	"time"
@@ -52,6 +53,7 @@ func runCheck(args []string, out, errOut io.Writer) int {
 		return 2
 	}
 	var wouldChange []string
+	var tally checkTally
 	rootCandidates := checkRootCandidates(args)
 	// Built on the first supported file, not up front: a run over files no
 	// formatter handles must stay silent, even about a malformed config.
@@ -60,12 +62,14 @@ func runCheck(args []string, out, errOut io.Writer) int {
 	for _, abs := range files {
 		ext := resolveDispatchExt(abs)
 		if !dispatch.KnownExtension(ext) {
+			tally.unsupported++
 			continue
 		}
 		if registry == nil {
 			registry, cfg = buildRegistry(errOut)
 		}
 		if cfg.IsDisabled(ext) || !registry.Supported(ext) {
+			tally.disabled++
 			continue
 		}
 		projectRoot := checkProjectRoot(rootCandidates, abs)
@@ -73,31 +77,82 @@ func runCheck(args []string, out, errOut io.Writer) int {
 		if disabled, projectCfg, err := projectDisables(projectRoot, ext, registry.Name(ext)); err != nil {
 			_, _ = fmt.Fprintf(errOut, "format-dispatch --check: project config: %v (ignoring)\n", err)
 		} else if disabled {
+			tally.disabled++
 			continue
 		} else {
 			registryForFile = registryWithProjectConfig(registry, cfg, ext, projectCfg)
 		}
 		fileCtx, fileCancel := context.WithTimeoutCause(ctx, formatterTimeout, errFormatterTimeout)
-		changed, err := wouldReformat(fileCtx, registryForFile, projectRoot, abs, ext)
+		changed, skipped, err := wouldReformat(fileCtx, registryForFile, projectRoot, abs, ext)
 		fileCancel()
 		if err != nil {
 			_, _ = fmt.Fprintf(errOut, "format-dispatch --check: %s: %v\n", abs, err)
 			return 2
 		}
+		if skipped {
+			tally.noTool(registryForFile.Name(ext))
+			continue
+		}
+		tally.checked++
 		if changed {
 			wouldChange = append(wouldChange, abs)
 		}
 	}
 
-	if len(wouldChange) == 0 {
-		_, _ = fmt.Fprintf(out, "format-dispatch --check: %d file(s) already formatted\n", len(files))
-		return 0
-	}
 	for _, path := range wouldChange {
 		_, _ = fmt.Fprintf(out, "would reformat: %s\n", path)
 	}
-	_, _ = fmt.Fprintf(out, "format-dispatch --check: %d file(s) need formatting\n", len(wouldChange))
+	_, _ = fmt.Fprintf(out, "format-dispatch --check: %s\n", tally.summary(len(wouldChange)))
+	if len(wouldChange) == 0 {
+		return 0
+	}
 	return 1
+}
+
+// checkTally counts what --check actually did, which is not the same as the
+// number of files it walked. Reporting the walked count as "already
+// formatted" claims files passed a check that never ran on them: an
+// unsupported type, an opted-out one, and one whose formatter isn't
+// installed all reach the end untouched and byte-identical. On a CI runner
+// missing half the toolchain that turns a green formatting gate into a
+// statement about nothing.
+type checkTally struct {
+	checked     int
+	unsupported int
+	disabled    int
+	skippedTool int
+	// tools are the distinct formatter names that declined for want of a
+	// binary, so the summary can say which ones to install.
+	tools []string
+}
+
+func (t *checkTally) noTool(formatter string) {
+	t.skippedTool++
+	if !slices.Contains(t.tools, formatter) {
+		t.tools = append(t.tools, formatter)
+	}
+}
+
+// summary reads as one line: what was checked, what needs work, and what
+// was passed over and why.
+func (t *checkTally) summary(needFormatting int) string {
+	head := fmt.Sprintf("%d file(s) checked, %d need formatting", t.checked, needFormatting)
+
+	var skipped []string
+	if t.unsupported > 0 {
+		skipped = append(skipped, fmt.Sprintf("%d unsupported", t.unsupported))
+	}
+	if t.disabled > 0 {
+		skipped = append(skipped, fmt.Sprintf("%d disabled", t.disabled))
+	}
+	if t.skippedTool > 0 {
+		sort.Strings(t.tools)
+		skipped = append(skipped, fmt.Sprintf("%d no tool (%s)", t.skippedTool, strings.Join(t.tools, ", ")))
+	}
+	if len(skipped) == 0 {
+		return head
+	}
+	return head + "; skipped: " + strings.Join(skipped, ", ")
 }
 
 // checkProjectRoot preserves the hook's project-root choice when --check is
@@ -152,33 +207,38 @@ func checkRootCandidates(paths []string) []string {
 // resolves its config by walking up from the file (biome.json, .sqlfluff, a
 // project .markdownlint-cli2.jsonc), so formatting a copy in a temp
 // directory elsewhere would silently apply the wrong rules.
-func wouldReformat(ctx context.Context, registry *dispatch.Registry, projectRoot, abs, ext string) (bool, error) {
+func wouldReformat(ctx context.Context, registry *dispatch.Registry, projectRoot, abs, ext string) (changed, skipped bool, err error) {
 	original, err := os.ReadFile(abs) //nolint:gosec // abs is a path the caller asked to check, by design
 	if err != nil {
-		return false, err
+		return false, false, err
 	}
 
 	scratch, cleanup, err := copyBeside(abs, original)
 	if err != nil {
-		return false, err
+		return false, false, err
 	}
 	defer cleanup()
 
-	// A formatter that skips (tool not installed) or fails leaves the copy
-	// untouched, which compares equal -- an absent tool must not fail a
-	// build for files it could never have formatted.
+	// A formatter that skips (tool not installed) leaves the copy untouched,
+	// which would compare equal and read as "already formatted". It is
+	// reported as a skip instead: an absent tool must not fail a build for
+	// files it could never have formatted, but it must not claim to have
+	// checked them either.
 	// Dispatch from the check's project root so config discovery matches the
 	// hook, even when the file being checked is nested below that root.
-	registry.Dispatch(ctx, projectRoot, scratch, ext)
+	res := registry.Dispatch(ctx, projectRoot, scratch, ext)
 	if err := context.Cause(ctx); err != nil {
-		return false, err
+		return false, false, err
+	}
+	if res.Skipped {
+		return false, true, nil
 	}
 
 	formatted, err := os.ReadFile(scratch) //nolint:gosec // scratch is the temp copy this function just created
 	if err != nil {
-		return false, err
+		return false, false, err
 	}
-	return !bytes.Equal(original, formatted), nil
+	return !bytes.Equal(original, formatted), false, nil
 }
 
 // copyBeside writes content to a uniquely-named sibling of abs, preserving
