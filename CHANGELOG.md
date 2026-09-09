@@ -46,6 +46,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- `--doctor` also reports whether this binary is wired into
+  `~/.claude/settings.json` and `~/.cursor/hooks.json`. Missing tools and
+  a missing hook look identical from the outside -- files simply stay
+  unformatted -- and it could only answer the first. A malformed hooks
+  file reports as unreadable rather than unwired, since `--install` would
+  fail on it rather than fix it.
 - `--check --write` formats the files `--check` reports, in place. The
   only write path in the binary was the stdin hook payload, so a
   developer whose CI failed on formatting had no single command to fix

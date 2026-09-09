@@ -55,7 +55,7 @@ Unsupported extensions and skipped paths are no-ops — see
 format-dispatch --version
 format-dispatch --check .              # CI: exit 1 if formatting needed
 format-dispatch --check . --write      # apply what --check reported
-format-dispatch --doctor               # which formatters, extensions, and tools you have
+format-dispatch --doctor               # formatters, tools, and whether the hook is wired
 format-dispatch --upgrade [--dry-run]
 ```
 

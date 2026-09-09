@@ -560,3 +560,48 @@ func TestApplyChangeReportsSettingsWriteFailure(t *testing.T) {
 	err := applyFixedChange(settingsPath, &out)
 	qt.Check(t, qt.IsNotNil(err))
 }
+
+// Wired must answer from the parsed entries, not by diffing a re-render:
+// rendering sorts top-level keys, so a settings file that merely needed
+// reordering would diff non-empty and read as wired when it is not.
+func TestWiredReadsStateWithoutRewriting(t *testing.T) {
+	dir := t.TempDir()
+	settings := filepath.Join(dir, "settings.json")
+	bin := filepath.Join(dir, "format-dispatch")
+
+	// Unsorted top-level keys: a re-render would reorder these.
+	qt.Assert(t, qt.IsNil(os.WriteFile(settings,
+		[]byte(`{"zebra":1,"alpha":2}`), 0o600)))
+
+	wired, err := Wired(settings, bin)
+	qt.Assert(t, qt.IsNil(err))
+	qt.Check(t, qt.IsFalse(wired), qt.Commentf("key order alone must not read as wired"))
+
+	before, after, err := Wire(settings, bin)
+	qt.Assert(t, qt.IsNil(err))
+	qt.Assert(t, qt.IsNil(os.WriteFile(settings, after, 0o600)))
+	qt.Check(t, qt.Not(qt.DeepEquals(before, after)))
+
+	wired, err = Wired(settings, bin)
+	qt.Assert(t, qt.IsNil(err))
+	qt.Check(t, qt.IsTrue(wired))
+}
+
+func TestWiredCursorReadsState(t *testing.T) {
+	dir := t.TempDir()
+	hooks := filepath.Join(dir, "hooks.json")
+	bin := filepath.Join(dir, "format-dispatch")
+
+	// A file that does not exist is not wired, and not an error.
+	wired, err := WiredCursor(hooks, bin)
+	qt.Assert(t, qt.IsNil(err))
+	qt.Check(t, qt.IsFalse(wired))
+
+	_, after, err := WireCursor(hooks, bin)
+	qt.Assert(t, qt.IsNil(err))
+	qt.Assert(t, qt.IsNil(os.WriteFile(hooks, after, 0o600)))
+
+	wired, err = WiredCursor(hooks, bin)
+	qt.Assert(t, qt.IsNil(err))
+	qt.Check(t, qt.IsTrue(wired))
+}

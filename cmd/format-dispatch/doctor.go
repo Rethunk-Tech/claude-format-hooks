@@ -11,6 +11,7 @@ import (
 
 	"github.com/Rethunk-Tech/claude-format-hooks/internal/dispatch"
 	"github.com/Rethunk-Tech/claude-format-hooks/internal/formatters"
+	"github.com/Rethunk-Tech/claude-format-hooks/internal/installer"
 )
 
 // runDoctor reports, for the resolved config, every formatter in the
@@ -55,7 +56,50 @@ func runDoctor(out, errOut io.Writer) int {
 	if disabled := disabledExtensions(registry); len(disabled) > 0 {
 		_, _ = fmt.Fprintf(out, "\ndisabled by config: %s\n", strings.Join(disabled, " "))
 	}
+	reportWiring(out)
 	return 0
+}
+
+// reportWiring answers the other half of "why is nothing happening when I
+// save". A complete toolchain is useless if the binary was never wired into
+// the harness, and the two questions look identical from the outside:
+// files simply stay unformatted.
+func reportWiring(out io.Writer) {
+	opts, err := installer.DefaultOptions()
+	if err != nil {
+		_, _ = fmt.Fprintf(out, "\nhook wiring: unknown (%v)\n", err)
+		return
+	}
+
+	_, _ = fmt.Fprintf(out, "\nhook wiring (%s):\n", opts.BinPath)
+	w := tabwriter.NewWriter(out, 0, 0, 2, ' ', 0)
+	for _, h := range []struct {
+		path  string
+		wired func(string, string) (bool, error)
+	}{
+		{opts.SettingsPath, installer.Wired},
+		{opts.CursorHooksPath, installer.WiredCursor},
+	} {
+		if h.path == "" {
+			continue
+		}
+		_, _ = fmt.Fprintf(w, "  %s\t%s\n", h.path, wiringState(h.wired(h.path, opts.BinPath)))
+	}
+	_ = w.Flush()
+}
+
+// wiringState renders one probe. A malformed hooks file is reported as
+// such rather than as "not wired": the difference is whether --install
+// would fix it or fail on it.
+func wiringState(wired bool, err error) string {
+	switch {
+	case err != nil:
+		return fmt.Sprintf("UNREADABLE: %v", err)
+	case wired:
+		return "wired"
+	default:
+		return "NOT WIRED (run --install)"
+	}
 }
 
 // toolStatus resolves a formatter's candidate binaries the way it will at

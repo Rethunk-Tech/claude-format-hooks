@@ -204,6 +204,19 @@ func Unwire(settingsPath, binPath string) (before, after []byte, err error) {
 	return before, after, nil
 }
 
+// Wired reports whether binPath is registered as a PostToolUse hook in
+// settingsPath. It exists so --doctor can answer "is this thing even
+// installed" without diffing Wire's output: rendering sorts top-level keys,
+// so a settings file that merely needed reordering would diff non-empty and
+// read as wired when it is not. A missing file is not wired, not an error.
+func Wired(settingsPath, binPath string) (bool, error) {
+	_, _, _, entries, _, err := parseHookDoc[PostToolUseEntry](settingsPath, postToolUseEvent)
+	if err != nil {
+		return false, err
+	}
+	return slices.ContainsFunc(entries, func(e PostToolUseEntry) bool { return hasBin(e, binPath) }), nil
+}
+
 // hasBin reports whether e has a hook command pointing at binPath.
 func hasBin(e PostToolUseEntry, binPath string) bool {
 	return slices.ContainsFunc(e.Hooks, func(h HookCommand) bool {
