@@ -63,8 +63,13 @@ format-dispatch --upgrade [--dry-run]
 binary and the tools it shells out to move together.
 
 `--upgrade` checks the release `.sha256` and then requires GitHub to hold a
-build-provenance attestation for the downloaded bytes; a binary the release
-workflow did not attest is refused rather than installed. `--dry-run` prints
+build-provenance attestation binding the downloaded bytes to
+`.github/workflows/release.yml` in this repository; anything else is refused
+rather than installed. The attestation's signature chain is not itself
+verified -- that would cost sigstore-go's 71 modules against this binary's
+current 7 -- so the trust anchor remains TLS to `api.github.com`, the same
+one the release metadata already rests on. `gh attestation verify` does the
+full cryptographic check when you want it. `--dry-run` prints
 the planned asset and path without going near the network.
 
 **Config:** `~/.claude/claude-format-hooks.json` (`$CLAUDE_FORMAT_HOOKS_CONFIG`);

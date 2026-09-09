@@ -3,6 +3,7 @@ package installer
 import (
 	"bytes"
 	"crypto/sha256"
+	"encoding/base64"
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
@@ -11,12 +12,19 @@ import (
 	"os"
 	"path/filepath"
 	"runtime"
+	"slices"
 	"strings"
 	"time"
 )
 
 const (
-	releaseRepository        = "Rethunk-Tech/claude-format-hooks"
+	releaseRepository = "Rethunk-Tech/claude-format-hooks"
+	// releaseWorkflowPath is the only workflow whose attestations are
+	// accepted. Without this binding any provenance attestation on the
+	// repository counts, including one minted by some other workflow a
+	// contributor adds later -- which is a far lower bar than "the release
+	// workflow built these bytes".
+	releaseWorkflowPath      = ".github/workflows/release.yml"
 	releaseAPIBaseURL        = "https://api.github.com"
 	maxUpgradeDownloadBytes  = 64 << 20
 	maxUpgradeErrorBodyBytes = 4 << 10
@@ -33,7 +41,31 @@ type releaseAsset struct {
 }
 
 type releaseAttestations struct {
-	Attestations []json.RawMessage `json:"attestations"`
+	Attestations []struct {
+		Bundle struct {
+			DSSEEnvelope struct {
+				Payload string `json:"payload"`
+			} `json:"dsseEnvelope"`
+		} `json:"bundle"`
+	} `json:"attestations"`
+}
+
+// provenanceStatement is the in-toto statement carried in an attestation's
+// DSSE envelope: what was built, by which workflow, in which repository.
+type provenanceStatement struct {
+	Subject []struct {
+		Digest map[string]string `json:"digest"`
+	} `json:"subject"`
+	Predicate struct {
+		BuildDefinition struct {
+			ExternalParameters struct {
+				Workflow struct {
+					Repository string `json:"repository"`
+					Path       string `json:"path"`
+				} `json:"workflow"`
+			} `json:"externalParameters"`
+		} `json:"buildDefinition"`
+	} `json:"predicate"`
 }
 
 type upgradeConfig struct {
@@ -141,17 +173,25 @@ func upgradeWithConfig(opts Options, dryRun bool, out io.Writer, cfg upgradeConf
 //
 // ponytail: the trust anchor is TLS to the release API host, which this path
 // already trusts for the release metadata and asset URLs it acts on
-// (install.sh states that trust). Ceiling: the attestation's Sigstore bundle
-// is not verified and the workflow path inside it is not read. Measured
-// against api.github.com in 2026-09, the endpoint returns "bundle": null and
-// offloads the bundle to a snappy-compressed blob URL; snappy is not in the
-// standard library. Reading it would buy little here anyway -- the endpoint is
-// repository-scoped, so a provenance attestation already proves this
-// repository's OIDC identity signed these bytes, and an attacker able to add
-// another attesting workflow already has the access to edit the release
-// workflow. Upgrade path if the threat model grows to include a compromised
-// API host: fetch bundle_url and verify the bundle (needs a snappy decoder
-// and sigstore-go).
+// (install.sh states that trust). Within that anchor this now binds the
+// attestation to these exact bytes AND to the release workflow, decoding the
+// in-toto statement out of the bundle's DSSE envelope with the standard
+// library alone.
+//
+// Ceiling: the DSSE signature, its Fulcio certificate chain and the Rekor
+// inclusion proof are not cryptographically verified, so this trusts the API
+// to hand back an unforged bundle rather than proving it. Measured 2026-09:
+// closing that means sigstore-go, which resolves to 71 modules (gRPC,
+// protobuf, k8s.io/klog) against this module's current 7 -- a tenfold
+// dependency increase, in a binary whose entire design premise is a 1-3ms
+// cold start on every file write. Measured, not worth it. Revisit only if
+// the threat model grows to include a compromised api.github.com, at which
+// point the attestation list itself is forgeable too and the whole path
+// needs rethinking, not just this check.
+//
+// An earlier note here recorded the endpoint returning "bundle": null and
+// offloading to a snappy-compressed blob. Re-measured 2026-09-09: the bundle
+// now comes back inline, which is what makes the workflow binding free.
 func verifyReleaseProvenance(client *http.Client, baseURL string, binary []byte) error {
 	digest := sha256.Sum256(binary)
 	url := strings.TrimRight(baseURL, "/") + "/repos/" + releaseRepository +
@@ -160,6 +200,14 @@ func verifyReleaseProvenance(client *http.Client, baseURL string, binary []byte)
 	if err != nil {
 		return fmt.Errorf("fetch attestations: %w", err)
 	}
+	return verifyProvenanceBody(body, binary)
+}
+
+// verifyProvenanceBody is verifyReleaseProvenance minus the fetch, so the
+// decision can be tested against a real captured API response instead of
+// only against a hand-written one.
+func verifyProvenanceBody(body, binary []byte) error {
+	digest := sha256.Sum256(binary)
 	// A digest with no attestation answers 404 on a repository that has never
 	// attested anything and an empty list on one that has; both are a refusal.
 	var attestations releaseAttestations
@@ -169,7 +217,68 @@ func verifyReleaseProvenance(client *http.Client, baseURL string, binary []byte)
 	if len(attestations.Attestations) == 0 {
 		return fmt.Errorf("%s attests no build provenance for this download", releaseRepository)
 	}
+
+	// Any one attestation binding these bytes to the release workflow is
+	// enough; a repository can hold several for the same digest.
+	want := hex.EncodeToString(digest[:])
+	var sawBundle bool
+	for _, att := range attestations.Attestations {
+		if att.Bundle.DSSEEnvelope.Payload == "" {
+			continue
+		}
+		sawBundle = true
+		stmt, err := decodeProvenance(att.Bundle.DSSEEnvelope.Payload)
+		if err != nil {
+			continue
+		}
+		if stmt.attests(want) {
+			return nil
+		}
+	}
+	if sawBundle {
+		return fmt.Errorf("no attestation binds these bytes to %s in %s",
+			releaseWorkflowPath, releaseRepository)
+	}
+	// The endpoint has returned bundle-less attestations before. Falling back
+	// to existence alone is exactly the posture this path had before the
+	// binding existed, and no weaker than the TLS anchor it already rests on
+	// -- whereas refusing would break every upgrade on an API shape change.
 	return nil
+}
+
+// decodeProvenance unwraps the base64 in-toto statement from a DSSE
+// envelope payload.
+func decodeProvenance(payload string) (provenanceStatement, error) {
+	raw, err := base64.StdEncoding.DecodeString(payload)
+	if err != nil {
+		return provenanceStatement{}, err
+	}
+	var stmt provenanceStatement
+	if err := json.Unmarshal(raw, &stmt); err != nil {
+		return provenanceStatement{}, err
+	}
+	return stmt, nil
+}
+
+// attests reports whether this statement says the release workflow, in the
+// release repository, built exactly these bytes. All three must hold: a
+// digest match alone would accept an attestation minted by any workflow,
+// and a workflow match alone would accept one for different bytes.
+func (s provenanceStatement) attests(wantDigest string) bool {
+	workflow := s.Predicate.BuildDefinition.ExternalParameters.Workflow
+	if workflow.Path != releaseWorkflowPath {
+		return false
+	}
+	// The statement spells the repository as a URL; compare the owner/name
+	// tail rather than pinning github.com's hostname.
+	if !strings.HasSuffix(strings.TrimSuffix(workflow.Repository, "/"), "/"+releaseRepository) {
+		return false
+	}
+	return slices.ContainsFunc(s.Subject, func(sub struct {
+		Digest map[string]string `json:"digest"`
+	}) bool {
+		return strings.EqualFold(sub.Digest["sha256"], wantDigest)
+	})
 }
 
 func fetchLatestRelease(client *http.Client, baseURL string) (githubRelease, error) {

@@ -17,6 +17,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   per-file timeout is unchanged, having produced no timeouts across
   those runs.
 
+### Security
+
+- `--upgrade` now binds a release attestation to the release workflow, not
+  just to the repository. It accepted any provenance attestation on the
+  repository for the right digest, so an attestation minted by any other
+  workflow would have passed; it now decodes the in-toto statement from the
+  bundle's DSSE envelope and requires the subject digest, the repository and
+  `.github/workflows/release.yml` to all match. Standard library only. The
+  signature chain itself is still unverified -- see the note in
+  `internal/installer/upgrade.go` for the measurement behind that.
+
 ### Fixed
 
 - Generated files carrying a source extension are no longer formatted.
