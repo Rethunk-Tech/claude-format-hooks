@@ -29,7 +29,15 @@ jobs:
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
 
+      # The lint job on ubuntu gets the default go.mod-only cache key. Sharing
+      # it let whichever job finished first save the Linux build cache, and
+      # lint usually wins, so this leg restored a cache with no -race build
+      # in it. Hashing go.sum as well gives the test legs their own key.
       - uses: Rethunk-Tech/gh-actions/setup-go@5d07bd8adb2dda1caa11cacd886edf73e2e95afb # v1.10
+        with:
+          cache-dependency-path: |
+            go.mod
+            go.sum
 
       - name: Go module verify
         run: go mod download && go mod verify
@@ -43,7 +51,11 @@ jobs:
             exit 1
           fi
 
+      # No file carries an OS build constraint, so every leg type-checks the
+      # same source and the full analyzer set only needs one OS. go test
+      # still runs vet's high-confidence subset on all three.
       - name: go vet
+        if: runner.os == 'Linux'
         run: go vet ./...
 
       - name: Test
@@ -58,7 +70,9 @@ jobs:
           awk -v pct="$pct" 'BEGIN { if (pct + 0 < 75) { print "::error::coverage " pct "% is below the 75% floor"; exit 1 } }'
 
       - name: Build
-        run: go build -trimpath -o format-dispatch ./cmd/format-dispatch
+        # No -trimpath: this binary is only dogfooded, and default build
+        # flags let it reuse dependency compiles already in the build cache.
+        run: go build -o format-dispatch ./cmd/format-dispatch
 
       # Dogfood --check on this repo's own tree. Only the natively-formatted
       # types (.json, .sh, .go) are actually verified here: the runner has no
