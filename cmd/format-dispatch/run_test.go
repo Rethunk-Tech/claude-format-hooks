@@ -773,14 +773,13 @@ func TestRunLogsSkipReason(t *testing.T) {
 }
 
 func TestRunPrintsDiagnosticOnFormatterFailure(t *testing.T) {
-	if runtime.GOOS == "windows" {
-		t.Skip("fake shell-script tool is POSIX-shell only")
-	}
 	toolDir := t.TempDir()
-	script := filepath.Join(toolDir, "bunx")
-	body := "#!/bin/sh\ni=1\nwhile [ $i -le 20 ]; do echo \"line $i\"; i=$((i+1)); done\nexit 1\n"
-	qt.Assert(t, qt.IsNil(os.WriteFile(script, []byte(body), 0o755)))
+	fakeTool(t, toolDir, "bunx")
+	t.Setenv(fakeToolEnv, "fail")
 	t.Setenv("PATH", toolDir)
+	// An earlier test with no bunx on PATH leaves a cached miss that would
+	// skip the formatter before the stub is ever looked up.
+	t.Setenv("CLAUDE_FORMAT_HOOKS_CACHE", t.TempDir())
 
 	projectRoot := t.TempDir()
 	abs := filepath.Join(projectRoot, "f.md")

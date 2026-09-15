@@ -18,8 +18,7 @@ func fakePath(t *testing.T, names ...string) {
 	t.Helper()
 	dir := t.TempDir()
 	for _, name := range names {
-		script := filepath.Join(dir, name)
-		qt.Assert(t, qt.IsNil(os.WriteFile(script, []byte("#!/bin/sh\n"), 0o755)))
+		fakeTool(t, dir, name)
 	}
 	t.Setenv("PATH", dir)
 }
