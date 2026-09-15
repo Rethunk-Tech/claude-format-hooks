@@ -8,7 +8,7 @@ Operators: [HUMANS.md](HUMANS.md).
 
 Go 1.27+. CI ([`.github/workflows/ci.yml`](.github/workflows/ci.yml)): build,
 vet, gofmt, test (75% coverage floor), golangci-lint, govulncheck on
-`ubuntu-latest`/`macos-latest`/`windows-latest`. Tag `v*` triggers
+`ubuntu-latest`/`windows-latest`. Tag `v*` triggers
 [`.github/workflows/release.yml`](.github/workflows/release.yml) cross-compile
 release binaries.
 
