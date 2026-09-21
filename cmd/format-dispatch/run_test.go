@@ -465,6 +465,18 @@ func TestRunDispatchesExtensionlessShellShebang(t *testing.T) {
 	qt.Check(t, qt.IsFalse(got == src), qt.Commentf("shell shebang file should be formatted"))
 }
 
+func TestRunDispatchesEnvSplitStringShebang(t *testing.T) {
+	projectRoot := t.TempDir()
+	abs := filepath.Join(projectRoot, "script")
+	src := "#!/usr/bin/env -S bash -euo pipefail\necho    hello\n"
+	writeFile(t, abs, src)
+
+	t.Setenv("CLAUDE_PROJECT_DIR", projectRoot)
+	qt.Check(t, qt.Equals(run(strings.NewReader(payload(abs))), 0))
+	got := readFile(t, abs)
+	qt.Check(t, qt.IsFalse(got == src), qt.Commentf("env -S shebang should still format as shell"))
+}
+
 func TestRunExtensionlessNonShellFilesAreNoop(t *testing.T) {
 	cases := []struct {
 		name string
