@@ -12,7 +12,7 @@ import (
 )
 
 var supportedExtensions = []string{
-	".json", ".sh", ".bash", ".go",
+	".json", ".sh", ".bash", ".zsh", ".ksh", ".dash", ".go",
 	".ts", ".tsx", ".js", ".jsx", ".mjs", ".cjs", ".mts", ".cts", ".css", ".jsonc",
 	".md", ".mdx", ".markdown", ".toml", ".yaml", ".yml", ".html", ".scss", ".less",
 	".graphql", ".gql", ".sql", ".py", ".pyi", ".ipynb", ".rs", ".tf", ".tfvars",
@@ -105,6 +105,9 @@ func TestName(t *testing.T) {
 		".json":        "json",
 		".sh":          "shfmt",
 		".bash":        "shfmt",
+		".zsh":         "shfmt",
+		".ksh":         "shfmt",
+		".dash":        "shfmt",
 		".go":          "gofmt",
 		".ts":          "biome",
 		".tsx":         "biome",

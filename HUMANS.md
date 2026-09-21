@@ -88,8 +88,10 @@ SQL: `~/.sqlfluff` bootstrap on first `.sql` write.
 
 ## Supported extensions
 
-JSON/shell/Go native; TS/CSS/JSONC via biome; MD via markdownlint-cli2; TOML
-via taplo; YAML/HTML/etc via prettier; SQL via sqlfluff; Python via ruff/black;
+JSON/shell/Go native (`.sh`/`.bash`/`.zsh`/`.ksh`/`.dash`, plus extensionless
+or hidden rc files whose shebang names a supported interpreter, including
+`env -S`); TS/CSS/JSONC via biome; MD via markdownlint-cli2; TOML via taplo;
+YAML/HTML/etc via prettier; SQL via sqlfluff; Python via ruff/black;
 notebooks via ruff/black; Rust via rustfmt; Terraform via terraform/tofu; proto
 via buf. Non-native formatters need `bunx` or the tool on `PATH`.
 

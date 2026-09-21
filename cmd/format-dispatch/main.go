@@ -14,7 +14,8 @@
 //     call reports failure.
 //   - An unsupported extension is an instant no-op: one ResolveExtension
 //     call and one map lookup, nothing else — no stat, no exec.LookPath, no
-//     subprocess. Extensionless files get one bounded shebang peek.
+//     subprocess. Extensionless files, and hidden names like `.bashrc`,
+//     get one bounded shebang peek.
 package main
 
 import (
@@ -281,9 +282,9 @@ func run(stdin io.Reader) int {
 	}
 
 	// Instant no-op path for an extension no formatter ever handles:
-	// KnownExtension needs no Registry to answer, so nothing is read. An
-	// extensionless file is the one exception -- resolving it means peeking
-	// at its shebang, which opens the file.
+	// KnownExtension needs no Registry to answer, so nothing is read. The
+	// exceptions are names that look like scripts -- no extension, or a
+	// hidden basename like .bashrc -- which cost one bounded shebang peek.
 	ext := resolveDispatchExt(path)
 	if !dispatch.KnownExtension(ext) {
 		logOutcome = "skip: unsupported extension"
@@ -371,16 +372,32 @@ func buildRegistry(errOut io.Writer) (*dispatch.Registry, config.Config) {
 }
 
 // resolveDispatchExt returns the extension a path dispatches under, peeking
-// at a shebang only when the name carries no extension of its own. The hook
-// and --check must agree on this or they disagree about what a file is.
+// at a shebang when the name has no extension of its own, or when the
+// whole basename *is* the "extension" (`.bashrc`: filepath.Ext returns
+// `.bashrc`, which no formatter registers). The hook and --check must
+// agree on this or they disagree about what a file is.
 func resolveDispatchExt(path string) string {
 	ext := dispatch.ResolveExtension(path)
-	if ext == "" {
-		if shebangExt, ok := shebangExt(path); ok {
-			return shebangExt
+	if dispatch.KnownExtension(ext) {
+		return ext
+	}
+	if shouldPeekShebang(path, ext) {
+		if shebang, ok := shebangExt(path); ok {
+			return shebang
 		}
 	}
 	return ext
+}
+
+// shouldPeekShebang is the exception to "unsupported extension is an
+// instant no-op": a 256-byte open is only worth it when the name looks
+// like an extensionless script or a Unix rc/dotfile, not foo.xyz.
+func shouldPeekShebang(path, ext string) bool {
+	if ext == "" {
+		return true
+	}
+	base := filepath.Base(path)
+	return strings.HasPrefix(base, ".") && !strings.Contains(base[1:], ".")
 }
 
 // projectRootEnv returns $CLAUDE_PROJECT_DIR as an absolute path, or "" if

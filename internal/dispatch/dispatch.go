@@ -53,6 +53,10 @@ func NewRegistry(cfg config.Config) *Registry {
 
 		".sh":   shell,
 		".bash": shell,
+		// Named the way the shebang peek already maps those interpreters.
+		".zsh":  shell,
+		".ksh":  shell,
+		".dash": shell,
 
 		".go": golang,
 

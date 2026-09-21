@@ -477,6 +477,41 @@ func TestRunDispatchesEnvSplitStringShebang(t *testing.T) {
 	qt.Check(t, qt.IsFalse(got == src), qt.Commentf("env -S shebang should still format as shell"))
 }
 
+func TestRunDispatchesHiddenShellRc(t *testing.T) {
+	projectRoot := t.TempDir()
+	abs := filepath.Join(projectRoot, ".bashrc")
+	src := "#!/bin/bash\necho    hello\n"
+	writeFile(t, abs, src)
+
+	t.Setenv("CLAUDE_PROJECT_DIR", projectRoot)
+	qt.Check(t, qt.Equals(run(strings.NewReader(payload(abs))), 0))
+	got := readFile(t, abs)
+	qt.Check(t, qt.IsFalse(got == src), qt.Commentf(".bashrc should format via shebang peek"))
+}
+
+func TestRunZshExtensionDispatchesToShell(t *testing.T) {
+	projectRoot := t.TempDir()
+	abs := filepath.Join(projectRoot, "tool.zsh")
+	src := "#!/usr/bin/env zsh\necho    hello\n"
+	writeFile(t, abs, src)
+
+	t.Setenv("CLAUDE_PROJECT_DIR", projectRoot)
+	qt.Check(t, qt.Equals(run(strings.NewReader(payload(abs))), 0))
+	got := readFile(t, abs)
+	qt.Check(t, qt.IsFalse(got == src), qt.Commentf(".zsh should format as shell"))
+}
+
+func TestRunUnknownExtensionDotfileWithoutShebangIsNoop(t *testing.T) {
+	projectRoot := t.TempDir()
+	abs := filepath.Join(projectRoot, ".gitignore")
+	src := "*.o\n"
+	writeFile(t, abs, src)
+
+	t.Setenv("CLAUDE_PROJECT_DIR", projectRoot)
+	qt.Check(t, qt.Equals(run(strings.NewReader(payload(abs))), 0))
+	qt.Check(t, qt.Equals(readFile(t, abs), src))
+}
+
 func TestRunExtensionlessNonShellFilesAreNoop(t *testing.T) {
 	cases := []struct {
 		name string

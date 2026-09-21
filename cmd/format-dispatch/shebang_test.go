@@ -49,3 +49,18 @@ func TestShebangExt(t *testing.T) {
 		})
 	}
 }
+
+func TestResolveDispatchExt(t *testing.T) {
+	dir := t.TempDir()
+	bashrc := filepath.Join(dir, ".bashrc")
+	writeFile(t, bashrc, "#!/bin/bash\necho hi\n")
+	qt.Check(t, qt.Equals(resolveDispatchExt(bashrc), ".sh"))
+
+	unknown := filepath.Join(dir, "notes.xyz")
+	writeFile(t, unknown, "#!/bin/bash\necho hi\n")
+	qt.Check(t, qt.Equals(resolveDispatchExt(unknown), ".xyz"))
+
+	zsh := filepath.Join(dir, "tool.zsh")
+	writeFile(t, zsh, "echo hi\n")
+	qt.Check(t, qt.Equals(resolveDispatchExt(zsh), ".zsh"))
+}

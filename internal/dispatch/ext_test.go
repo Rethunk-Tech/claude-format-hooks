@@ -14,6 +14,7 @@ func TestResolveExtensionFallsBackToPathExtension(t *testing.T) {
 	}{
 		{"config.json", ".json"},
 		{"config.JSON", ".json"},
+		{"script.zsh", ".zsh"},
 		{"README", ""},
 		{"", ""},
 		{filepath.Join("nested.dir", "notes.UNKNOWN"), ".UNKNOWN"},

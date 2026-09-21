@@ -5,6 +5,22 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+### Added
+
+- `.zsh`, `.ksh`, and `.dash` route to the native shell formatter. Those
+  interpreters already formatted when the file had no extension and a
+  matching shebang; a `tool.zsh` write was a silent no-op.
+
+### Fixed
+
+- `#!/usr/bin/env -S python3 -u` (and other env flags: `-i`, `-u NAME`,
+  `NAME=VALUE`, `--split-string`) no longer treat env's own argument as
+  the interpreter. Those scripts were skipped even though the same file
+  with a plain `env python3` shebang formatted.
+- Hidden Unix rc files (`.bashrc`, `.zshrc`) are shebang-peeked. Go's
+  `filepath.Ext` returns the whole name, so they used to look like an
+  unsupported extension and skip without opening the file.
+
 ## [Unreleased]
 
 ## [0.5.0] - 2026-09-09
