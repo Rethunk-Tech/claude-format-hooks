@@ -1,6 +1,10 @@
 package formatters
 
 import (
+	"os"
+	"os/exec"
+	"path/filepath"
+	"strings"
 	"testing"
 
 	"github.com/go-quicktest/qt"
@@ -54,4 +58,67 @@ func TestSQLFluffParseFailureMatchesEitherMarkerAlone(t *testing.T) {
 func TestSQLFluffCleanOutputIsNotAParseFailure(t *testing.T) {
 	qt.Check(t, qt.IsFalse(sqlfluffFailedToParse("All Finished!")))
 	qt.Check(t, qt.IsFalse(sqlfluffFailedToParse("")))
+}
+
+// The unqualified credential_id belongs to the policy's table, not to the
+// subquery's. RF03 sees one table in the subquery and qualifies it as
+// c.credential_id, which silently changes the policy's meaning.
+const sqlfluffCorrelatedPolicy = `create policy credential_access on credential_grant
+for select
+using (
+    exists (
+        select 1
+        from credential as c
+        where c.owner_id = auth.uid()
+          and credential_id = credential_grant.credential_id
+    )
+);
+`
+
+func TestSQLFluffFixKeepsCorrelatedReferencesUnqualified(t *testing.T) {
+	if testing.Short() {
+		t.Skip("runs the real sqlfluff")
+	}
+	if _, err := exec.LookPath("sqlfluff"); err != nil {
+		t.Skip("sqlfluff not installed")
+	}
+	isolateDiskCache(t)
+	t.Setenv("HOME", t.TempDir())
+	dir := t.TempDir()
+	qt.Assert(t, qt.IsNil(os.WriteFile(filepath.Join(dir, ".sqlfluff"), []byte("[sqlfluff]\ndialect = postgres\n"), 0o644)))
+	abs := filepath.Join(dir, "policy.sql")
+	qt.Assert(t, qt.IsNil(os.WriteFile(abs, []byte(sqlfluffCorrelatedPolicy), 0o644)))
+
+	res := NewSQLFluff().Format(t.Context(), dir, abs)
+	qt.Assert(t, qt.Equals(res.Diagnostic, ""))
+
+	got, err := os.ReadFile(abs)
+	qt.Assert(t, qt.IsNil(err))
+	qt.Check(t, qt.StringContains(string(got), "and credential_id = credential_grant.credential_id"))
+	qt.Check(t, qt.IsFalse(strings.Contains(string(got), "c.credential_id")))
+}
+
+func TestSQLFluffFixKeepsConfiguredExclusions(t *testing.T) {
+	// --exclude-rules replaces the configured list rather than adding to
+	// it, so the configured rules must be carried into the fix call.
+	isolateDiskCache(t)
+	t.Setenv("HOME", t.TempDir())
+	dir := t.TempDir()
+	argsLog := filepath.Join(dir, "args")
+	writeFakeTool(t, "sqlfluff", `if [ "$1" = render ]; then
+printf '    encoding:           autodetect          \n    exclude_rules:      PG01,\nLT05          \n    fix_even_unparsable:False\n    exclude_rules:      from the rendered file\n'
+exit 0
+fi
+echo "$@" > `+argsLog)
+
+	res := NewSQLFluff().Format(t.Context(), dir, filepath.Join(dir, "f.sql"))
+	qt.Assert(t, qt.Equals(res.Diagnostic, ""))
+	got, err := os.ReadFile(argsLog)
+	qt.Assert(t, qt.IsNil(err))
+	qt.Check(t, qt.StringContains(string(got), "fix --exclude-rules PG01,LT05,RF03 --"))
+}
+
+func TestSQLFluffExcludeRulesWithoutConfiguredList(t *testing.T) {
+	qt.Check(t, qt.Equals(sqlfluffExcludeRules(""), "RF03"))
+	qt.Check(t, qt.Equals(sqlfluffExcludeRules("    exclude_rules:                          \n"), "RF03"))
 }

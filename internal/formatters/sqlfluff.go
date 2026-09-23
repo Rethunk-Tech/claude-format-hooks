@@ -3,6 +3,7 @@ package formatters
 import (
 	"context"
 	"fmt"
+	"os/exec"
 	"path/filepath"
 	"strings"
 )
@@ -48,9 +49,19 @@ func (sqlfluffFormatter) Format(ctx context.Context, projectRoot, abs string) Re
 	}
 	userSQLFluffConfig()
 
+	// --exclude-rules replaces the configured exclude_rules instead of
+	// extending it, so the effective list is read back from sqlfluff's own
+	// merged config (render is the cheapest command that prints it) and
+	// carried forward alongside the unsafe fixers.
+	render := exec.CommandContext(ctx, "sqlfluff", "render", "-vv", "--", abs) //nolint:gosec // external formatter by design; args are our own construction, never a shell
+	render.Dir = projectRoot
+	// A failed render (no dialect, bad config) still yields RF03 below, and
+	// the fix call then reports the real error.
+	rendered, _ := render.CombinedOutput()
 	// No --force: it is the default as of sqlfluff 4, and passing it prints
 	// a deprecation warning that would itself become diagnostic noise.
-	ok, diag, raw := runExternalOutput(ctx, projectRoot, "sqlfluff", []string{"fix", "--", abs})
+	ok, diag, raw := runExternalOutput(ctx, projectRoot, "sqlfluff",
+		[]string{"fix", "--exclude-rules", sqlfluffExcludeRules(string(rendered)), "--", abs})
 	if ok {
 		return Result{}
 	}
@@ -68,6 +79,41 @@ func (sqlfluffFormatter) Format(ctx context.Context, projectRoot, abs string) Re
 	}
 	// Ran, rewrote what it could, left some violations behind: success.
 	return Result{}
+}
+
+// sqlfluffUnsafeFixRules are never applied by fix because their rewrites can
+// change what a query means. RF03 qualifies an unqualified column with the
+// only table it sees in a subquery, but in a correlated subquery whose outer
+// table sqlfluff does not count (a CREATE POLICY ... USING (EXISTS ...)) that
+// column belongs to the outer table, so the rewrite retargets it.
+const sqlfluffUnsafeFixRules = "RF03"
+
+// sqlfluffExcludeRules returns the configured exclude_rules from `sqlfluff
+// render -vv` output plus sqlfluffUnsafeFixRules. The config dump precedes
+// the rendered SQL, so only the first exclude_rules key is read; a
+// multi-line value prints its continuation lines unindented.
+func sqlfluffExcludeRules(renderOutput string) string {
+	var parts []string
+	inValue := false
+	for line := range strings.Lines(renderOutput) {
+		line = strings.TrimRight(line, " \r\n")
+		if inValue {
+			if line == "" || strings.HasPrefix(line, " ") {
+				break
+			}
+			parts = append(parts, strings.TrimSpace(line))
+			continue
+		}
+		if value, found := strings.CutPrefix(strings.TrimSpace(line), "exclude_rules:"); found && strings.HasPrefix(line, " ") {
+			parts = append(parts, strings.TrimSpace(value))
+			inValue = true
+		}
+	}
+	configured := strings.Trim(strings.Join(parts, ""), ", ")
+	if configured == "" {
+		return sqlfluffUnsafeFixRules
+	}
+	return configured + "," + sqlfluffUnsafeFixRules
 }
 
 func sqlfluffNoDialect(output string) bool {

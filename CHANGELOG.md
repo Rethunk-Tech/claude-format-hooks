@@ -15,6 +15,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- `sqlfluff fix` no longer applies RF03 (`references.consistent`), whose
+  qualification fix could retarget an outer-table column in a correlated
+  subquery (e.g. a `CREATE POLICY ... USING (EXISTS ...)`) to the inner
+  table. The configured `exclude_rules` are read back and kept.
 - `#!/usr/bin/env -S python3 -u` (and other env flags: `-i`, `-u NAME`,
   `NAME=VALUE`, `--split-string`) no longer treat env's own argument as
   the interpreter. Those scripts were skipped even though the same file
