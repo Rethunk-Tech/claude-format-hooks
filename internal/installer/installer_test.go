@@ -463,7 +463,7 @@ func TestWriteAtomicCreateTempFailure(t *testing.T) {
 func TestWriteAtomicRenameFailure(t *testing.T) {
 	dir := t.TempDir()
 	path := filepath.Join(dir, "f.json")
-	qt.Assert(t, qt.IsNil(os.Mkdir(path, 0o755)))
+	qt.Assert(t, qt.IsNil(os.Mkdir(path, 0o750)))
 
 	err := writeAtomic(path, []byte(`{"a":1}`), 0o600)
 	qt.Check(t, qt.IsNotNil(err))
@@ -498,7 +498,7 @@ func TestApplyChangeReportsBackupWriteFailure(t *testing.T) {
 	settingsPath := filepath.Join(dir, "settings.json")
 	backupPath := settingsPath + ".bak"
 	qt.Assert(t, qt.IsNil(os.WriteFile(settingsPath, []byte(`{"before":true}`), 0o600)))
-	qt.Assert(t, qt.IsNil(os.Mkdir(backupPath, 0o755)))
+	qt.Assert(t, qt.IsNil(os.Mkdir(backupPath, 0o750)))
 
 	var out strings.Builder
 	err := applyFixedChange(settingsPath, &out)
@@ -508,7 +508,7 @@ func TestApplyChangeReportsBackupWriteFailure(t *testing.T) {
 
 func TestApplyChangeReportsSettingsReadFailure(t *testing.T) {
 	settingsPath := filepath.Join(t.TempDir(), "settings.json")
-	qt.Assert(t, qt.IsNil(os.Mkdir(settingsPath, 0o755)))
+	qt.Assert(t, qt.IsNil(os.Mkdir(settingsPath, 0o750)))
 
 	var out strings.Builder
 	err := applyFixedChange(settingsPath, &out)
@@ -522,7 +522,7 @@ func TestApplyChangeReportsMkdirFailure(t *testing.T) {
 
 	dir := t.TempDir()
 	blocked := filepath.Join(dir, "blocked")
-	qt.Assert(t, qt.IsNil(os.Mkdir(blocked, 0o755)))
+	qt.Assert(t, qt.IsNil(os.Mkdir(blocked, 0o750)))
 	qt.Assert(t, qt.IsNil(os.Chmod(blocked, 0o555)))
 	t.Cleanup(func() {
 		_ = os.Chmod(blocked, 0o700)

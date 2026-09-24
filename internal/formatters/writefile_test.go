@@ -44,7 +44,7 @@ func TestWriteFormattedFollowsSymlinkToTarget(t *testing.T) {
 	dir := t.TempDir()
 	target := filepath.Join(dir, "target")
 	link := filepath.Join(dir, "link")
-	qt.Assert(t, qt.IsNil(os.WriteFile(target, []byte("old"), 0o644)))
+	qt.Assert(t, qt.IsNil(os.WriteFile(target, []byte("old"), 0o600)))
 	qt.Assert(t, qt.IsNil(os.Symlink(target, link)))
 
 	qt.Assert(t, qt.IsNil(writeFormatted(link, []byte("old"), []byte("new"), 0o644)))
@@ -78,7 +78,7 @@ func TestWriteFormattedDanglingSymlinkNoOp(t *testing.T) {
 
 func TestWriteFormattedSkipsStaleSource(t *testing.T) {
 	path := filepath.Join(t.TempDir(), "f")
-	qt.Assert(t, qt.IsNil(os.WriteFile(path, []byte("newer"), 0o644)))
+	qt.Assert(t, qt.IsNil(os.WriteFile(path, []byte("newer"), 0o600)))
 
 	qt.Assert(t, qt.IsNil(writeFormatted(path, []byte("old"), []byte("formatted"), 0o644)))
 
@@ -93,7 +93,7 @@ func TestWriteFormattedReturnsEvalSymlinksError(t *testing.T) {
 	}
 	dir := t.TempDir()
 	blocker := filepath.Join(dir, "blocker")
-	qt.Assert(t, qt.IsNil(os.WriteFile(blocker, []byte("not a directory"), 0o644)))
+	qt.Assert(t, qt.IsNil(os.WriteFile(blocker, []byte("not a directory"), 0o600)))
 
 	err := writeFormatted(filepath.Join(blocker, "target"), []byte("old"), []byte("new"), 0o644)
 
@@ -106,7 +106,7 @@ func TestWriteFormattedReturnsCreateTempError(t *testing.T) {
 	}
 	dir := t.TempDir()
 	path := filepath.Join(dir, "f")
-	qt.Assert(t, qt.IsNil(os.WriteFile(path, []byte("old"), 0o644)))
+	qt.Assert(t, qt.IsNil(os.WriteFile(path, []byte("old"), 0o600)))
 	qt.Assert(t, qt.IsNil(os.Chmod(dir, 0o555)))
 	t.Cleanup(func() {
 		_ = os.Chmod(dir, 0o700)
@@ -126,7 +126,7 @@ func TestWriteFormattedReturnsCreateTempError(t *testing.T) {
 func TestWriteFormattedReturnsReadFileErrorForDirectoryTarget(t *testing.T) {
 	dir := t.TempDir()
 	target := filepath.Join(dir, "target")
-	qt.Assert(t, qt.IsNil(os.Mkdir(target, 0o755)))
+	qt.Assert(t, qt.IsNil(os.Mkdir(target, 0o750)))
 
 	err := writeFormatted(target, []byte("old"), []byte("new"), 0o644)
 
@@ -146,7 +146,7 @@ func TestWriteFormattedIgnoresMissingTargetAfterFormatting(t *testing.T) {
 func TestWriteFormattedReturnsRenameErrorForDirectoryTarget(t *testing.T) {
 	dir := t.TempDir()
 	target := filepath.Join(dir, "target")
-	qt.Assert(t, qt.IsNil(os.Mkdir(target, 0o755)))
+	qt.Assert(t, qt.IsNil(os.Mkdir(target, 0o750)))
 
 	err := writeFormatted(target, nil, []byte("new"), 0o644)
 

@@ -27,9 +27,9 @@ func TestResolveMarkdownlintConfigNeverOverwritesAnEditedFile(t *testing.T) {
 	// defaults on the next .md write would make that pointless.
 	home := t.TempDir()
 	path := filepath.Join(home, ".claude", userMarkdownlintConfigFile)
-	qt.Assert(t, qt.IsNil(os.MkdirAll(filepath.Dir(path), 0o755)))
+	qt.Assert(t, qt.IsNil(os.MkdirAll(filepath.Dir(path), 0o750)))
 	edited := []byte(`{ "config": { "MD013": true } }`)
-	qt.Assert(t, qt.IsNil(os.WriteFile(path, edited, 0o644)))
+	qt.Assert(t, qt.IsNil(os.WriteFile(path, edited, 0o600)))
 
 	got := resolveMarkdownlintConfig(home)
 
@@ -53,7 +53,7 @@ func TestResolveMarkdownlintConfigReturnsEmptyWhenUnwritable(t *testing.T) {
 	// "no --config" rather than failing the write that triggered the hook.
 	home := t.TempDir()
 	blocker := filepath.Join(home, ".claude")
-	qt.Assert(t, qt.IsNil(os.WriteFile(blocker, []byte("not a directory"), 0o644)))
+	qt.Assert(t, qt.IsNil(os.WriteFile(blocker, []byte("not a directory"), 0o600)))
 
 	qt.Check(t, qt.Equals(resolveMarkdownlintConfig(home), ""))
 }

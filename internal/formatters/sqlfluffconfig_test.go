@@ -62,7 +62,7 @@ func TestSQLFluffFormatMaterializesUserConfig(t *testing.T) {
 	writeFakeTool(t, "sqlfluff", "exit 0")
 	dir := t.TempDir()
 	abs := filepath.Join(dir, "f.sql")
-	qt.Assert(t, qt.IsNil(os.WriteFile(abs, []byte("select 1;\n"), 0o644)))
+	qt.Assert(t, qt.IsNil(os.WriteFile(abs, []byte("select 1;\n"), 0o600)))
 
 	res := NewSQLFluff().Format(t.Context(), dir, abs)
 
@@ -86,7 +86,7 @@ func TestSQLFluffFormatPreservesExistingUserConfig(t *testing.T) {
 	writeFakeTool(t, "sqlfluff", "exit 0")
 	dir := t.TempDir()
 	abs := filepath.Join(dir, "f.sql")
-	qt.Assert(t, qt.IsNil(os.WriteFile(abs, []byte("select 1;\n"), 0o644)))
+	qt.Assert(t, qt.IsNil(os.WriteFile(abs, []byte("select 1;\n"), 0o600)))
 
 	res := NewSQLFluff().Format(t.Context(), dir, abs)
 

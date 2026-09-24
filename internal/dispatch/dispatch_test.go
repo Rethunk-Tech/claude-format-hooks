@@ -160,7 +160,7 @@ func TestName(t *testing.T) {
 func TestDispatchRoutesToFormatter(t *testing.T) {
 	dir := t.TempDir()
 	path := filepath.Join(dir, "t.json")
-	qt.Assert(t, qt.IsNil(os.WriteFile(path, []byte(`{"b":1,"a":2}`), 0o644)))
+	qt.Assert(t, qt.IsNil(os.WriteFile(path, []byte(`{"b":1,"a":2}`), 0o600)))
 
 	r := NewRegistry(config.Default())
 	result := r.Dispatch(t.Context(), dir, path, ".json")

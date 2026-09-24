@@ -85,9 +85,9 @@ func TestSQLFluffFixKeepsCorrelatedReferencesUnqualified(t *testing.T) {
 	isolateDiskCache(t)
 	t.Setenv("HOME", t.TempDir())
 	dir := t.TempDir()
-	qt.Assert(t, qt.IsNil(os.WriteFile(filepath.Join(dir, ".sqlfluff"), []byte("[sqlfluff]\ndialect = postgres\n"), 0o644)))
+	qt.Assert(t, qt.IsNil(os.WriteFile(filepath.Join(dir, ".sqlfluff"), []byte("[sqlfluff]\ndialect = postgres\n"), 0o600)))
 	abs := filepath.Join(dir, "policy.sql")
-	qt.Assert(t, qt.IsNil(os.WriteFile(abs, []byte(sqlfluffCorrelatedPolicy), 0o644)))
+	qt.Assert(t, qt.IsNil(os.WriteFile(abs, []byte(sqlfluffCorrelatedPolicy), 0o600)))
 
 	res := NewSQLFluff().Format(t.Context(), dir, abs)
 	qt.Assert(t, qt.Equals(res.Diagnostic, ""))
