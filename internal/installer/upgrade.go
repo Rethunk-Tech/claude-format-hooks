@@ -2,6 +2,7 @@ package installer
 
 import (
 	"bytes"
+	"context"
 	"crypto/sha256"
 	"encoding/base64"
 	"encoding/hex"
@@ -323,7 +324,8 @@ func (s provenanceStatement) attests(wantDigest string) bool {
 	}
 	return slices.ContainsFunc(s.Subject, func(sub struct {
 		Digest map[string]string `json:"digest"`
-	}) bool {
+	},
+	) bool {
 		return strings.EqualFold(sub.Digest["sha256"], wantDigest)
 	})
 }
@@ -342,7 +344,7 @@ func fetchLatestRelease(client *http.Client, baseURL string) (githubRelease, err
 }
 
 func fetchHTTP(client *http.Client, url string) ([]byte, error) {
-	req, err := http.NewRequest(http.MethodGet, url, nil)
+	req, err := http.NewRequestWithContext(context.Background(), http.MethodGet, url, nil)
 	if err != nil {
 		return nil, err
 	}

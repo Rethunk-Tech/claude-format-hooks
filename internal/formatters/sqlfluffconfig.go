@@ -13,8 +13,10 @@ var sqlfluffDefaults = []byte(`[sqlfluff]
 dialect = ansi
 `)
 
-var sqlfluffConfigOnce sync.Once
-var sqlfluffConfigPath string
+var (
+	sqlfluffConfigOnce sync.Once
+	sqlfluffConfigPath string
+)
 
 // userSQLFluffConfig materializes a user-level default once per process.
 // SQLFluff loads ~/.sqlfluff before project config, so project settings still
