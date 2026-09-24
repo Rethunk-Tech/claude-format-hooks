@@ -17,7 +17,7 @@ func TestResolveSQLFluffConfigMaterializesANSIDefault(t *testing.T) {
 	path := resolveSQLFluffConfig(home)
 
 	qt.Assert(t, qt.Equals(path, filepath.Join(home, userSQLFluffConfigFile)))
-	written, err := os.ReadFile(path)
+	written, err := os.ReadFile(path) //nolint:gosec // test path is created under t.TempDir
 	qt.Assert(t, qt.IsNil(err))
 	qt.Check(t, qt.DeepEquals(written, sqlfluffDefaults))
 	qt.Check(t, qt.IsTrue(strings.Contains(string(written), "dialect = ansi")))
@@ -32,7 +32,7 @@ func TestResolveSQLFluffConfigNeverOverwritesAnExistingFile(t *testing.T) {
 	got := resolveSQLFluffConfig(home)
 
 	qt.Assert(t, qt.Equals(got, path))
-	after, err := os.ReadFile(path)
+	after, err := os.ReadFile(path) //nolint:gosec // test path is created under t.TempDir
 	qt.Assert(t, qt.IsNil(err))
 	qt.Check(t, qt.DeepEquals(after, edited), qt.Commentf("an existing user config must survive"))
 }
@@ -67,7 +67,7 @@ func TestSQLFluffFormatMaterializesUserConfig(t *testing.T) {
 	res := NewSQLFluff().Format(t.Context(), dir, abs)
 
 	assertFormatted(t, res)
-	written, err := os.ReadFile(filepath.Join(home, userSQLFluffConfigFile))
+	written, err := os.ReadFile(filepath.Join(home, userSQLFluffConfigFile)) //nolint:gosec // test path is created under t.TempDir
 	qt.Assert(t, qt.IsNil(err))
 	qt.Check(t, qt.DeepEquals(written, sqlfluffDefaults))
 }
@@ -91,7 +91,7 @@ func TestSQLFluffFormatPreservesExistingUserConfig(t *testing.T) {
 	res := NewSQLFluff().Format(t.Context(), dir, abs)
 
 	assertFormatted(t, res)
-	written, err := os.ReadFile(configPath)
+	written, err := os.ReadFile(configPath) //nolint:gosec // test path is created under t.TempDir
 	qt.Assert(t, qt.IsNil(err))
 	qt.Check(t, qt.DeepEquals(written, existing))
 }

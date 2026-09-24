@@ -196,7 +196,7 @@ func writeFile(t *testing.T, path, content string) {
 
 func readFile(t *testing.T, path string) string {
 	t.Helper()
-	b, err := os.ReadFile(path)
+	b, err := os.ReadFile(path) //nolint:gosec // test path is created under t.TempDir
 	qt.Assert(t, qt.IsNil(err))
 	return string(b)
 }

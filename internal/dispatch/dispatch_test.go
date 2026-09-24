@@ -166,7 +166,7 @@ func TestDispatchRoutesToFormatter(t *testing.T) {
 	result := r.Dispatch(t.Context(), dir, path, ".json")
 	qt.Assert(t, qt.IsNil(result.Err))
 
-	out, err := os.ReadFile(path)
+	out, err := os.ReadFile(path) //nolint:gosec // test path is created under t.TempDir
 	qt.Assert(t, qt.IsNil(err))
 	qt.Assert(t, qt.Equals(string(out), "{\n  \"b\": 1,\n  \"a\": 2\n}\n"))
 }

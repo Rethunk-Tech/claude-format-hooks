@@ -49,7 +49,7 @@ func TestWriteFormattedFollowsSymlinkToTarget(t *testing.T) {
 
 	qt.Assert(t, qt.IsNil(writeFormatted(link, []byte("old"), []byte("new"), 0o644)))
 
-	got, err := os.ReadFile(target)
+	got, err := os.ReadFile(target) //nolint:gosec // test path is created under t.TempDir
 	qt.Assert(t, qt.IsNil(err))
 	qt.Check(t, qt.Equals(string(got), "new"))
 	assertStillSymlink(t, link)
@@ -66,7 +66,7 @@ func TestWriteFormattedDanglingSymlinkNoOp(t *testing.T) {
 
 	qt.Assert(t, qt.IsNil(writeFormatted(link, []byte("old"), []byte("new"), 0o644)))
 
-	_, readErr := os.ReadFile(link)
+	_, readErr := os.ReadFile(link) //nolint:gosec // test path is created under t.TempDir
 	qt.Check(t, qt.IsTrue(os.IsNotExist(readErr)), qt.Commentf("reading through a dangling symlink must fail"))
 	gotTarget, err := os.Readlink(link)
 	qt.Assert(t, qt.IsNil(err))
@@ -82,7 +82,7 @@ func TestWriteFormattedSkipsStaleSource(t *testing.T) {
 
 	qt.Assert(t, qt.IsNil(writeFormatted(path, []byte("old"), []byte("formatted"), 0o644)))
 
-	got, err := os.ReadFile(path)
+	got, err := os.ReadFile(path) //nolint:gosec // test path is created under t.TempDir
 	qt.Assert(t, qt.IsNil(err))
 	qt.Check(t, qt.Equals(string(got), "newer"), qt.Commentf("a newer on-disk source must not be overwritten"))
 }

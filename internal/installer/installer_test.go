@@ -348,7 +348,7 @@ func TestInstallBacksUpExistingSettings(t *testing.T) {
 	var out strings.Builder
 	qt.Assert(t, qt.IsNil(Install(Options{BinPath: binPath, SettingsPath: settingsPath}, false, &out)))
 
-	backup, err := os.ReadFile(settingsPath + ".bak")
+	backup, err := os.ReadFile(settingsPath + ".bak") //nolint:gosec // test path is created under t.TempDir
 	qt.Assert(t, qt.IsNil(err))
 	qt.Check(t, qt.DeepEquals(backup, original))
 	qt.Check(t, qt.StringContains(out.String(), ".bak"))
@@ -373,7 +373,7 @@ func TestInstallSecondRunOverwritesRollingBackup(t *testing.T) {
 
 	qt.Assert(t, qt.IsNil(Uninstall(Options{BinPath: binPath, SettingsPath: settingsPath}, false, &out)))
 
-	backup, err := os.ReadFile(settingsPath + ".bak")
+	backup, err := os.ReadFile(settingsPath + ".bak") //nolint:gosec // test path is created under t.TempDir
 	qt.Assert(t, qt.IsNil(err))
 	qt.Check(t, qt.DeepEquals(backup, afterFirstInstall), qt.Commentf("the rolling backup should hold the state just before the most recent write, not the very first one"))
 }

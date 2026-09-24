@@ -60,7 +60,7 @@ func TestCheckNeverModifiesTheFilesItInspects(t *testing.T) {
 	var out, errOut bytes.Buffer
 	qt.Assert(t, qt.Equals(runCheck([]string{dir}, &out, &errOut), 1))
 
-	after, err := os.ReadFile(path)
+	after, err := os.ReadFile(path) //nolint:gosec // test path is created under t.TempDir
 	qt.Assert(t, qt.IsNil(err))
 	qt.Check(t, qt.Equals(string(after), unformattedJSON))
 }

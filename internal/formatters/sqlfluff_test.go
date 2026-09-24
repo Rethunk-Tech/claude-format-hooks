@@ -92,7 +92,7 @@ func TestSQLFluffFixKeepsCorrelatedReferencesUnqualified(t *testing.T) {
 	res := NewSQLFluff().Format(t.Context(), dir, abs)
 	qt.Assert(t, qt.Equals(res.Diagnostic, ""))
 
-	got, err := os.ReadFile(abs)
+	got, err := os.ReadFile(abs) //nolint:gosec // test path is created under t.TempDir
 	qt.Assert(t, qt.IsNil(err))
 	qt.Check(t, qt.StringContains(string(got), "and credential_id = credential_grant.credential_id"))
 	qt.Check(t, qt.IsFalse(strings.Contains(string(got), "c.credential_id")))
@@ -113,7 +113,7 @@ echo "$@" > `+argsLog)
 
 	res := NewSQLFluff().Format(t.Context(), dir, filepath.Join(dir, "f.sql"))
 	qt.Assert(t, qt.Equals(res.Diagnostic, ""))
-	got, err := os.ReadFile(argsLog)
+	got, err := os.ReadFile(argsLog) //nolint:gosec // test path is created under t.TempDir
 	qt.Assert(t, qt.IsNil(err))
 	qt.Check(t, qt.StringContains(string(got), "fix --exclude-rules PG01,LT05,RF03 --"))
 }

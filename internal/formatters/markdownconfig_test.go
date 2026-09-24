@@ -16,7 +16,7 @@ func TestResolveMarkdownlintConfigMaterializesDefaults(t *testing.T) {
 	path := resolveMarkdownlintConfig(home)
 
 	qt.Assert(t, qt.Equals(path, filepath.Join(home, ".claude", userMarkdownlintConfigFile)))
-	written, err := os.ReadFile(path)
+	written, err := os.ReadFile(path) //nolint:gosec // test path is created under t.TempDir
 	qt.Assert(t, qt.IsNil(err))
 	qt.Check(t, qt.DeepEquals(written, markdownlintDefaults), qt.Commentf("materialized file must be the embedded defaults verbatim"))
 }
@@ -34,7 +34,7 @@ func TestResolveMarkdownlintConfigNeverOverwritesAnEditedFile(t *testing.T) {
 	got := resolveMarkdownlintConfig(home)
 
 	qt.Assert(t, qt.Equals(got, path))
-	after, err := os.ReadFile(path)
+	after, err := os.ReadFile(path) //nolint:gosec // test path is created under t.TempDir
 	qt.Assert(t, qt.IsNil(err))
 	qt.Check(t, qt.DeepEquals(after, edited), qt.Commentf("an existing config is the user's and must survive"))
 }
@@ -64,7 +64,7 @@ func TestWriteIfMissingKeepsTheExistingFile(t *testing.T) {
 
 	qt.Assert(t, qt.IsNil(writeIfMissing(path, []byte("second"))))
 
-	got, err := os.ReadFile(path)
+	got, err := os.ReadFile(path) //nolint:gosec // test path is created under t.TempDir
 	qt.Assert(t, qt.IsNil(err))
 	qt.Check(t, qt.Equals(string(got), "first"), qt.Commentf("writeIfMissing must not clobber"))
 }
