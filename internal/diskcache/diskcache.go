@@ -179,7 +179,7 @@ func Set(dir, key, value string) {
 		return
 	}
 	tmpName := tmp.Name()
-	if _, err := tmp.Write([]byte(data)); err != nil {
+	if _, err := tmp.WriteString(data); err != nil {
 		_ = tmp.Close()
 		_ = os.Remove(tmpName)
 		return
