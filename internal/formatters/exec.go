@@ -24,7 +24,7 @@ func runExternal(ctx context.Context, dir, name string, args []string) (ok bool,
 // raw is empty when ok is true or when the process produced no output at
 // all; diagnostic (returned as the second value when ok is false) is
 // already truncated, raw is not.
-func runExternalOutput(ctx context.Context, dir, name string, args []string) (ok bool, diagnostic string, raw string) {
+func runExternalOutput(ctx context.Context, dir, name string, args []string) (ok bool, diagnostic, raw string) {
 	cmd := exec.CommandContext(ctx, name, args...) //nolint:gosec // running an external formatter by design; args are our own construction, never a shell
 	cmd.Dir = dir
 	out, err := cmd.CombinedOutput()
