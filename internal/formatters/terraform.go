@@ -12,7 +12,7 @@ type terraformFormatter struct{}
 
 // NewTerraform returns the terraformFormatter for Terraform configuration,
 // variable, test, mock, and query files.
-func NewTerraform() Formatter { return terraformFormatter{} }
+func NewTerraform() terraformFormatter { return terraformFormatter{} }
 
 func (terraformFormatter) Name() string { return "terraform" }
 

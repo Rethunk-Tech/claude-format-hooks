@@ -17,7 +17,7 @@ import (
 type shellFormatter struct{ cfg config.Config }
 
 // NewShell returns the native shellFormatter for .sh/.bash/.zsh/.ksh/.dash.
-func NewShell(cfg config.Config) Formatter { return shellFormatter{cfg: cfg} }
+func NewShell(cfg config.Config) shellFormatter { return shellFormatter{cfg: cfg} }
 
 func (shellFormatter) Name() string { return "shfmt" }
 

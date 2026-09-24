@@ -21,7 +21,7 @@ type graphqlRouter struct {
 // biome config and biome is enabled, prettier otherwise. Its Name remains
 // "prettier" so disabledFormatters: ["prettier"] removes GraphQL from the
 // registry while disabledFormatters: ["biome"] leaves the prettier fallback.
-func NewGraphQLRouter(cfg config.Config) Formatter {
+func NewGraphQLRouter(cfg config.Config) graphqlRouter {
 	return graphqlRouter{
 		biome:         NewBiome(),
 		prettier:      NewPrettier(),

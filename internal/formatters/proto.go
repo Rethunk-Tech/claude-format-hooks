@@ -12,7 +12,7 @@ import "context"
 type protoFormatter struct{}
 
 // NewProto returns the protoFormatter for .proto.
-func NewProto() Formatter { return protoFormatter{} }
+func NewProto() protoFormatter { return protoFormatter{} }
 
 func (protoFormatter) Name() string { return "buf" }
 

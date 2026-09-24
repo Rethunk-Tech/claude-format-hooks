@@ -28,7 +28,7 @@ import (
 type sqlfluffFormatter struct{}
 
 // NewSQLFluff returns the sqlfluffFormatter for .sql.
-func NewSQLFluff() Formatter { return sqlfluffFormatter{} }
+func NewSQLFluff() sqlfluffFormatter { return sqlfluffFormatter{} }
 
 func (sqlfluffFormatter) Name() string { return "sqlfluff" }
 

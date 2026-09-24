@@ -16,7 +16,7 @@ import (
 type goFormatter struct{}
 
 // NewGo returns the native goFormatter for .go.
-func NewGo() Formatter { return goFormatter{} }
+func NewGo() goFormatter { return goFormatter{} }
 
 func (goFormatter) Name() string { return "gofmt" }
 

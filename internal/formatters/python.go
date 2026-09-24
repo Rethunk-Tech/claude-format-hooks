@@ -11,7 +11,7 @@ import "context"
 type pythonFormatter struct{}
 
 // NewPython returns the pythonFormatter for .py and .pyi.
-func NewPython() Formatter { return pythonFormatter{} }
+func NewPython() pythonFormatter { return pythonFormatter{} }
 
 func (pythonFormatter) Name() string { return "ruff/black" }
 

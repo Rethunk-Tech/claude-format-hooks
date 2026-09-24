@@ -26,7 +26,7 @@ type biomeFormatter struct{}
 
 // NewBiome returns the biomeFormatter for JS/TS/JSX/TSX/CSS/JSONC, GraphQL,
 // and JSON when selected by their project-aware routers.
-func NewBiome() Formatter { return biomeFormatter{} }
+func NewBiome() biomeFormatter { return biomeFormatter{} }
 
 // biomeConfigNames are the config filenames that mark a directory as the
 // root of a Biome project.

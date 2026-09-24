@@ -11,7 +11,7 @@ import (
 type notebookFormatter struct{}
 
 // NewNotebook returns the notebookFormatter for .ipynb.
-func NewNotebook() Formatter { return notebookFormatter{} }
+func NewNotebook() notebookFormatter { return notebookFormatter{} }
 
 func (notebookFormatter) Name() string { return "ruff/black-notebook" }
 

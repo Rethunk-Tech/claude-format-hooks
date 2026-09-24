@@ -39,7 +39,7 @@ func inPlace(flags ...string) func(bin, abs string) []string {
 // NewClangFormat returns the C/C++/Objective-C formatter. clang-format is
 // the only formatter in wide use for these languages and handles all of
 // them from one binary, so there is no alternative to weigh.
-func NewClangFormat() Formatter {
+func NewClangFormat() systemFormatter {
 	return systemFormatter{name: "clang-format", bins: []string{"clang-format"}, args: inPlace("-i")}
 }
 
@@ -47,7 +47,7 @@ func NewClangFormat() Formatter {
 // thing Java has to a canonical tool; clang-format also parses Java and is
 // far more commonly already installed, so it stands in when the dedicated
 // tool is absent.
-func NewJava() Formatter {
+func NewJava() systemFormatter {
 	return systemFormatter{
 		name: "google-java-format",
 		bins: []string{"google-java-format", "clang-format"},
@@ -61,14 +61,14 @@ func NewJava() Formatter {
 }
 
 // NewKotlin returns the .kt/.kts formatter, via ktlint's format mode.
-func NewKotlin() Formatter {
+func NewKotlin() systemFormatter {
 	return systemFormatter{name: "ktlint", bins: []string{"ktlint"}, args: inPlace("--format", "--log-level=none")}
 }
 
 // NewSwift returns the .swift formatter. swift-format ships with the
 // toolchain as of Swift 6; the third-party swiftformat predates it and is
 // still what many projects have installed.
-func NewSwift() Formatter {
+func NewSwift() systemFormatter {
 	return systemFormatter{
 		name: "swift-format",
 		bins: []string{"swift-format", "swiftformat"},
@@ -86,7 +86,7 @@ func NewSwift() Formatter {
 // runs. --fail-level fatal is load-bearing: without it rubocop exits
 // non-zero whenever any offense it chose not to fix remains, which would
 // report a correctly-rewritten file as a failed format on every write.
-func NewRuby() Formatter {
+func NewRuby() systemFormatter {
 	return systemFormatter{
 		name: "rubocop",
 		bins: []string{"rubocop", "standardrb"},
@@ -100,7 +100,7 @@ func NewRuby() Formatter {
 }
 
 // NewPHP returns the .php formatter, via php-cs-fixer or Laravel's Pint.
-func NewPHP() Formatter {
+func NewPHP() systemFormatter {
 	return systemFormatter{
 		name: "php-cs-fixer",
 		bins: []string{"php-cs-fixer", "pint"},
@@ -116,7 +116,7 @@ func NewPHP() Formatter {
 // NewNix returns the .nix formatter. nixfmt is the format the Nix project
 // itself settled on (RFC 166); alejandra and nixpkgs-fmt are the two
 // pre-RFC tools still pinned by existing flakes.
-func NewNix() Formatter {
+func NewNix() systemFormatter {
 	return systemFormatter{
 		name: "nixfmt",
 		bins: []string{"nixfmt", "alejandra", "nixpkgs-fmt"},
@@ -125,6 +125,6 @@ func NewNix() Formatter {
 }
 
 // NewLua returns the .lua formatter, via stylua.
-func NewLua() Formatter {
+func NewLua() systemFormatter {
 	return systemFormatter{name: "stylua", bins: []string{"stylua"}, args: inPlace()}
 }

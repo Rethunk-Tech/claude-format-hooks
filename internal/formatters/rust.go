@@ -9,7 +9,7 @@ import "context"
 type rustFormatter struct{}
 
 // NewRust returns the rustFormatter for .rs.
-func NewRust() Formatter { return rustFormatter{} }
+func NewRust() rustFormatter { return rustFormatter{} }
 
 func (rustFormatter) Name() string { return "rustfmt" }
 

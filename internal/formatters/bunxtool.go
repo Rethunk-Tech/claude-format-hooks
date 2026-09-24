@@ -28,7 +28,7 @@ type bunxFormatter struct {
 // resolved, so a project with no markdownlint config of its own gets sane
 // defaults instead of stock rules that fire on ordinary technical writing.
 // A project's own config still layers over it and wins.
-func NewMarkdown() Formatter {
+func NewMarkdown() bunxFormatter {
 	args := func(abs string) []string {
 		args := []string{}
 		if cfg := userMarkdownlintConfig(); cfg != "" {
@@ -46,7 +46,7 @@ func NewMarkdown() Formatter {
 }
 
 // NewTOML returns the bunxFormatter for .toml, via taplo.
-func NewTOML() Formatter {
+func NewTOML() bunxFormatter {
 	return bunxFormatter{
 		name:     "taplo",
 		pathArgs: func(abs string) []string { return []string{"format", "--", abs} },
@@ -63,7 +63,7 @@ const prettierNoParserMarker = "No parser could be inferred"
 
 // NewPrettier returns the bunxFormatter for .yaml/.yml/.html/.vue and the
 // plugin-backed .svelte/.astro, via prettier.
-func NewPrettier() Formatter {
+func NewPrettier() bunxFormatter {
 	return bunxFormatter{
 		name:     "prettier",
 		pathArgs: func(abs string) []string { return []string{"--write", "--", abs} },

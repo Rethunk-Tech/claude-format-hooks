@@ -91,10 +91,10 @@ func TestPathFormattersRunWithoutBunx(t *testing.T) {
 		new  func() Formatter
 		file string
 	}{
-		{"biome", NewBiome, "f.ts"},
-		{"markdownlint-cli2", NewMarkdown, "f.md"},
-		{"taplo", NewTOML, "f.toml"},
-		{"prettier", NewPrettier, "f.yaml"},
+		{"biome", func() Formatter { return NewBiome() }, "f.ts"},
+		{"markdownlint-cli2", func() Formatter { return NewMarkdown() }, "f.md"},
+		{"taplo", func() Formatter { return NewTOML() }, "f.toml"},
+		{"prettier", func() Formatter { return NewPrettier() }, "f.yaml"},
 	}
 
 	for _, tc := range cases {

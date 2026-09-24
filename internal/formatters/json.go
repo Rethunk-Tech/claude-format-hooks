@@ -22,7 +22,7 @@ import (
 type jsonFormatter struct{ cfg config.Config }
 
 // NewJSON returns the native jsonFormatter for .json.
-func NewJSON(cfg config.Config) Formatter { return jsonFormatter{cfg: cfg} }
+func NewJSON(cfg config.Config) jsonFormatter { return jsonFormatter{cfg: cfg} }
 
 // jsonRouter sends .json to biome where the project has a biome config unless
 // biome is disabled, and to the native formatter everywhere else. Its Name
@@ -47,7 +47,7 @@ type jsonRouter struct {
 // otherwise. Project-level "biome" disables therefore cannot be enforced by
 // registry name filtering alone; hook and --check callers must preserve the
 // router's delegated formatter opt-outs.
-func NewJSONRouter(cfg config.Config) Formatter {
+func NewJSONRouter(cfg config.Config) jsonRouter {
 	return jsonRouter{
 		biome:         NewBiome(),
 		native:        NewJSON(cfg),
