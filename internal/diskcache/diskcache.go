@@ -11,6 +11,7 @@
 package diskcache
 
 import (
+	"bytes"
 	"hash/fnv"
 	"os"
 	"path/filepath"
@@ -87,15 +88,15 @@ func Get(dir, key string, maxAge time.Duration) (value string, ok bool) {
 // read treats it as a miss, while the sweep leaves it alone rather than
 // removing a file it does not understand.
 func parseEntry(raw []byte) (value string, stamped time.Time, ok bool) {
-	i := strings.IndexByte(string(raw), '\n')
-	if i < 0 {
+	timestamp, payload, found := bytes.Cut(raw, []byte{'\n'})
+	if !found {
 		return "", time.Time{}, false
 	}
-	ts, err := strconv.ParseInt(string(raw[:i]), 10, 64)
+	ts, err := strconv.ParseInt(string(timestamp), 10, 64)
 	if err != nil {
 		return "", time.Time{}, false
 	}
-	return string(raw[i+1:]), time.Unix(ts, 0), true
+	return string(payload), time.Unix(ts, 0), true
 }
 
 func cacheNamespacePrefix(key string) string {
