@@ -74,7 +74,7 @@ func fakeRouterTools(t *testing.T) string {
 		}
 	}
 	for name, script := range scripts {
-		qt.Assert(t, qt.IsNil(os.WriteFile(filepath.Join(toolDir, name), []byte(script), 0o755)))
+		qt.Assert(t, qt.IsNil(os.WriteFile(filepath.Join(toolDir, name), []byte(script), 0o755))) //nolint:gosec // test formatter fixture must be executable
 	}
 	t.Setenv("CLAUDE_FORMAT_HOOKS_CACHE", filepath.Join(t.TempDir(), "cache"))
 	t.Setenv("FORMATTER_MARKER", marker)
@@ -326,7 +326,7 @@ func TestDispatchArgsUpgradeHappyPathViaReleaseAPI(t *testing.T) {
 	target := installer.HookBinaryPath(binDir)
 	oldBinary := []byte("old release binary\n")
 	qt.Assert(t, qt.IsNil(os.MkdirAll(binDir, 0o700)))
-	qt.Assert(t, qt.IsNil(os.WriteFile(target, oldBinary, 0o751)))
+	qt.Assert(t, qt.IsNil(os.WriteFile(target, oldBinary, 0o751))) //nolint:gosec // test binary fixture must retain executable mode
 
 	assetName := fmt.Sprintf("format-dispatch-%s-%s", runtime.GOOS, runtime.GOARCH)
 	if runtime.GOOS == "windows" {
@@ -375,7 +375,7 @@ func TestDispatchArgsUpgradeDryRunViaReleaseAPI(t *testing.T) {
 	target := installer.HookBinaryPath(binDir)
 	oldBinary := []byte("old release binary\n")
 	qt.Assert(t, qt.IsNil(os.MkdirAll(binDir, 0o700)))
-	qt.Assert(t, qt.IsNil(os.WriteFile(target, oldBinary, 0o751)))
+	qt.Assert(t, qt.IsNil(os.WriteFile(target, oldBinary, 0o751))) //nolint:gosec // test binary fixture must retain executable mode
 
 	var binaryRequests atomic.Int32
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -903,7 +903,7 @@ func TestProvisionAfterRefreshesToolsUnlessDryRun(t *testing.T) {
 		t.Helper()
 		dir := t.TempDir()
 		script := "#!/bin/sh\nprintf '%s' \"$*\" > " + argv + "\n"
-		qt.Assert(t, qt.IsNil(os.WriteFile(filepath.Join(dir, "bun"), []byte(script), 0o755)))
+		qt.Assert(t, qt.IsNil(os.WriteFile(filepath.Join(dir, "bun"), []byte(script), 0o755))) //nolint:gosec // test tool fixture must be executable
 		t.Setenv("PATH", dir)
 	}
 
@@ -932,7 +932,7 @@ func fakeFormatterTool(t *testing.T, name, body string) {
 		t.Skip("fake shell-script tools are POSIX-shell only")
 	}
 	dir := t.TempDir()
-	qt.Assert(t, qt.IsNil(os.WriteFile(filepath.Join(dir, name), []byte("#!/bin/sh\n"+body+"\n"), 0o755)))
+	qt.Assert(t, qt.IsNil(os.WriteFile(filepath.Join(dir, name), []byte("#!/bin/sh\n"+body+"\n"), 0o755))) //nolint:gosec // test formatter fixture must be executable
 	t.Setenv("PATH", dir)
 	t.Setenv("CLAUDE_FORMAT_HOOKS_CACHE", t.TempDir())
 }

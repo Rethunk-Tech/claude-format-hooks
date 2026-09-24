@@ -20,7 +20,7 @@ func fakeBun(t *testing.T, script string) {
 	}
 	dir := t.TempDir()
 	path := filepath.Join(dir, "bun")
-	qt.Assert(t, qt.IsNil(os.WriteFile(path, []byte("#!/bin/sh\n"+script+"\n"), 0o755)))
+	qt.Assert(t, qt.IsNil(os.WriteFile(path, []byte("#!/bin/sh\n"+script+"\n"), 0o755))) //nolint:gosec // test bun fixture must be executable
 	t.Setenv("PATH", dir)
 }
 

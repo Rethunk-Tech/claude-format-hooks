@@ -84,7 +84,7 @@ func TestDoctorReportsHookWiring(t *testing.T) {
 		opts, err := installer.DefaultOptions()
 		qt.Assert(t, qt.IsNil(err))
 		qt.Assert(t, qt.IsNil(os.MkdirAll(filepath.Dir(opts.BinPath), 0o750)))
-		qt.Assert(t, qt.IsNil(os.WriteFile(opts.BinPath, []byte("#!/bin/sh\n"), 0o755)))
+		qt.Assert(t, qt.IsNil(os.WriteFile(opts.BinPath, []byte("#!/bin/sh\n"), 0o755))) //nolint:gosec // test hook fixture must be executable
 		qt.Assert(t, qt.IsNil(installer.Install(opts, false, io.Discard)))
 
 		var out, errOut strings.Builder

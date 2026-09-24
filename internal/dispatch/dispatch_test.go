@@ -174,7 +174,7 @@ func TestDispatchRoutesToFormatter(t *testing.T) {
 func TestDispatchUsesCallerResolvedExtensionForExtensionlessPath(t *testing.T) {
 	dir := t.TempDir()
 	path := filepath.Join(dir, "script")
-	qt.Assert(t, qt.IsNil(os.WriteFile(path, []byte("#!/bin/sh\necho hi\n"), 0o755)))
+	qt.Assert(t, qt.IsNil(os.WriteFile(path, []byte("#!/bin/sh\necho hi\n"), 0o755))) //nolint:gosec // test shell fixture must be executable
 
 	r := NewRegistry(config.Default())
 	result := r.Dispatch(t.Context(), dir, path, ".sh")

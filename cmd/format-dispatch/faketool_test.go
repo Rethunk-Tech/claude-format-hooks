@@ -38,5 +38,5 @@ func fakeTool(t *testing.T, dir, name string) {
 	if runtime.GOOS == "windows" {
 		name += ".exe"
 	}
-	qt.Assert(t, qt.IsNil(os.WriteFile(filepath.Join(dir, name), bin, 0o755)))
+	qt.Assert(t, qt.IsNil(os.WriteFile(filepath.Join(dir, name), bin, 0o755))) //nolint:gosec // copied test binary must be executable
 }

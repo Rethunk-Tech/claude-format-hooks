@@ -288,7 +288,7 @@ func TestUpgradeOversizedBinaryLeavesInstalledBinaryUntouched(t *testing.T) {
 
 	target := HookBinaryPath(t.TempDir())
 	oldBinary := []byte("installed binary\n")
-	if err := os.WriteFile(target, oldBinary, 0o751); err != nil {
+	if err := os.WriteFile(target, oldBinary, 0o751); err != nil { //nolint:gosec // test binary fixture must retain executable mode
 		t.Fatal(err)
 	}
 

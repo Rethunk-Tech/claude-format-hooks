@@ -158,7 +158,7 @@ func TestWouldReformatReportsFormattedCopyReadError(t *testing.T) {
 	script := "#!/bin/sh\nfor arg in \"$@\"; do\n  case \"$arg\" in\n    *.ts) rm -f \"$arg\"; exit 0 ;;\n  esac\ndone\nexit 1\n"
 	for _, name := range []string{"biome", "bunx"} {
 		tool := filepath.Join(toolDir, name)
-		qt.Assert(t, qt.IsNil(os.WriteFile(tool, []byte(script), 0o755)))
+		qt.Assert(t, qt.IsNil(os.WriteFile(tool, []byte(script), 0o755))) //nolint:gosec // test formatter fixture must be executable
 	}
 	t.Setenv("CLAUDE_PROJECT_DIR", projectRoot)
 	t.Setenv("CLAUDE_FORMAT_HOOKS_CONFIG", configPath)
@@ -226,7 +226,7 @@ func TestCheckResolvesTerraformMultiDotExtensions(t *testing.T) {
 	toolDir := t.TempDir()
 	terraform := filepath.Join(toolDir, "terraform")
 	script := "#!/bin/sh\nfor arg in \"$@\"; do\n  case \"$arg\" in\n    *.tftest.hcl|*.tfmock.hcl|*.tfquery.hcl) printf 'formatted\\n' > \"$arg\"; exit 0 ;;\n  esac\ndone\nexit 1\n"
-	qt.Assert(t, qt.IsNil(os.WriteFile(terraform, []byte(script), 0o755)))
+	qt.Assert(t, qt.IsNil(os.WriteFile(terraform, []byte(script), 0o755))) //nolint:gosec // test formatter fixture must be executable
 
 	t.Setenv("CLAUDE_PROJECT_DIR", projectRoot)
 	t.Setenv("CLAUDE_FORMAT_HOOKS_CONFIG", configPath)
@@ -495,7 +495,7 @@ func TestCheckDispatchesNestedBiomeFromProjectRoot(t *testing.T) {
 	script := "#!/bin/sh\nprintf '%s' \"$PWD\" > \"$FMTCHECK_MARKER\"\nfor arg in \"$@\"; do\n  case \"$arg\" in\n    *.ts) printf 'const value = { answer: 42 };\\n' > \"$arg\"; exit 0 ;;\n  esac\ndone\nexit 1\n"
 	for _, name := range []string{"biome", "bunx"} {
 		tool := filepath.Join(toolDir, name)
-		qt.Assert(t, qt.IsNil(os.WriteFile(tool, []byte(script), 0o755)))
+		qt.Assert(t, qt.IsNil(os.WriteFile(tool, []byte(script), 0o755))) //nolint:gosec // test formatter fixture must be executable
 	}
 
 	t.Setenv("CLAUDE_PROJECT_DIR", projectRoot)
@@ -514,7 +514,7 @@ func TestCheckDispatchesNestedBiomeFromProjectRoot(t *testing.T) {
 	timeoutScript := "#!/bin/sh\nprintf 'timeout:%s' \"$PWD\" > \"$FMTCHECK_MARKER\"\nexec /bin/sleep 30\n"
 	for _, name := range []string{"biome", "bunx"} {
 		tool := filepath.Join(toolDir, name)
-		qt.Assert(t, qt.IsNil(os.WriteFile(tool, []byte(timeoutScript), 0o755)))
+		qt.Assert(t, qt.IsNil(os.WriteFile(tool, []byte(timeoutScript), 0o755))) //nolint:gosec // test formatter fixture must be executable
 	}
 	var timeoutOut, timeoutErrOut bytes.Buffer
 	started := time.Now()

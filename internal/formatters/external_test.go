@@ -26,7 +26,7 @@ func writeFakeTool(t *testing.T, name, body string) {
 	dir := t.TempDir()
 	path := filepath.Join(dir, name)
 	script := "#!/bin/sh\n" + body + "\n"
-	qt.Assert(t, qt.IsNil(os.WriteFile(path, []byte(script), 0o755)))
+	qt.Assert(t, qt.IsNil(os.WriteFile(path, []byte(script), 0o755))) //nolint:gosec // test formatter fixture must be executable
 	t.Setenv("PATH", dir)
 }
 
@@ -214,9 +214,9 @@ func TestPythonFormatterPrefersRuffOverBlack(t *testing.T) {
 	isolateDiskCache(t)
 	dir := t.TempDir()
 	path := filepath.Join(dir, "ruff")
-	qt.Assert(t, qt.IsNil(os.WriteFile(path, []byte("#!/bin/sh\nexit 0\n"), 0o755)))
+	qt.Assert(t, qt.IsNil(os.WriteFile(path, []byte("#!/bin/sh\nexit 0\n"), 0o755))) //nolint:gosec // test formatter fixture must be executable
 	blackPath := filepath.Join(dir, "black")
-	qt.Assert(t, qt.IsNil(os.WriteFile(blackPath, []byte("#!/bin/sh\nexit 1\n"), 0o755)))
+	qt.Assert(t, qt.IsNil(os.WriteFile(blackPath, []byte("#!/bin/sh\nexit 1\n"), 0o755))) //nolint:gosec // test formatter fixture must be executable
 	t.Setenv("PATH", dir)
 
 	fileDir := t.TempDir()
@@ -335,7 +335,7 @@ func TestTerraformFormatterPrefersTerraformOverTofu(t *testing.T) {
 	writeFakeTool(t, "terraform", "exit 0")
 	terraformDir := os.Getenv("PATH")
 	tofu := filepath.Join(terraformDir, "tofu")
-	qt.Assert(t, qt.IsNil(os.WriteFile(tofu, []byte("#!/bin/sh\nexit 1\n"), 0o755)))
+	qt.Assert(t, qt.IsNil(os.WriteFile(tofu, []byte("#!/bin/sh\nexit 1\n"), 0o755))) //nolint:gosec // test formatter fixture must be executable
 
 	res := NewTerraform().Format(t.Context(), dir, abs)
 

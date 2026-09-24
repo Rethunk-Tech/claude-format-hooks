@@ -157,7 +157,7 @@ case "$1" in
 esac
 exit 1
 `, authExit, verifyExit)
-	qt.Assert(t, qt.IsNil(os.WriteFile(filepath.Join(dir, "gh"), []byte(script), 0o755)))
+	qt.Assert(t, qt.IsNil(os.WriteFile(filepath.Join(dir, "gh"), []byte(script), 0o755))) //nolint:gosec // test gh fixture must be executable
 	t.Setenv("PATH", dir)
 }
 

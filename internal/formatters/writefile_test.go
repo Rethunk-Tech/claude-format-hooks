@@ -16,7 +16,7 @@ func TestWriteFormattedPreservesExistingMode(t *testing.T) {
 		t.Skip("Windows doesn't model POSIX executable bits")
 	}
 	path := filepath.Join(t.TempDir(), "f")
-	qt.Assert(t, qt.IsNil(os.WriteFile(path, []byte("old"), 0o755)))
+	qt.Assert(t, qt.IsNil(os.WriteFile(path, []byte("old"), 0o755))) //nolint:gosec // test fixture must retain executable mode
 
 	qt.Assert(t, qt.IsNil(writeFormatted(path, []byte("old"), []byte("new"), 0o644)))
 
@@ -200,7 +200,7 @@ func TestShellFormatterPreservesExecutableBit(t *testing.T) {
 	dir := t.TempDir()
 	path := filepath.Join(dir, "t.sh")
 	src := "#!/bin/sh\nif true; then\necho hi\nfi\n"
-	qt.Assert(t, qt.IsNil(os.WriteFile(path, []byte(src), 0o755)))
+	qt.Assert(t, qt.IsNil(os.WriteFile(path, []byte(src), 0o755))) //nolint:gosec // test shell fixture must be executable
 
 	res := NewShell(config.Default()).Format(t.Context(), dir, path)
 	qt.Assert(t, qt.IsNil(res.Err))
