@@ -79,15 +79,15 @@ func DefaultOptions() (Options, error) {
 // Rewriting sorts keys, which is encoding/json's behaviour for a map.
 type jsonObject map[string]json.RawMessage
 
-// parseHookDoc reads a hooks document (a missing file is treated as `{}`)
-// and decodes it down to one event's entries, leaving every key it does not
-// touch as a raw blob. exists distinguishes an absent file from an empty
-// one, which is what tells WireCursor whether to add a version field.
-func parseHookDoc[T any](path, event string) (before []byte, top, hooks jsonObject, entries []T, exists bool, err error) {
+// readHooksDoc reads a hooks document (a missing file is treated as `{}`)
+// and decodes its top-level object, leaving every key it does not touch as
+// a raw blob. exists distinguishes an absent file from an empty one, which
+// is what tells WireCursor whether to add a version field.
+func readHooksDoc(path string) (before []byte, top jsonObject, exists bool, err error) {
 	before, err = os.ReadFile(path) //nolint:gosec // caller-controlled hooks location (env override or fixed default)
 	if err != nil {
 		if !os.IsNotExist(err) {
-			return nil, nil, nil, nil, false, err
+			return nil, nil, false, err
 		}
 		before = []byte("{}")
 	} else {
@@ -96,22 +96,66 @@ func parseHookDoc[T any](path, event string) (before []byte, top, hooks jsonObje
 
 	top = jsonObject{}
 	if err := json.Unmarshal(before, &top); err != nil {
-		return nil, nil, nil, nil, false, fmt.Errorf("parse %s: %w", path, err)
+		return nil, nil, false, fmt.Errorf("parse %s: %w", path, err)
 	}
+	return before, top, exists, nil
+}
 
-	hooks = jsonObject{}
+// hooksObject decodes top's "hooks" key, or an empty object when absent.
+func hooksObject(top jsonObject, path string) (jsonObject, error) {
+	hooks := jsonObject{}
 	if raw, ok := top["hooks"]; ok {
 		if err := json.Unmarshal(raw, &hooks); err != nil {
-			return nil, nil, nil, nil, false, fmt.Errorf("parse %s: hooks: %w", path, err)
+			return nil, fmt.Errorf("parse %s: hooks: %w", path, err)
 		}
 	}
+	return hooks, nil
+}
 
+// eventEntries decodes hooks[event] into entries, or leaves entries nil when
+// the event has no array of its own.
+func eventEntries[T any](hooks jsonObject, path, event string) ([]T, error) {
+	var entries []T
 	if raw, ok := hooks[event]; ok {
 		if err := json.Unmarshal(raw, &entries); err != nil {
-			return nil, nil, nil, nil, false, fmt.Errorf("parse %s: hooks.%s: %w", path, event, err)
+			return nil, fmt.Errorf("parse %s: hooks.%s: %w", path, event, err)
 		}
 	}
+	return entries, nil
+}
+
+// parseHookDoc reads a hooks document and decodes it down to one event's
+// entries, along with the document state a caller needs to rewrite it.
+func parseHookDoc[T any](path, event string) (before []byte, top, hooks jsonObject, entries []T, exists bool, err error) {
+	before, top, exists, err = readHooksDoc(path)
+	if err != nil {
+		return nil, nil, nil, nil, false, err
+	}
+	hooks, err = hooksObject(top, path)
+	if err != nil {
+		return nil, nil, nil, nil, false, err
+	}
+	entries, err = eventEntries[T](hooks, path, event)
+	if err != nil {
+		return nil, nil, nil, nil, false, err
+	}
 	return before, top, hooks, entries, exists, nil
+}
+
+// hookDocEntries reads a hooks document and returns only its parsed entries
+// and whether the event array already exists, for callers that inspect the
+// document without rewriting it.
+func hookDocEntries[T any](path, event string) (entries []T, exists bool, err error) {
+	_, top, exists, err := readHooksDoc(path)
+	if err != nil {
+		return nil, false, err
+	}
+	hooks, err := hooksObject(top, path)
+	if err != nil {
+		return nil, false, err
+	}
+	entries, err = eventEntries[T](hooks, path, event)
+	return entries, exists, err
 }
 
 const postToolUseEvent = "PostToolUse"
@@ -210,7 +254,7 @@ func Unwire(settingsPath, binPath string) (before, after []byte, err error) {
 // so a settings file that merely needed reordering would diff non-empty and
 // read as wired when it is not. A missing file is not wired, not an error.
 func Wired(settingsPath, binPath string) (bool, error) {
-	_, _, _, entries, _, err := parseHookDoc[PostToolUseEntry](settingsPath, postToolUseEvent)
+	entries, _, err := hookDocEntries[PostToolUseEntry](settingsPath, postToolUseEvent)
 	if err != nil {
 		return false, err
 	}

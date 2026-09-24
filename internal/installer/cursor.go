@@ -41,7 +41,7 @@ func WireCursor(path, binPath string) (before, after []byte, err error) {
 
 // WiredCursor is Wired for Cursor's afterFileEdit document.
 func WiredCursor(path, binPath string) (bool, error) {
-	_, _, _, entries, exists, err := parseHookDoc[json.RawMessage](path, cursorEvent)
+	entries, exists, err := hookDocEntries[json.RawMessage](path, cursorEvent)
 	if err != nil || !exists {
 		return false, err
 	}
