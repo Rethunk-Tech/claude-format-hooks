@@ -178,13 +178,11 @@ func runCheckJobs(
 	sem := make(chan struct{}, workers)
 
 	for i, job := range jobs {
-		wg.Add(1)
-		go func() {
-			defer wg.Done()
+		wg.Go(func() {
 			sem <- struct{}{}
 			defer func() { <-sem }()
 			outcomes[i] = runCheckJob(ctx, job, registry, cfg, rootCandidates, errOut, &errMu, write)
-		}()
+		})
 	}
 	wg.Wait()
 	return outcomes

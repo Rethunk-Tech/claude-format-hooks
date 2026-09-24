@@ -109,7 +109,7 @@ func TestDoctorReportsHookWiring(t *testing.T) {
 // wiringLineSays reports whether the --doctor line naming path ends in
 // state, independent of how tabwriter padded the columns.
 func wiringLineSays(output, path, state string) bool {
-	for _, line := range strings.Split(output, "\n") {
+	for line := range strings.SplitSeq(output, "\n") {
 		if strings.Contains(line, path) {
 			return strings.HasSuffix(strings.TrimSpace(line), state)
 		}

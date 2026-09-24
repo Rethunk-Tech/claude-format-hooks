@@ -288,16 +288,14 @@ func TestSetIsAtomicUnderConcurrency(t *testing.T) {
 
 	var wg sync.WaitGroup
 	for range 32 {
-		wg.Add(1)
-		go func() {
-			defer wg.Done()
+		wg.Go(func() {
 			for range 20 {
 				Set(dir, key, value)
 				if got, ok := Get(dir, key, time.Minute); ok && got != value {
 					t.Errorf("torn read: %q", got)
 				}
 			}
-		}()
+		})
 	}
 	wg.Wait()
 
