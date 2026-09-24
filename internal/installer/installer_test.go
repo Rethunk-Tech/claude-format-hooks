@@ -208,7 +208,11 @@ func keysInOrder(t *testing.T, raw []byte) []string {
 	for dec.More() {
 		keyTok, err := dec.Token()
 		qt.Assert(t, qt.IsNil(err))
-		keys = append(keys, keyTok.(string))
+		key, ok := keyTok.(string)
+		if !ok {
+			t.Fatalf("JSON object key token = %T, want string", keyTok)
+		}
+		keys = append(keys, key)
 		var skip json.RawMessage
 		qt.Assert(t, qt.IsNil(dec.Decode(&skip)))
 	}

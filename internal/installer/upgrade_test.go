@@ -118,7 +118,7 @@ func TestUpgradeChecksumMismatchLeavesBinaryUntouched(t *testing.T) {
 func TestUpgradeUnattestedBinaryLeavesBinaryUntouched(t *testing.T) {
 	binary := []byte("unattested release binary\n")
 	server, counts := upgradeTestServerForTarget(t, binary, binary,
-		runtime.GOOS, runtime.GOARCH, true, true, false)
+		runtime.GOOS, true, true, false)
 	defer server.Close()
 
 	oldBinary := []byte("old release binary\n")
@@ -329,7 +329,7 @@ func TestUpgradeFreshInstallUsesExecutableMode(t *testing.T) {
 
 func TestUpgradeMissingBinaryAsset(t *testing.T) {
 	server, _ := upgradeTestServerForTarget(t, []byte("binary\n"), []byte("binary\n"),
-		runtime.GOOS, runtime.GOARCH, false, true, true)
+		runtime.GOOS, false, true, true)
 	defer server.Close()
 
 	err := upgradeWithConfig(Options{BinPath: HookBinaryPath(t.TempDir())}, false, nil, releaseConfig(server))
@@ -340,7 +340,7 @@ func TestUpgradeMissingBinaryAsset(t *testing.T) {
 
 func TestUpgradeMissingChecksumAsset(t *testing.T) {
 	server, _ := upgradeTestServerForTarget(t, []byte("binary\n"), []byte("binary\n"),
-		runtime.GOOS, runtime.GOARCH, true, false, true)
+		runtime.GOOS, true, false, true)
 	defer server.Close()
 
 	err := upgradeWithConfig(Options{BinPath: HookBinaryPath(t.TempDir())}, false, nil, releaseConfig(server))
@@ -351,7 +351,7 @@ func TestUpgradeMissingChecksumAsset(t *testing.T) {
 
 func TestUpgradeWindowsAssetPairOnLinux(t *testing.T) {
 	binary := []byte("windows release binary\n")
-	server, _ := upgradeTestServerForTarget(t, binary, binary, "windows", "amd64", true, true, true)
+	server, _ := upgradeTestServerForTarget(t, binary, binary, "windows", true, true, true)
 	defer server.Close()
 
 	target := HookBinaryPath(t.TempDir())
@@ -359,7 +359,7 @@ func TestUpgradeWindowsAssetPairOnLinux(t *testing.T) {
 		client:     server.Client(),
 		apiBaseURL: server.URL,
 		goos:       "windows",
-		goarch:     "amd64",
+		goarch:     runtime.GOARCH,
 	})
 	if err != nil {
 		t.Fatal(err)
@@ -368,12 +368,12 @@ func TestUpgradeWindowsAssetPairOnLinux(t *testing.T) {
 }
 
 func upgradeTestServer(t *testing.T, binary, checksumBinary []byte) (*httptest.Server, releaseRequestCounts) {
-	return upgradeTestServerForTarget(t, binary, checksumBinary, runtime.GOOS, runtime.GOARCH, true, true, true)
+	return upgradeTestServerForTarget(t, binary, checksumBinary, runtime.GOOS, true, true, true)
 }
 
-func upgradeTestServerForTarget(t *testing.T, binary, checksumBinary []byte, goos, goarch string, includeBinary, includeChecksum, attested bool) (*httptest.Server, releaseRequestCounts) {
+func upgradeTestServerForTarget(t *testing.T, binary, checksumBinary []byte, goos string, includeBinary, includeChecksum, attested bool) (*httptest.Server, releaseRequestCounts) {
 	t.Helper()
-	assetName := fmt.Sprintf("format-dispatch-%s-%s", goos, goarch)
+	assetName := fmt.Sprintf("format-dispatch-%s-%s", goos, runtime.GOARCH)
 	if goos == "windows" {
 		assetName += ".exe"
 	}

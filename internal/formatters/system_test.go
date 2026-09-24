@@ -27,7 +27,11 @@ var systemFormatters = []struct {
 func TestSystemFormatterNamesAndTools(t *testing.T) {
 	for _, tc := range systemFormatters {
 		qt.Check(t, qt.Equals(tc.f.Name(), tc.name))
-		tools := tc.f.(Prober).Tools()
+		prober, ok := tc.f.(Prober)
+		if !ok {
+			t.Fatalf("%s does not implement Prober", tc.name)
+		}
+		tools := prober.Tools()
 		qt.Assert(t, qt.Not(qt.HasLen(tools, 0)))
 		qt.Check(t, qt.Equals(tools[0], tc.preferred),
 			qt.Commentf("%s must try its preferred binary first", tc.name))
