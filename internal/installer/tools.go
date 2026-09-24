@@ -9,6 +9,13 @@ import (
 	"time"
 )
 
+const (
+	biomeTool        = "@biomejs/biome"
+	prettierTool     = "prettier"
+	taploTool        = "@taplo/cli"
+	markdownlintTool = "markdownlint-cli2"
+)
+
 // bunTools are the formatters dispatched through bunx. They are installed
 // globally at install time rather than fetched on first use: the hook's
 // per-file budget is a few seconds, and a cold npm-registry fetch does not
@@ -16,10 +23,10 @@ import (
 // still costs a resolution step, and the binaries must be on PATH where bunx
 // can reach them immediately.
 var bunTools = []string{
-	"@biomejs/biome",
-	"prettier",
-	"@taplo/cli",
-	"markdownlint-cli2",
+	biomeTool,
+	prettierTool,
+	taploTool,
+	markdownlintTool,
 }
 
 // provisionTimeout bounds the whole provisioning step. Installing four
@@ -44,8 +51,7 @@ func ProvisionTools(out io.Writer) error {
 	defer cancel()
 
 	_, _ = fmt.Fprintf(out, "==> Installing formatters globally: %v\n", bunTools)
-	args := append([]string{"add", "-g"}, bunTools...)
-	if output, err := exec.CommandContext(ctx, "bun", args...).CombinedOutput(); err != nil { //nolint:gosec // args is bunTools, a package-level constant list; never caller input
+	if output, err := exec.CommandContext(ctx, "bun", "add", "-g", biomeTool, prettierTool, taploTool, markdownlintTool).CombinedOutput(); err != nil {
 		_, _ = fmt.Fprintf(out, "    (skipped: %v -- formatters will be fetched on first use)\n", err)
 		if len(output) > 0 {
 			_, _ = fmt.Fprintf(out, "    %s\n", firstLine(output))
