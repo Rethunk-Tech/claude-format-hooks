@@ -135,9 +135,11 @@ func TestInstallRollsBackClaudeWhenCursorWriteFails(t *testing.T) {
 	cursorPath := filepath.Join(cursorDir, "hooks.json")
 	qt.Assert(t, qt.IsNil(os.Mkdir(cursorDir, 0o700)))
 	qt.Assert(t, qt.IsNil(os.WriteFile(cursorPath, []byte(`{"version":1,"hooks":{"sessionStart":[]}}`), 0o600)))
-	qt.Assert(t, qt.IsNil(os.Chmod(cursorDir, 0o500)))
+	qt.Assert(t, qt.IsNil(os.Chmod(cursorDir, 0o500))) //nolint:gosec // test must make the directory unwritable
 	t.Cleanup(func() {
-		_ = os.Chmod(cursorDir, 0o700)
+		if err := os.Chmod(cursorDir, 0o700); err != nil { //nolint:gosec // cleanup restores directory access
+			t.Errorf("restore directory permissions: %v", err)
+		}
 	})
 	probe := filepath.Join(cursorDir, "permission-probe")
 	if err := os.WriteFile(probe, []byte("probe"), 0o600); err == nil {

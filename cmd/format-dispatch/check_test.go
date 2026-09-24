@@ -775,7 +775,7 @@ func TestCheckWritePreservesMode(t *testing.T) {
 	}
 	dir := t.TempDir()
 	path := writeCheckFile(t, dir, "s.sh", "#!/bin/sh\necho    hi\n")
-	qt.Assert(t, qt.IsNil(os.Chmod(path, 0o755)))
+	qt.Assert(t, qt.IsNil(os.Chmod(path, 0o755))) //nolint:gosec // test fixture must retain executable mode
 
 	var out, errOut strings.Builder
 	qt.Check(t, qt.Equals(runCheck([]string{dir, "--write"}, &out, &errOut), 0))

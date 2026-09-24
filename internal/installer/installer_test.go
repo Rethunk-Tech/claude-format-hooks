@@ -478,9 +478,11 @@ func TestWriteAtomicCreateTempFailureInReadOnlyDirectory(t *testing.T) {
 	}
 
 	dir := t.TempDir()
-	qt.Assert(t, qt.IsNil(os.Chmod(dir, 0o555)))
+	qt.Assert(t, qt.IsNil(os.Chmod(dir, 0o555))) //nolint:gosec // test must make the directory unwritable
 	t.Cleanup(func() {
-		_ = os.Chmod(dir, 0o700)
+		if err := os.Chmod(dir, 0o700); err != nil { //nolint:gosec // cleanup restores directory access
+			t.Errorf("restore directory permissions: %v", err)
+		}
 	})
 	probe, err := os.CreateTemp(dir, "permission-probe-*")
 	if err == nil {
@@ -523,9 +525,11 @@ func TestApplyChangeReportsMkdirFailure(t *testing.T) {
 	dir := t.TempDir()
 	blocked := filepath.Join(dir, "blocked")
 	qt.Assert(t, qt.IsNil(os.Mkdir(blocked, 0o750)))
-	qt.Assert(t, qt.IsNil(os.Chmod(blocked, 0o555)))
+	qt.Assert(t, qt.IsNil(os.Chmod(blocked, 0o555))) //nolint:gosec // test must make the directory unwritable
 	t.Cleanup(func() {
-		_ = os.Chmod(blocked, 0o700)
+		if err := os.Chmod(blocked, 0o700); err != nil { //nolint:gosec // cleanup restores directory access
+			t.Errorf("restore directory permissions: %v", err)
+		}
 	})
 	probe := filepath.Join(blocked, "permission-probe")
 	if err := os.Mkdir(probe, 0o700); err == nil {
@@ -545,9 +549,11 @@ func TestApplyChangeReportsSettingsWriteFailure(t *testing.T) {
 	}
 
 	dir := t.TempDir()
-	qt.Assert(t, qt.IsNil(os.Chmod(dir, 0o555)))
+	qt.Assert(t, qt.IsNil(os.Chmod(dir, 0o555))) //nolint:gosec // test must make the directory unwritable
 	t.Cleanup(func() {
-		_ = os.Chmod(dir, 0o700)
+		if err := os.Chmod(dir, 0o700); err != nil { //nolint:gosec // cleanup restores directory access
+			t.Errorf("restore directory permissions: %v", err)
+		}
 	})
 	probe := filepath.Join(dir, "permission-probe")
 	if err := os.WriteFile(probe, []byte("probe"), 0o600); err == nil {

@@ -107,9 +107,11 @@ func TestWriteFormattedReturnsCreateTempError(t *testing.T) {
 	dir := t.TempDir()
 	path := filepath.Join(dir, "f")
 	qt.Assert(t, qt.IsNil(os.WriteFile(path, []byte("old"), 0o600)))
-	qt.Assert(t, qt.IsNil(os.Chmod(dir, 0o555)))
+	qt.Assert(t, qt.IsNil(os.Chmod(dir, 0o555))) //nolint:gosec // test must make the directory unwritable
 	t.Cleanup(func() {
-		_ = os.Chmod(dir, 0o700)
+		if err := os.Chmod(dir, 0o700); err != nil { //nolint:gosec // cleanup restores directory access
+			t.Errorf("restore directory permissions: %v", err)
+		}
 	})
 	probe, probeErr := os.CreateTemp(dir, ".chmod-probe-*")
 	if probeErr == nil {
@@ -160,9 +162,11 @@ func TestWriteIfMissingReturnsCreateTempError(t *testing.T) {
 	}
 	dir := t.TempDir()
 	path := filepath.Join(dir, "config.jsonc")
-	qt.Assert(t, qt.IsNil(os.Chmod(dir, 0o555)))
+	qt.Assert(t, qt.IsNil(os.Chmod(dir, 0o555))) //nolint:gosec // test must make the directory unwritable
 	t.Cleanup(func() {
-		_ = os.Chmod(dir, 0o700)
+		if err := os.Chmod(dir, 0o700); err != nil { //nolint:gosec // cleanup restores directory access
+			t.Errorf("restore directory permissions: %v", err)
+		}
 	})
 	probe, probeErr := os.CreateTemp(dir, ".chmod-probe-*")
 	if probeErr == nil {
