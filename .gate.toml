@@ -1,0 +1,20 @@
+# CI runs the suite with -race and a 75% coverage floor, which detection's plain `go test ./...` does not.
+[gates.test]
+run = '''
+cov=$(mktemp "${TMPDIR:-/tmp}/cover.XXXXXX")
+trap 'rm -f "$cov"' EXIT
+go test -race -coverprofile="$cov" -covermode=atomic ./... || exit 1
+pct=$(go tool cover -func="$cov" | tail -1 | grep -oE '[0-9]+\.[0-9]+')
+awk -v pct="$pct" 'BEGIN { if (pct + 0 < 75) { print "coverage " pct "% is below the 75% floor"; exit 1 } }'
+'''
+
+[gates.mod-verify]
+run = "go mod verify"
+
+# CI dogfoods --check on this repo's own tree with the freshly built binary.
+[gates.format-check]
+run = '''
+bin=$(mktemp -d "${TMPDIR:-/tmp}/fd.XXXXXX")
+trap 'rm -rf "$bin"' EXIT
+go build -o "$bin/format-dispatch" ./cmd/format-dispatch && "$bin/format-dispatch" --check .
+'''

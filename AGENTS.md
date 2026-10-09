@@ -68,3 +68,7 @@ formatter reads as native.
   [`internal/formatters/system.go`](internal/formatters/system.go).
 - No drive-by refactors; match file style.
 - Build and PR workflow: [CONTRIBUTING.md](CONTRIBUTING.md).
+
+## Gate budget
+
+Measured 2026-10-09 at load 5-30 on 32 cores. Detection found build, golangci-lint (which covers gofumpt and vet), `go test ./...`, govulncheck, actionlint and shellcheck. CI also runs the suite with `-race` and a 75% coverage floor, `go mod verify` and a `--check` dogfood of the freshly built binary, so `.gate.toml` replaces the plain test with the race and coverage run and adds the other two. Warm: 2 s wall and 7 s CPU before the race run was added, 7.8 s wall and 16 s CPU after (the coverage run is uncached; measured at load 21). Cold (fresh copy, throwaway Go build, module and lint caches, so the go1.27.2 toolchain download is included): 25 s wall and 193 s CPU at load 26-33. Warm is under the 10 s bar; cold is under 30 s wall but its CPU is the toolchain download and a full `-race` build, which a second cold run would not repeat.
