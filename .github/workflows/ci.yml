@@ -92,4 +92,5 @@ jobs:
       - uses: Rethunk-Tech/gh-actions/setup-go@99dfb9093ab089d28f76d8036322a7c062259e76 # v1.13
         with:
           run-lint: "true"
+          lint-version: v2.14.0
           run-govulncheck: "true"
