@@ -16,7 +16,8 @@ formats/lints a file right after Write/Edit/MultiEdit/NotebookEdit writes it
 Single global Go binary (`format-dispatch`), no per-repo setup. Native
 in-process formatters for JSON, shell, and Go; everything else routes to
 biome, prettier, taplo, markdownlint-cli2, sqlfluff, ruff/black, rustfmt,
-`terraform fmt` (or `tofu fmt`), and buf.
+`terraform fmt` (or `tofu fmt`), buf, clang-format, google-java-format, ktlint,
+swift-format/swiftformat, rubocop/standardrb, php-cs-fixer/pint, nixfmt, and stylua.
 
 ## Quick start
 
