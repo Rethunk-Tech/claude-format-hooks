@@ -33,7 +33,7 @@ jobs:
       # it let whichever job finished first save the Linux build cache, and
       # lint usually wins, so this leg restored a cache with no -race build
       # in it. Hashing go.sum as well gives the test legs their own key.
-      - uses: Rethunk-Tech/gh-actions/setup-go@77071f0a197d38f7d90c9acf67547fdd990f269a # v1.14
+      - uses: Rethunk-Tech/gh-actions/setup-go@1417493f40c23b8826601ac9de8d7abda0b84ec6 # v1.15
         with:
           cache-dependency-path: |
             go.mod
@@ -89,7 +89,7 @@ jobs:
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
 
-      - uses: Rethunk-Tech/gh-actions/setup-go@77071f0a197d38f7d90c9acf67547fdd990f269a # v1.14
+      - uses: Rethunk-Tech/gh-actions/setup-go@1417493f40c23b8826601ac9de8d7abda0b84ec6 # v1.15
         with:
           run-lint: "true"
           run-govulncheck: "true"
