@@ -10,8 +10,9 @@ Thanks for helping improve **claude-format-hooks**.
 ## Prerequisites
 
 - [Go](https://go.dev/) (see the `go` version in [go.mod](go.mod))
-- [`golangci-lint`](https://golangci-lint.run/) v2.12.2+ (CI pins this
-  version; see [`.golangci.yml`](.golangci.yml))
+- [`golangci-lint`](https://golangci-lint.run/) v2 (the config
+  schema in [`.golangci.yml`](.golangci.yml); CI's lint version comes from
+  `Rethunk-Tech/gh-actions/setup-go`)
 - Optional: `bun` (`bunx`) and `sqlfluff` if you're changing an external
   formatter and want to exercise it locally — see
   [HUMANS.md](HUMANS.md#prerequisites)
