@@ -9,6 +9,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- `go.mod` is formatted with `go mod edit -fmt` and `go.work` with
+  `go work edit -fmt`. The path is passed explicitly, and any other
+  basename is left untouched.
 - `.zsh`, `.ksh`, and `.dash` route to the native shell formatter. Those
   interpreters already formatted when the file had no extension and a
   matching shebang; a `tool.zsh` write was a silent no-op.

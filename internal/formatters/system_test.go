@@ -1,6 +1,8 @@
 package formatters
 
 import (
+	"os"
+	"os/exec"
 	"path/filepath"
 	"testing"
 
@@ -22,6 +24,8 @@ var systemFormatters = []struct {
 	{NewPHP(), "php-cs-fixer", "php-cs-fixer"},
 	{NewNix(), "nixfmt", "nixfmt"},
 	{NewLua(), "stylua", "stylua"},
+	{NewGoMod(), "go mod edit", "go"},
+	{NewGoWork(), "go work edit", "go"},
 }
 
 func TestSystemFormatterNamesAndTools(t *testing.T) {
@@ -83,6 +87,99 @@ func TestSystemFormatterFallsThroughToAlternative(t *testing.T) {
 				qt.Commentf("the file must be the last argument"))
 		})
 	}
+}
+
+func TestGoModAndWorkEditOnlyTheirOwnFile(t *testing.T) {
+	isolateDiskCache(t)
+	dir := t.TempDir()
+	gomod := filepath.Join(dir, "go.mod")
+	otherMod := filepath.Join(dir, "other.mod")
+	gowork := filepath.Join(dir, "go.work")
+	otherWork := filepath.Join(dir, "notes.work")
+	for _, path := range []string{gomod, otherMod, gowork, otherWork} {
+		qt.Assert(t, qt.IsNil(os.WriteFile(path, []byte("x\n"), 0o600)))
+	}
+	argv := filepath.Join(dir, "argv")
+	writeFakeTool(t, "go", `printf '%s' "$*" > `+argv)
+
+	res := NewGoMod().Format(t.Context(), dir, gomod)
+	assertFormatted(t, res)
+	assertArgv(t, argv, "mod edit -fmt "+gomod)
+
+	qt.Assert(t, qt.IsNil(os.Remove(argv)))
+	res = NewGoMod().Format(t.Context(), dir, otherMod)
+	qt.Check(t, qt.IsTrue(res.Skipped))
+	_, err := os.Stat(argv)
+	qt.Check(t, qt.IsTrue(os.IsNotExist(err)))
+
+	res = NewGoWork().Format(t.Context(), dir, gowork)
+	assertFormatted(t, res)
+	assertArgv(t, argv, "work edit -fmt "+gowork)
+
+	qt.Assert(t, qt.IsNil(os.Remove(argv)))
+	res = NewGoWork().Format(t.Context(), dir, otherWork)
+	qt.Check(t, qt.IsTrue(res.Skipped))
+	_, err = os.Stat(argv)
+	qt.Check(t, qt.IsTrue(os.IsNotExist(err)))
+
+	// --check copies beside the original as .fmtcheck-<8 hex>-<base>.
+	// That copy is the file the command must rewrite; a lookalike name is not.
+	scratch := filepath.Join(dir, ".fmtcheck-0123abcd-go.mod")
+	qt.Assert(t, qt.IsNil(os.WriteFile(scratch, []byte("x\n"), 0o600)))
+	res = NewGoMod().Format(t.Context(), dir, scratch)
+	assertFormatted(t, res)
+	assertArgv(t, argv, "mod edit -fmt "+scratch)
+
+	lookalike := filepath.Join(dir, "notgo.mod")
+	qt.Assert(t, qt.IsNil(os.WriteFile(lookalike, []byte("x\n"), 0o600)))
+	qt.Assert(t, qt.IsNil(os.Remove(argv)))
+	res = NewGoMod().Format(t.Context(), dir, lookalike)
+	qt.Check(t, qt.IsTrue(res.Skipped))
+	_, err = os.Stat(argv)
+	qt.Check(t, qt.IsTrue(os.IsNotExist(err)))
+}
+
+func TestGoModAndWorkFormatInPlace(t *testing.T) {
+	if _, err := exec.LookPath("go"); err != nil {
+		t.Skip("go not on PATH")
+	}
+	isolateDiskCache(t)
+	root := t.TempDir()
+	sub := filepath.Join(root, "sub")
+	qt.Assert(t, qt.IsNil(os.Mkdir(sub, 0o750)))
+
+	messyMod := "module example.com/x\n\ngo 1.22\n\nrequire (\nexample.com/b v1.2.3\nexample.com/a v1.0.0\n)\n"
+	messyWork := "go 1.22\n\nuse (\n./b\n./a\n)\n"
+	parentMod := filepath.Join(root, "go.mod")
+	childMod := filepath.Join(sub, "go.mod")
+	otherMod := filepath.Join(root, "other.mod")
+	work := filepath.Join(root, "go.work")
+	otherWork := filepath.Join(root, "notes.work")
+	for _, path := range []string{parentMod, childMod, otherMod} {
+		qt.Assert(t, qt.IsNil(os.WriteFile(path, []byte(messyMod), 0o600)))
+	}
+	for _, path := range []string{work, otherWork} {
+		qt.Assert(t, qt.IsNil(os.WriteFile(path, []byte(messyWork), 0o600)))
+	}
+
+	res := NewGoMod().Format(t.Context(), root, childMod)
+	assertFormatted(t, res)
+	qt.Check(t, qt.StringContains(string(readSource(t, childMod)), "\texample.com/a v1.0.0\n"))
+	qt.Check(t, qt.Equals(string(readSource(t, parentMod)), messyMod))
+	qt.Check(t, qt.Equals(string(readSource(t, otherMod)), messyMod))
+
+	res = NewGoWork().Format(t.Context(), root, work)
+	assertFormatted(t, res)
+	qt.Check(t, qt.StringContains(string(readSource(t, work)), "\t./a\n"))
+	qt.Check(t, qt.Equals(string(readSource(t, otherWork)), messyWork))
+	qt.Check(t, qt.Equals(string(readSource(t, parentMod)), messyMod))
+
+	scratch := filepath.Join(root, ".fmtcheck-0123abcd-go.mod")
+	qt.Assert(t, qt.IsNil(os.WriteFile(scratch, []byte(messyMod), 0o600)))
+	res = NewGoMod().Format(t.Context(), root, scratch)
+	assertFormatted(t, res)
+	qt.Check(t, qt.StringContains(string(readSource(t, scratch)), "\texample.com/a v1.0.0\n"))
+	qt.Check(t, qt.Equals(string(readSource(t, parentMod)), messyMod))
 }
 
 func TestSystemFormatterReportsToolFailure(t *testing.T) {

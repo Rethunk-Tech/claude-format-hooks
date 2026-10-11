@@ -1,6 +1,10 @@
 package formatters
 
-import "context"
+import (
+	"context"
+	"path/filepath"
+	"strings"
+)
 
 // systemFormatter runs the first available of one or more system binaries
 // against a single file, skipping when none resolve. Every language whose
@@ -14,6 +18,13 @@ type systemFormatter struct {
 	// args builds the argv tail for the binary that was found, since
 	// alternatives for the same language rarely share a flag spelling.
 	args func(bin, abs string) []string
+	// onlyBase, when set, is the only basename this formatter may rewrite.
+	// go mod edit and go work edit rewrite the path they are given, and
+	// with no path they rewrite the module or workspace file found from
+	// the working directory, so the name check is what keeps them off
+	// every other file. A --check sibling copy
+	// (.fmtcheck-<8 hex>-<base>) still counts as that basename.
+	onlyBase string
 }
 
 func (s systemFormatter) Name() string { return s.name }
@@ -21,6 +32,9 @@ func (s systemFormatter) Name() string { return s.name }
 func (s systemFormatter) Tools() []string { return s.bins }
 
 func (s systemFormatter) Format(ctx context.Context, projectRoot, abs string) Result {
+	if s.onlyBase != "" && originalBase(abs) != s.onlyBase {
+		return Result{Skipped: true}
+	}
 	for _, bin := range s.bins {
 		if _, err := lookPath(bin); err != nil {
 			continue
@@ -28,6 +42,34 @@ func (s systemFormatter) Format(ctx context.Context, projectRoot, abs string) Re
 		return runExternalResult(ctx, projectRoot, bin, s.args(bin, abs))
 	}
 	return Result{Skipped: true}
+}
+
+// originalBase is the file's basename. --check formats a sibling named
+// .fmtcheck-<8 hex>-<original> (cmd/format-dispatch copyBeside) so the
+// tool still sees the extension; that copy has to count as the original
+// name or the check reports the tool as missing and never compares bytes.
+func originalBase(abs string) string {
+	base := filepath.Base(abs)
+	rest, ok := strings.CutPrefix(base, ".fmtcheck-")
+	if !ok {
+		return base
+	}
+	hexPart, orig, ok := strings.Cut(rest, "-")
+	if !ok || len(hexPart) != 8 || !isLowerHex(hexPart) {
+		return base
+	}
+	return orig
+}
+
+func isLowerHex(s string) bool {
+	for _, c := range s {
+		switch {
+		case c >= '0' && c <= '9', c >= 'a' && c <= 'f':
+		default:
+			return false
+		}
+	}
+	return true
 }
 
 // inPlace is the argv shape shared by every formatter here that takes one
@@ -127,4 +169,26 @@ func NewNix() systemFormatter {
 // NewLua returns the .lua formatter, via stylua.
 func NewLua() systemFormatter {
 	return systemFormatter{name: "stylua", bins: []string{"stylua"}, args: inPlace()}
+}
+
+// NewGoMod returns the go.mod formatter. The file path is always passed:
+// without it, go mod edit -fmt rewrites the main module's go.mod.
+func NewGoMod() systemFormatter {
+	return systemFormatter{
+		name:     "go mod edit",
+		bins:     []string{"go"},
+		args:     inPlace("mod", "edit", "-fmt"),
+		onlyBase: "go.mod",
+	}
+}
+
+// NewGoWork returns the go.work formatter. The file path is always passed:
+// without it, go work edit -fmt walks parent directories for a go.work.
+func NewGoWork() systemFormatter {
+	return systemFormatter{
+		name:     "go work edit",
+		bins:     []string{"go"},
+		args:     inPlace("work", "edit", "-fmt"),
+		onlyBase: "go.work",
+	}
 }

@@ -12,7 +12,7 @@ import (
 )
 
 var supportedExtensions = []string{
-	".json", ".sh", ".bash", ".zsh", ".ksh", ".dash", ".go",
+	".json", ".sh", ".bash", ".zsh", ".ksh", ".dash", ".go", ".mod", ".work",
 	".ts", ".tsx", ".js", ".jsx", ".mjs", ".cjs", ".mts", ".cts", ".css", ".jsonc",
 	".md", ".mdx", ".markdown", ".toml", ".yaml", ".yml", ".html", ".scss", ".less",
 	".graphql", ".gql", ".sql", ".py", ".pyi", ".ipynb", ".rs", ".tf", ".tfvars",
@@ -109,6 +109,8 @@ func TestName(t *testing.T) {
 		".ksh":         "shfmt",
 		".dash":        "shfmt",
 		".go":          "gofmt",
+		".mod":         "go mod edit",
+		".work":        "go work edit",
 		".ts":          "biome",
 		".tsx":         "biome",
 		".js":          "biome",
@@ -255,6 +257,8 @@ func TestRegistryCoversAddedLanguages(t *testing.T) {
 		".php":     "php-cs-fixer",
 		".nix":     "nixfmt",
 		".lua":     "stylua",
+		".mod":     "go mod edit",
+		".work":    "go work edit",
 		".vue":     "prettier",
 		".svelte":  "prettier",
 		".astro":   "prettier",

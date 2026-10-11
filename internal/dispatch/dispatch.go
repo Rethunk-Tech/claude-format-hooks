@@ -28,6 +28,8 @@ func NewRegistry(cfg config.Config) *Registry {
 	json := formatters.NewJSONRouter(cfg)
 	shell := formatters.NewShell(cfg)
 	golang := formatters.NewGo()
+	gomod := formatters.NewGoMod()
+	gowork := formatters.NewGoWork()
 	biome := formatters.NewBiome()
 	markdown := formatters.NewMarkdown()
 	toml := formatters.NewTOML()
@@ -59,6 +61,10 @@ func NewRegistry(cfg config.Config) *Registry {
 		".dash": shell,
 
 		".go": golang,
+		// .mod and .work are broader than the two files these commands
+		// may rewrite. The formatters skip every other basename.
+		".mod":  gomod,
+		".work": gowork,
 
 		".ts":  biome,
 		".tsx": biome,
