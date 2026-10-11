@@ -15,6 +15,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- `.go` files format with `gofumpt` when it is on `PATH`, so a hook pass
+  matches `golangci-lint fmt` instead of stopping at `gofmt`.
+  `-extra=group_params` is added only when a parent `.golangci.yml` sets
+  `formatters.settings.gofumpt.extra.group-params: true`. `goimports` runs
+  first when it is on `PATH` and that file's `formatters.enable` lists it.
+  Invalid Go stays a silent skip. Without `gofumpt`, formatting stays
+  `go/format.Source`.
 - `sqlfluff fix` no longer applies RF03 (`references.consistent`), whose
   qualification fix could retarget an outer-table column in a correlated
   subquery (e.g. a `CREATE POLICY ... USING (EXISTS ...)`) to the inner

@@ -8,6 +8,7 @@ Operator setup and troubleshooting. Developers: [AGENTS.md](AGENTS.md).
 
 Go ([go.mod](go.mod)); optional `bun` (bunx formatters),
 `sqlfluff`, `ruff`/`black`, `rustfmt`, `terraform`/`tofu`, `buf`,
+`gofumpt`/`goimports` (`.go` stays `gofmt` when `gofumpt` is absent),
 `clang-format`, `google-java-format`, `ktlint`, `swift-format`/`swiftformat`,
 `rubocop`/`standardrb`, `php-cs-fixer`/`pint`, `nixfmt`, `stylua`.
 `format-dispatch --doctor` reports which of these are actually reachable.
@@ -88,7 +89,9 @@ SQL: `~/.sqlfluff` bootstrap on first `.sql` write.
 
 ## Supported extensions
 
-JSON/shell/Go native (`.sh`/`.bash`/`.zsh`/`.ksh`/`.dash`, plus extensionless
+JSON/shell/Go (`.go` via `gofumpt` when it is on `PATH`, with `goimports`
+first when a parent `.golangci.yml` enables it, otherwise native `gofmt`;
+`.sh`/`.bash`/`.zsh`/`.ksh`/`.dash`, plus extensionless
 or hidden rc files whose shebang names a supported interpreter, including
 `env -S`); TS/CSS/JSONC via biome; MD via markdownlint-cli2; TOML via taplo;
 YAML/HTML/etc via prettier; SQL via sqlfluff; Python via ruff/black;

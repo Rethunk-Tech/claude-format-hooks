@@ -37,7 +37,9 @@ Single package: `go test -race -v ./internal/formatters/...`.
 | [`internal/installer/`](internal/installer/) | Hook wiring, upgrade, bunx tool provisioning |
 
 Native formatters: JSON (`encoding/json.Indent`), shell (`mvdan.cc/sh/v3`),
-Go (`go/format.Source`). External tools invoked via `bunx` or system `PATH`.
+Go (`gofumpt` on `PATH`, otherwise `go/format.Source`; `goimports` runs first
+when it is on `PATH` and a parent `.golangci.yml` lists it). External tools
+invoked via `bunx` or system `PATH`.
 A formatter that shells out reports its candidate binaries via the optional
 `formatters.Prober` interface, which is what `--doctor` reads; without one a
 formatter reads as native.
