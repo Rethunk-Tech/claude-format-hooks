@@ -32,6 +32,8 @@ func TestShebangExt(t *testing.T) {
 		{"ruby", "#!/usr/bin/env ruby\n", ".rb", true},
 		{"node", "#!/usr/bin/env node\n", ".js", true},
 		{"bun", "#!/usr/bin/env bun\n", ".js", true},
+		{"deno", "#!/usr/bin/env deno\n", ".ts", true},
+		{"env -S deno", "#!/usr/bin/env -S deno run\n", ".ts", true},
 		{"unknown interpreter", "#!/usr/bin/env perl\n", "", false},
 		{"unknown after env -S", "#!/usr/bin/env -S perl -w\n", "", false},
 		{"no shebang", "echo hello\n", "", false},
