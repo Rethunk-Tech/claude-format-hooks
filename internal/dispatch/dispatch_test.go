@@ -15,8 +15,8 @@ import (
 var supportedExtensions = []string{
 	".json", ".json.example", ".sh", ".bash", ".zsh", ".ksh", ".dash", ".go", ".mod", ".work",
 	".ts", ".tsx", ".js", ".jsx", ".mjs", ".cjs", ".mts", ".cts", ".css", ".jsonc", ".jsonc.example",
-	".md", ".mdx", ".markdown", ".toml", ".toml.example", ".yaml", ".yml", ".yaml.example", ".yml.example", ".html", ".scss", ".less",
-	".graphql", ".gql", ".sql", ".sql.example", ".py", ".pyi", ".ipynb", ".rs", ".tf", ".tfvars",
+	".md", ".mdx", ".markdown", ".md.example", ".toml", ".toml.example", ".yaml", ".yml", ".yaml.example", ".yml.example", ".html", ".scss", ".less",
+	".graphql", ".gql", ".sql", ".sql.example", ".py", ".py.example", ".pyi", ".ipynb", ".rs", ".tf", ".tfvars",
 	".tftest.hcl", ".tfmock.hcl", ".tfquery.hcl", ".proto",
 }
 
@@ -127,6 +127,7 @@ func TestName(t *testing.T) {
 		".md":            "markdownlint-cli2",
 		".mdx":           "markdownlint-cli2",
 		".markdown":      "markdownlint-cli2",
+		".md.example":    "markdownlint-cli2",
 		".toml":          "taplo",
 		".toml.example":  "taplo",
 		".yaml":          "prettier",
@@ -141,6 +142,7 @@ func TestName(t *testing.T) {
 		".sql":           "sqlfluff",
 		".sql.example":   "sqlfluff",
 		".py":            "ruff/black",
+		".py.example":    "ruff/black",
 		".pyi":           "ruff/black",
 		".ipynb":         "ruff/black-notebook",
 		".rs":            "rustfmt",
@@ -204,6 +206,8 @@ func TestDispatchFormatsExampleSuffixes(t *testing.T) {
 		{"config.toml.example", "taplo"},
 		{"config.jsonc.example", "biome"},
 		{"config.sql.example", "sqlfluff"},
+		{"README.md.example", "markdownlint-cli2"},
+		{"app.py.example", "ruff/black"},
 	} {
 		ext := ResolveExtension(tc.name)
 		qt.Check(t, qt.Equals(r.Name(ext), tc.want), qt.Commentf("path=%q", tc.name))
@@ -232,6 +236,10 @@ func TestDispatchFormatsExampleSuffixes(t *testing.T) {
 	qt.Assert(t, qt.IsNil(os.WriteFile(filepath.Join(bin, "biome"), []byte(biomeScript), 0o755))) //nolint:gosec // test formatter fixture must be executable
 	sqlScript := "#!/bin/sh\nif [ \"$1\" = render ]; then exit 0; fi\nprintf 'SELECT 1\\n'\n"
 	qt.Assert(t, qt.IsNil(os.WriteFile(filepath.Join(bin, "sqlfluff"), []byte(sqlScript), 0o755))) //nolint:gosec // test formatter fixture must be executable
+	mdScript := "#!/bin/sh\nprev=\nfor arg do\n  if [ \"$prev\" = -- ]; then target=$arg; fi\n  prev=$arg\ndone\nprintf '# Title\\n' > \"$target\"\n"
+	qt.Assert(t, qt.IsNil(os.WriteFile(filepath.Join(bin, "markdownlint-cli2"), []byte(mdScript), 0o755))) //nolint:gosec // test formatter fixture must be executable
+	ruffScript := "#!/bin/sh\nprintf 'def f():\\n    return 1\\n'\n"
+	qt.Assert(t, qt.IsNil(os.WriteFile(filepath.Join(bin, "ruff"), []byte(ruffScript), 0o755))) //nolint:gosec // test formatter fixture must be executable
 	t.Setenv("PATH", bin)
 
 	tomlPath := filepath.Join(dir, "config.toml.example")
@@ -268,6 +276,30 @@ func TestDispatchFormatsExampleSuffixes(t *testing.T) {
 	sqlOut, err := os.ReadFile(sqlPath) //nolint:gosec // test path is created under t.TempDir
 	qt.Assert(t, qt.IsNil(err))
 	qt.Assert(t, qt.Equals(string(sqlOut), "SELECT 1\n"))
+
+	mdPath := filepath.Join(dir, "README.md.example")
+	qt.Assert(t, qt.IsNil(os.WriteFile(mdPath, []byte("#Title\n"), 0o600)))
+	mdExt := ResolveExtension(mdPath)
+	qt.Assert(t, qt.Equals(mdExt, ".md.example"))
+	qt.Assert(t, qt.Equals(r.Name(mdExt), "markdownlint-cli2"))
+	mdResult := r.Dispatch(t.Context(), dir, mdPath, mdExt)
+	qt.Assert(t, qt.IsNil(mdResult.Err))
+	qt.Assert(t, qt.IsFalse(mdResult.Skipped))
+	mdOut, err := os.ReadFile(mdPath) //nolint:gosec // test path is created under t.TempDir
+	qt.Assert(t, qt.IsNil(err))
+	qt.Assert(t, qt.Equals(string(mdOut), "# Title\n"))
+
+	pyPath := filepath.Join(dir, "app.py.example")
+	qt.Assert(t, qt.IsNil(os.WriteFile(pyPath, []byte("def f( ):\n  return 1\n"), 0o600)))
+	pyExt := ResolveExtension(pyPath)
+	qt.Assert(t, qt.Equals(pyExt, ".py.example"))
+	qt.Assert(t, qt.Equals(r.Name(pyExt), "ruff/black"))
+	pyResult := r.Dispatch(t.Context(), dir, pyPath, pyExt)
+	qt.Assert(t, qt.IsNil(pyResult.Err))
+	qt.Assert(t, qt.IsFalse(pyResult.Skipped))
+	pyOut, err := os.ReadFile(pyPath) //nolint:gosec // test path is created under t.TempDir
+	qt.Assert(t, qt.IsNil(err))
+	qt.Assert(t, qt.Equals(string(pyOut), "def f():\n    return 1\n"))
 }
 
 func TestDispatchUsesCallerResolvedExtensionForExtensionlessPath(t *testing.T) {

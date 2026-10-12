@@ -45,9 +45,11 @@ uses biome, fed on stdin under a `.jsonc` name, because biome only reads
 the final suffix. `.yaml.example` and `.yml.example` use prettier with
 `--parser yaml`. `.toml.example` uses taplo with `--stdin-filepath`,
 because taplo only includes `*.toml`. `.sql.example` uses sqlfluff via
-stdin with `--stdin-filename`, because sqlfluff only collects `*.sql`. A
-bare `.example` is not registered. External tools
-invoked via `bunx` or system `PATH`.
+stdin with `--stdin-filename`, because sqlfluff only collects `*.sql`.
+`.md.example` uses markdownlint-cli2; an explicit path is fixed in place.
+`.py.example` uses ruff or black, fed on stdin under a `.py` name, because
+black's include stops at `*.py` and `*.pyi`. A bare `.example` is not
+registered. External tools invoked via `bunx` or system `PATH`.
 A formatter that shells out reports its candidate binaries via the optional
 `formatters.Prober` interface, which is what `--doctor` reads; without one a
 formatter reads as native.

@@ -93,6 +93,9 @@ func NewRegistry(cfg config.Config) *Registry {
 		// Cursor rule files: YAML frontmatter over markdown, which
 		// markdownlint-cli2 already handles.
 		".mdc": markdown,
+		// Same document as .md. markdownlint-cli2 fixes an explicit path,
+		// so the .example suffix does not need a renamed copy.
+		".md.example": markdown,
 
 		".toml": toml,
 		// Same document as .toml. Taplo's include rule is **/*.toml, so
@@ -123,7 +126,11 @@ func NewRegistry(cfg config.Config) *Registry {
 		// formatter feeds these copies on stdin and names the file.
 		".sql.example": sql,
 
-		".py":          python,
+		".py": python,
+		// Same document as .py. Black's include stops at *.py and *.pyi,
+		// so a copy whose final suffix is .example is skipped in place.
+		// Stdin is formatted as Python under the name with .example removed.
+		".py.example":  python,
 		".pyi":         python,
 		".ipynb":       notebook,
 		".rs":          rust,

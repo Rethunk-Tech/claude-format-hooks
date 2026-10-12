@@ -274,6 +274,44 @@ func TestPythonFormatterFallsBackToBlack(t *testing.T) {
 	}
 }
 
+func TestPythonExampleUsesStdin(t *testing.T) {
+	isolateDiskCache(t)
+	argvPath := filepath.Join(t.TempDir(), "argv")
+	t.Setenv("RUFF_ARGV", argvPath)
+	writeFakeTool(t, "ruff", `printf '%s\n' "$@" > "$RUFF_ARGV"; printf 'def f():\n    return 1\n'`)
+
+	dir := t.TempDir()
+	abs := filepath.Join(dir, "app.py.example")
+	qt.Assert(t, qt.IsNil(os.WriteFile(abs, []byte("def f( ):\n  return 1\n"), 0o600)))
+	res := NewPython().Format(t.Context(), dir, abs)
+	assertFormatted(t, res)
+	named := abs[:len(abs)-len(".example")]
+	assertArgv(t, argvPath, "format\n--stdin-filename\n"+named+"\n-\n")
+	qt.Check(t, qt.Equals(string(readSource(t, abs)), "def f():\n    return 1\n"))
+
+	plain := filepath.Join(dir, "app.py")
+	qt.Assert(t, qt.IsNil(os.WriteFile(plain, []byte("def f( ):\n  return 1\n"), 0o600)))
+	res = NewPython().Format(t.Context(), dir, plain)
+	assertFormatted(t, res)
+	assertArgv(t, argvPath, "format\n--\n"+plain+"\n")
+	qt.Check(t, qt.Equals(string(readSource(t, plain)), "def f( ):\n  return 1\n"),
+		qt.Commentf("a .py file is rewritten in place by ruff, not from stdout"))
+}
+
+func TestPythonExampleFallsBackToBlackStdin(t *testing.T) {
+	isolateDiskCache(t)
+	argvPath := filepath.Join(t.TempDir(), "argv")
+	t.Setenv("BLACK_ARGV", argvPath)
+	writeFakeTool(t, "black", `printf '%s\n' "$@" > "$BLACK_ARGV"; printf 'def f():\n    return 1\n'`)
+
+	dir, abs := sourceFile(t, "app.py.example", "def f( ):\n  return 1\n")
+	res := NewPython().Format(t.Context(), dir, abs)
+	assertFormatted(t, res)
+	named := abs[:len(abs)-len(".example")]
+	assertArgv(t, argvPath, "--quiet\n--stdin-filename\n"+named+"\n-\n")
+	qt.Check(t, qt.Equals(string(readSource(t, abs)), "def f():\n    return 1\n"))
+}
+
 func TestPythonFormatterFailure(t *testing.T) {
 	isolateDiskCache(t)
 	writeFakeTool(t, "ruff", "exit 1")

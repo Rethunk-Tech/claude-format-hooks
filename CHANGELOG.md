@@ -9,6 +9,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- `.md.example` uses the Markdown formatter. markdownlint-cli2 fixes an
+  explicit path in place. A bare `.example` file is left untouched.
+- `.py.example` uses the Python formatter. These copies are formatted via
+  stdin with the `.example` suffix removed, so ruff and black see a `.py`
+  name. Black's include stops at `*.py` and `*.pyi`. A bare `.example`
+  file is left untouched.
 - `.jsonc.example` uses the JSONC formatter. Biome only reads the final
   suffix, so these copies are formatted via stdin with `--stdin-file-path`
   named as `.jsonc`. A bare `.example` file is left untouched.

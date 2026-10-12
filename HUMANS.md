@@ -94,8 +94,9 @@ first when a parent `.golangci.yml` enables it, otherwise native `gofmt`;
 `go.mod` via `go mod edit -fmt` and `go.work` via `go work edit -fmt`,
 each only when the file has that exact name;
 `.json.example` as JSON, `.jsonc.example` as JSONC, `.yaml.example` /
-`.yml.example` as YAML, `.toml.example` as TOML, and `.sql.example` as
-SQL; a file named `notes.example` is not formatted;
+`.yml.example` as YAML, `.toml.example` as TOML, `.sql.example` as SQL,
+`.md.example` as Markdown, and `.py.example` as Python; a file named
+`notes.example` is not formatted;
 `.sh`/`.bash`/`.zsh`/`.ksh`/`.dash`, plus extensionless
 or hidden rc files whose shebang names a supported interpreter, including
 `env -S`); TS/CSS/JSONC via biome; MD via markdownlint-cli2; TOML via taplo;

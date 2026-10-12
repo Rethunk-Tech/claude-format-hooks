@@ -43,6 +43,10 @@ func TestResolveExtensionPrefersLongestRegisteredSuffix(t *testing.T) {
 		{"config.toml.example", ".toml.example"},
 		{"config.sql.example", ".sql.example"},
 		{"config.SQL.EXAMPLE", ".sql.example"},
+		{"README.md.example", ".md.example"},
+		{"README.MD.EXAMPLE", ".md.example"},
+		{"app.py.example", ".py.example"},
+		{"app.PY.EXAMPLE", ".py.example"},
 		{"config.TOML.EXAMPLE", ".toml.example"},
 		{"config.YAML.EXAMPLE", ".yaml.example"},
 	}
