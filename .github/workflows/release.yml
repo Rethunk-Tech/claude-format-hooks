@@ -51,7 +51,7 @@ jobs:
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
 
-      - uses: Rethunk-Tech/gh-actions/setup-go@f49ada2688f22a9bed2770b7ac8877f7a6f3ec0f # v1.16
+      - uses: Rethunk-Tech/gh-actions/setup-go@bc5fa5b1004205c9c9399fc941d79d5ada53c59b # v1.16
 
       # Pure Go, no cgo — every target cross-compiles from one ubuntu
       # runner instead of needing native macOS/Windows builders.
