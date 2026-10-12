@@ -40,7 +40,9 @@ Native formatters: JSON (`encoding/json.Indent`), shell (`mvdan.cc/sh/v3`),
 Go (`gofumpt` on `PATH`, otherwise `go/format.Source`; `goimports` runs first
 when it is on `PATH` and a parent `.golangci.yml` lists it). `go.mod` and
 `go.work` are `go mod edit -fmt` and `go work edit -fmt` on those exact
-filenames. External tools
+filenames. `.json.example` uses that JSON formatter; `.yaml.example` and
+`.yml.example` use prettier with `--parser yaml`. A bare `.example` is
+not registered. External tools
 invoked via `bunx` or system `PATH`.
 A formatter that shells out reports its candidate binaries via the optional
 `formatters.Prober` interface, which is what `--doctor` reads; without one a

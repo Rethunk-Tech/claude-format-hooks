@@ -105,6 +105,19 @@ func TestJSONRouterUsesPathBiomeWithoutBunx(t *testing.T) {
 	qt.Check(t, qt.Equals(string(got), src), qt.Commentf("PATH biome should handle the file without bunx"))
 }
 
+func TestJSONRouterFormatsExampleCopyWithoutBiome(t *testing.T) {
+	isolateDiskCache(t)
+	dir := t.TempDir()
+	writeFakeTool(t, "biome", "exit 0")
+	qt.Assert(t, qt.IsNil(os.WriteFile(filepath.Join(dir, "biome.json"), []byte("{}\n"), 0o600)))
+	path := filepath.Join(dir, "config.json.example")
+	qt.Assert(t, qt.IsNil(os.WriteFile(path, []byte(`{"a":1}`), 0o600)))
+
+	res := NewJSONRouter(config.Default()).Format(t.Context(), dir, path)
+	qt.Assert(t, qt.IsFalse(res.Skipped))
+	qt.Check(t, qt.Equals(string(readSource(t, path)), "{\n  \"a\": 1\n}\n"))
+}
+
 func TestJSONRouterSkipsDisabledBiome(t *testing.T) {
 	isolateDiskCache(t)
 	dir, path := biomeProject(t, "t.json", `{"a":1}`)

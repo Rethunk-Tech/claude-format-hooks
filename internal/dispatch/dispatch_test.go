@@ -12,9 +12,9 @@ import (
 )
 
 var supportedExtensions = []string{
-	".json", ".sh", ".bash", ".zsh", ".ksh", ".dash", ".go", ".mod", ".work",
+	".json", ".json.example", ".sh", ".bash", ".zsh", ".ksh", ".dash", ".go", ".mod", ".work",
 	".ts", ".tsx", ".js", ".jsx", ".mjs", ".cjs", ".mts", ".cts", ".css", ".jsonc",
-	".md", ".mdx", ".markdown", ".toml", ".yaml", ".yml", ".html", ".scss", ".less",
+	".md", ".mdx", ".markdown", ".toml", ".yaml", ".yml", ".yaml.example", ".yml.example", ".html", ".scss", ".less",
 	".graphql", ".gql", ".sql", ".py", ".pyi", ".ipynb", ".rs", ".tf", ".tfvars",
 	".tftest.hcl", ".tfmock.hcl", ".tfquery.hcl", ".proto",
 }
@@ -102,47 +102,50 @@ func TestName(t *testing.T) {
 	r := NewRegistry(config.Default())
 
 	want := map[string]string{
-		".json":        "json",
-		".sh":          "shfmt",
-		".bash":        "shfmt",
-		".zsh":         "shfmt",
-		".ksh":         "shfmt",
-		".dash":        "shfmt",
-		".go":          "gofmt",
-		".mod":         "go mod edit",
-		".work":        "go work edit",
-		".ts":          "biome",
-		".tsx":         "biome",
-		".js":          "biome",
-		".jsx":         "biome",
-		".mjs":         "biome",
-		".cjs":         "biome",
-		".mts":         "biome",
-		".cts":         "biome",
-		".css":         "biome",
-		".jsonc":       "biome",
-		".md":          "markdownlint-cli2",
-		".mdx":         "markdownlint-cli2",
-		".markdown":    "markdownlint-cli2",
-		".toml":        "taplo",
-		".yaml":        "prettier",
-		".yml":         "prettier",
-		".html":        "prettier",
-		".scss":        "prettier",
-		".less":        "prettier",
-		".graphql":     "prettier",
-		".gql":         "prettier",
-		".sql":         "sqlfluff",
-		".py":          "ruff/black",
-		".pyi":         "ruff/black",
-		".ipynb":       "ruff/black-notebook",
-		".rs":          "rustfmt",
-		".tf":          "terraform",
-		".tfvars":      "terraform",
-		".tftest.hcl":  "terraform",
-		".tfmock.hcl":  "terraform",
-		".tfquery.hcl": "terraform",
-		".proto":       "buf",
+		".json":         "json",
+		".json.example": "json",
+		".sh":           "shfmt",
+		".bash":         "shfmt",
+		".zsh":          "shfmt",
+		".ksh":          "shfmt",
+		".dash":         "shfmt",
+		".go":           "gofmt",
+		".mod":          "go mod edit",
+		".work":         "go work edit",
+		".ts":           "biome",
+		".tsx":          "biome",
+		".js":           "biome",
+		".jsx":          "biome",
+		".mjs":          "biome",
+		".cjs":          "biome",
+		".mts":          "biome",
+		".cts":          "biome",
+		".css":          "biome",
+		".jsonc":        "biome",
+		".md":           "markdownlint-cli2",
+		".mdx":          "markdownlint-cli2",
+		".markdown":     "markdownlint-cli2",
+		".toml":         "taplo",
+		".yaml":         "prettier",
+		".yml":          "prettier",
+		".yaml.example": "prettier",
+		".yml.example":  "prettier",
+		".html":         "prettier",
+		".scss":         "prettier",
+		".less":         "prettier",
+		".graphql":      "prettier",
+		".gql":          "prettier",
+		".sql":          "sqlfluff",
+		".py":           "ruff/black",
+		".pyi":          "ruff/black",
+		".ipynb":        "ruff/black-notebook",
+		".rs":           "rustfmt",
+		".tf":           "terraform",
+		".tfvars":       "terraform",
+		".tftest.hcl":   "terraform",
+		".tfmock.hcl":   "terraform",
+		".tfquery.hcl":  "terraform",
+		".proto":        "buf",
 	}
 	for _, ext := range supportedExtensions {
 		qt.Check(t, qt.Equals(r.Name(ext), want[ext]), qt.Commentf("ext=%q", ext))
@@ -171,6 +174,29 @@ func TestDispatchRoutesToFormatter(t *testing.T) {
 	out, err := os.ReadFile(path) //nolint:gosec // test path is created under t.TempDir
 	qt.Assert(t, qt.IsNil(err))
 	qt.Assert(t, qt.Equals(string(out), "{\n  \"b\": 1,\n  \"a\": 2\n}\n"))
+}
+
+func TestDispatchFormatsExampleSuffixes(t *testing.T) {
+	dir := t.TempDir()
+	path := filepath.Join(dir, "config.json.example")
+	qt.Assert(t, qt.IsNil(os.WriteFile(path, []byte(`{"b":1,"a":2}`), 0o600)))
+
+	r := NewRegistry(config.Default())
+	ext := ResolveExtension(path)
+	qt.Assert(t, qt.Equals(ext, ".json.example"))
+	result := r.Dispatch(t.Context(), dir, path, ext)
+	qt.Assert(t, qt.IsNil(result.Err))
+
+	out, err := os.ReadFile(path) //nolint:gosec // test path is created under t.TempDir
+	qt.Assert(t, qt.IsNil(err))
+	qt.Assert(t, qt.Equals(string(out), "{\n  \"b\": 1,\n  \"a\": 2\n}\n"))
+
+	for _, name := range []string{"config.yaml.example", "config.yml.example"} {
+		ext := ResolveExtension(name)
+		qt.Check(t, qt.Equals(r.Name(ext), "prettier"), qt.Commentf("path=%q", name))
+		qt.Check(t, qt.IsTrue(r.Supported(ext)), qt.Commentf("path=%q", name))
+	}
+	qt.Check(t, qt.IsFalse(r.Supported(ResolveExtension("notes.example"))))
 }
 
 func TestDispatchUsesCallerResolvedExtensionForExtensionlessPath(t *testing.T) {

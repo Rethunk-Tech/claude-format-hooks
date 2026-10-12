@@ -52,6 +52,8 @@ func NewRegistry(cfg config.Config) *Registry {
 
 	all := map[string]formatters.Formatter{
 		".json": json,
+		// Same document as .json. A bare .example is not registered.
+		".json.example": json,
 
 		".sh":   shell,
 		".bash": shell,
@@ -93,7 +95,11 @@ func NewRegistry(cfg config.Config) *Registry {
 
 		".yaml": prettier,
 		".yml":  prettier,
-		".html": prettier,
+		// Same document as .yaml/.yml. Prettier only inspects the final
+		// suffix, so these copies name the yaml parser.
+		".yaml.example": prettier,
+		".yml.example":  prettier,
+		".html":         prettier,
 		// biome's CSS parser doesn't support the SCSS/Less supersets;
 		// prettier does natively.
 		".scss": prettier,

@@ -393,6 +393,26 @@ func TestFindUpward(t *testing.T) {
 	qt.Check(t, qt.Equals(findUpward(root, root, "nope.json"), ""))
 }
 
+func TestPrettierNamesParserForExampleSuffixes(t *testing.T) {
+	isolateDiskCache(t)
+	argvPath := filepath.Join(t.TempDir(), "argv")
+	t.Setenv("PRETTIER_ARGV", argvPath)
+	writeFakeTool(t, "prettier", `printf '%s\n' "$@" > "$PRETTIER_ARGV"; exit 0`)
+
+	dir := t.TempDir()
+	for _, name := range []string{"config.yaml.example", "config.yml.example"} {
+		abs := filepath.Join(dir, name)
+		res := NewPrettier().Format(t.Context(), dir, abs)
+		assertFormatted(t, res)
+		assertArgv(t, argvPath, "--write\n--parser\nyaml\n--\n"+abs+"\n")
+	}
+
+	html := filepath.Join(dir, "page.html")
+	res := NewPrettier().Format(t.Context(), dir, html)
+	assertFormatted(t, res)
+	assertArgv(t, argvPath, "--write\n--\n"+html+"\n")
+}
+
 // Prettier is the formatter for .svelte and .astro, but only via a plugin
 // the project installs itself. Without one prettier exits non-zero saying
 // it has no parser -- reporting that as a failed format would put a

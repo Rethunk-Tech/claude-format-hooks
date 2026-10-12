@@ -2,6 +2,7 @@ package formatters
 
 import (
 	"context"
+	"path/filepath"
 	"strings"
 )
 
@@ -61,17 +62,32 @@ func NewTOML() bunxFormatter {
 // reporting a diagnostic the operator cannot act on from here.
 const prettierNoParserMarker = "No parser could be inferred"
 
-// NewPrettier returns the bunxFormatter for .yaml/.yml/.html/.vue and the
-// plugin-backed .svelte/.astro, via prettier.
+// NewPrettier returns the bunxFormatter for .yaml/.yml (including the
+// .yaml.example/.yml.example copies), .html/.vue, and the plugin-backed
+// .svelte/.astro, via prettier.
 func NewPrettier() bunxFormatter {
 	return bunxFormatter{
 		name:     "prettier",
-		pathArgs: func(abs string) []string { return []string{"--write", "--", abs} },
-		bunxArgs: func(abs string) []string { return []string{"prettier", "--write", "--", abs} },
+		pathArgs: prettierWriteArgs,
+		bunxArgs: func(abs string) []string {
+			return append([]string{"prettier"}, prettierWriteArgs(abs)...)
+		},
 		skipIf: func(diagnostic string) bool {
 			return strings.Contains(diagnostic, prettierNoParserMarker)
 		},
 	}
+}
+
+// prettierWriteArgs is prettier's --write invocation. Prettier picks a parser
+// from the final suffix, and .example is not one it knows, so a YAML copy
+// has to name the parser or every write of it is reported as "no parser".
+func prettierWriteArgs(abs string) []string {
+	args := []string{"--write"}
+	base := strings.ToLower(filepath.Base(abs))
+	if strings.HasSuffix(base, ".yaml.example") || strings.HasSuffix(base, ".yml.example") {
+		args = append(args, "--parser", "yaml")
+	}
+	return append(args, "--", abs)
 }
 
 func (b bunxFormatter) Name() string { return b.name }

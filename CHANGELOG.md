@@ -9,6 +9,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- `.yaml.example`, `.yml.example`, and `.json.example` use the YAML and
+  JSON formatters. Prettier is given `--parser yaml` for the YAML copies,
+  because it only looks at the final suffix. A bare `.example` file is
+  left untouched.
 - `go.mod` is formatted with `go mod edit -fmt` and `go.work` with
   `go work edit -fmt`. The path is passed explicitly, and any other
   basename is left untouched.

@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"os"
+	"path/filepath"
 	"strings"
 
 	"github.com/Rethunk-Tech/claude-format-hooks/internal/config"
@@ -58,6 +59,11 @@ func NewJSONRouter(cfg config.Config) jsonRouter {
 func (jsonRouter) Name() string { return "json" }
 
 func (r jsonRouter) Format(ctx context.Context, projectRoot, abs string) Result {
+	// Biome exits 0 on a suffix it does not recognize (--no-errors-on-unmatched)
+	// and leaves the file as it was. These copies are still JSON.
+	if strings.HasSuffix(strings.ToLower(filepath.Base(abs)), ".json.example") {
+		return r.native.Format(ctx, projectRoot, abs)
+	}
 	// Without a usable Biome launcher the native formatter is still better than
 	// leaving the file untouched, even though it ignores `expand`.
 	if biomeUsable(projectRoot, abs, r.biomeDisabled) {
