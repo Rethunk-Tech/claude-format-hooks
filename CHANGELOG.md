@@ -9,6 +9,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- `.toml.example` uses the TOML formatter. Taplo only includes `*.toml`,
+  so these copies are formatted via stdin with `--stdin-filepath`. A bare
+  `.example` file is left untouched.
 - `.yaml.example`, `.yml.example`, and `.json.example` use the YAML and
   JSON formatters. Prettier is given `--parser yaml` for the YAML copies,
   because it only looks at the final suffix. A bare `.example` file is

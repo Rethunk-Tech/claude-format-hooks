@@ -3,6 +3,8 @@ package formatters
 import (
 	"bytes"
 	"context"
+	"fmt"
+	"os"
 	"os/exec"
 	"unicode/utf8"
 )
@@ -58,6 +60,34 @@ func truncate(out []byte, maxLines, maxChars int) string {
 		cut--
 	}
 	return string(joined[:cut])
+}
+
+// runExternalStdin feeds abs to name on stdin and writes stdout back over
+// abs. Tools that select documents by the final suffix (taplo's **/*.toml
+// include) format stdin as the language anyway, so a copy they would
+// otherwise exclude still gets written.
+func runExternalStdin(ctx context.Context, dir, name string, args []string, abs string) Result {
+	src, err := os.ReadFile(abs) //nolint:gosec // abs is the file this formatter was invoked to format, by design
+	if err != nil {
+		return Result{Err: fmt.Errorf("read: %w", err)}
+	}
+
+	cmd := exec.CommandContext(ctx, name, args...) //nolint:gosec // running an external formatter by design; args are our own construction, never a shell
+	cmd.Dir = dir
+	cmd.Stdin = bytes.NewReader(src)
+	var stdout, stderr bytes.Buffer
+	cmd.Stdout = &stdout
+	cmd.Stderr = &stderr
+	if err := cmd.Run(); err != nil {
+		if ctx.Err() != nil {
+			return Result{Diagnostic: context.Cause(ctx).Error()}
+		}
+		if stderr.Len() == 0 {
+			return Result{Diagnostic: err.Error()}
+		}
+		return Result{Diagnostic: truncate(stderr.Bytes(), 10, 500)}
+	}
+	return writeIfChanged(abs, src, stdout.Bytes(), 0o644)
 }
 
 // runExternalResult runs an external formatter and shapes the outcome as a

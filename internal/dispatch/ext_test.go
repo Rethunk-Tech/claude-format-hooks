@@ -37,6 +37,8 @@ func TestResolveExtensionPrefersLongestRegisteredSuffix(t *testing.T) {
 		{"config.yaml.example", ".yaml.example"},
 		{"config.yml.example", ".yml.example"},
 		{"config.json.example", ".json.example"},
+		{"config.toml.example", ".toml.example"},
+		{"config.TOML.EXAMPLE", ".toml.example"},
 		{"config.YAML.EXAMPLE", ".yaml.example"},
 	}
 	for _, tc := range cases {

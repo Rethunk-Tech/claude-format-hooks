@@ -21,6 +21,9 @@ type bunxFormatter struct {
 	// tool's failure can mean "this file isn't mine" rather than "this file
 	// is broken".
 	skipIf func(diagnostic string) bool
+	// stdinFromFile reports paths the tool will not rewrite in place. The
+	// file is fed on stdin and stdout is written back.
+	stdinFromFile func(abs string) bool
 }
 
 // NewMarkdown returns the bunxFormatter for .md/.mdx, via markdownlint-cli2.
@@ -46,13 +49,32 @@ func NewMarkdown() bunxFormatter {
 	}
 }
 
-// NewTOML returns the bunxFormatter for .toml, via taplo.
+// NewTOML returns the bunxFormatter for .toml and .toml.example, via taplo.
 func NewTOML() bunxFormatter {
 	return bunxFormatter{
 		name:     "taplo",
-		pathArgs: func(abs string) []string { return []string{"format", "--", abs} },
-		bunxArgs: func(abs string) []string { return []string{"@taplo/cli", "format", "--", abs} },
+		pathArgs: tomlFormatArgs,
+		bunxArgs: func(abs string) []string {
+			return append([]string{"@taplo/cli"}, tomlFormatArgs(abs)...)
+		},
+		stdinFromFile: tomlExampleCopy,
 	}
+}
+
+// tomlFormatArgs is taplo's format invocation. Taplo's default include is
+// **/*.toml, so a copy whose final suffix is .example is collected and then
+// excluded, and the command exits 0 having changed nothing. Stdin is parsed
+// as TOML regardless of that suffix; --stdin-filepath keeps path-scoped
+// format rules pointed at the real file.
+func tomlFormatArgs(abs string) []string {
+	if tomlExampleCopy(abs) {
+		return []string{"format", "--stdin-filepath", abs, "-"}
+	}
+	return []string{"format", "--", abs}
+}
+
+func tomlExampleCopy(abs string) bool {
+	return strings.HasSuffix(strings.ToLower(filepath.Base(abs)), ".toml.example")
 }
 
 // prettierNoParserMarker appears when prettier recognizes the file but has
@@ -97,19 +119,26 @@ func (b bunxFormatter) Name() string { return b.name }
 func (b bunxFormatter) Tools() []string { return []string{b.name, "bunx"} }
 
 func (b bunxFormatter) Format(ctx context.Context, projectRoot, abs string) Result {
-	res := runPathOrBunx(ctx, projectRoot, b.name, b.pathArgs(abs), b.bunxArgs(abs))
+	stdinPath := ""
+	if b.stdinFromFile != nil && b.stdinFromFile(abs) {
+		stdinPath = abs
+	}
+	res := runPathOrBunx(ctx, projectRoot, b.name, b.pathArgs(abs), b.bunxArgs(abs), stdinPath)
 	if b.skipIf != nil && res.Diagnostic != "" && b.skipIf(res.Diagnostic) {
 		return Result{Skipped: true}
 	}
 	return res
 }
 
-func runPathOrBunx(ctx context.Context, cwd, pathName string, pathArgs, bunxArgs []string) Result {
+func runPathOrBunx(ctx context.Context, cwd, pathName string, pathArgs, bunxArgs []string, stdinPath string) Result {
 	command, args := "bunx", bunxArgs
 	if path, err := lookPath(pathName); err == nil {
 		command, args = path, pathArgs
 	} else if _, err := lookPath("bunx"); err != nil {
 		return Result{Skipped: true}
+	}
+	if stdinPath != "" {
+		return runExternalStdin(ctx, cwd, command, args, stdinPath)
 	}
 
 	ok, diag := runExternal(ctx, cwd, command, args)

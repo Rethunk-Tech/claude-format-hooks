@@ -3,6 +3,7 @@ package dispatch
 import (
 	"os"
 	"path/filepath"
+	"runtime"
 	"slices"
 	"testing"
 
@@ -14,7 +15,7 @@ import (
 var supportedExtensions = []string{
 	".json", ".json.example", ".sh", ".bash", ".zsh", ".ksh", ".dash", ".go", ".mod", ".work",
 	".ts", ".tsx", ".js", ".jsx", ".mjs", ".cjs", ".mts", ".cts", ".css", ".jsonc",
-	".md", ".mdx", ".markdown", ".toml", ".yaml", ".yml", ".yaml.example", ".yml.example", ".html", ".scss", ".less",
+	".md", ".mdx", ".markdown", ".toml", ".toml.example", ".yaml", ".yml", ".yaml.example", ".yml.example", ".html", ".scss", ".less",
 	".graphql", ".gql", ".sql", ".py", ".pyi", ".ipynb", ".rs", ".tf", ".tfvars",
 	".tftest.hcl", ".tfmock.hcl", ".tfquery.hcl", ".proto",
 }
@@ -126,6 +127,7 @@ func TestName(t *testing.T) {
 		".mdx":          "markdownlint-cli2",
 		".markdown":     "markdownlint-cli2",
 		".toml":         "taplo",
+		".toml.example": "taplo",
 		".yaml":         "prettier",
 		".yml":          "prettier",
 		".yaml.example": "prettier",
@@ -191,12 +193,39 @@ func TestDispatchFormatsExampleSuffixes(t *testing.T) {
 	qt.Assert(t, qt.IsNil(err))
 	qt.Assert(t, qt.Equals(string(out), "{\n  \"b\": 1,\n  \"a\": 2\n}\n"))
 
-	for _, name := range []string{"config.yaml.example", "config.yml.example"} {
-		ext := ResolveExtension(name)
-		qt.Check(t, qt.Equals(r.Name(ext), "prettier"), qt.Commentf("path=%q", name))
-		qt.Check(t, qt.IsTrue(r.Supported(ext)), qt.Commentf("path=%q", name))
+	for _, tc := range []struct {
+		name string
+		want string
+	}{
+		{"config.yaml.example", "prettier"},
+		{"config.yml.example", "prettier"},
+		{"config.toml.example", "taplo"},
+	} {
+		ext := ResolveExtension(tc.name)
+		qt.Check(t, qt.Equals(r.Name(ext), tc.want), qt.Commentf("path=%q", tc.name))
+		qt.Check(t, qt.IsTrue(r.Supported(ext)), qt.Commentf("path=%q", tc.name))
 	}
 	qt.Check(t, qt.IsFalse(r.Supported(ResolveExtension("notes.example"))))
+
+	if runtime.GOOS == "windows" {
+		return
+	}
+	t.Setenv("CLAUDE_FORMAT_HOOKS_CACHE", t.TempDir())
+	bin := t.TempDir()
+	script := "#!/bin/sh\nprintf 'a = 1\\n'\n"
+	qt.Assert(t, qt.IsNil(os.WriteFile(filepath.Join(bin, "taplo"), []byte(script), 0o755))) //nolint:gosec // test formatter fixture must be executable
+	t.Setenv("PATH", bin)
+
+	tomlPath := filepath.Join(dir, "config.toml.example")
+	qt.Assert(t, qt.IsNil(os.WriteFile(tomlPath, []byte("a=1\n"), 0o600)))
+	tomlExt := ResolveExtension(tomlPath)
+	qt.Assert(t, qt.Equals(tomlExt, ".toml.example"))
+	tomlResult := r.Dispatch(t.Context(), dir, tomlPath, tomlExt)
+	qt.Assert(t, qt.IsNil(tomlResult.Err))
+	qt.Assert(t, qt.IsFalse(tomlResult.Skipped))
+	tomlOut, err := os.ReadFile(tomlPath) //nolint:gosec // test path is created under t.TempDir
+	qt.Assert(t, qt.IsNil(err))
+	qt.Assert(t, qt.Equals(string(tomlOut), "a = 1\n"))
 }
 
 func TestDispatchUsesCallerResolvedExtensionForExtensionlessPath(t *testing.T) {

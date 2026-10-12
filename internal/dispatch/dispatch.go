@@ -92,6 +92,9 @@ func NewRegistry(cfg config.Config) *Registry {
 		".mdc": markdown,
 
 		".toml": toml,
+		// Same document as .toml. Taplo's include rule is **/*.toml, so
+		// the formatter feeds these copies on stdin and names the file.
+		".toml.example": toml,
 
 		".yaml": prettier,
 		".yml":  prettier,

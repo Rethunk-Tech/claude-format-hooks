@@ -136,6 +136,40 @@ func TestTOMLFormatterSuccess(t *testing.T) {
 	qt.Check(t, qt.Equals(res.Diagnostic, ""))
 }
 
+func TestTOMLNamesFileForExampleSuffix(t *testing.T) {
+	isolateDiskCache(t)
+	argvPath := filepath.Join(t.TempDir(), "argv")
+	t.Setenv("TAPLO_ARGV", argvPath)
+	writeFakeTool(t, "taplo", `printf '%s\n' "$@" > "$TAPLO_ARGV"; printf 'a = 1\n'`)
+
+	dir := t.TempDir()
+	abs := filepath.Join(dir, "config.toml.example")
+	qt.Assert(t, qt.IsNil(os.WriteFile(abs, []byte("a=1\n"), 0o600)))
+	res := NewTOML().Format(t.Context(), dir, abs)
+	assertFormatted(t, res)
+	assertArgv(t, argvPath, "format\n--stdin-filepath\n"+abs+"\n-\n")
+	qt.Check(t, qt.Equals(string(readSource(t, abs)), "a = 1\n"))
+
+	plain := filepath.Join(dir, "config.toml")
+	qt.Assert(t, qt.IsNil(os.WriteFile(plain, []byte("a=1\n"), 0o600)))
+	res = NewTOML().Format(t.Context(), dir, plain)
+	assertFormatted(t, res)
+	assertArgv(t, argvPath, "format\n--\n"+plain+"\n")
+	qt.Check(t, qt.Equals(string(readSource(t, plain)), "a=1\n"),
+		qt.Commentf("a .toml file is rewritten in place by taplo, not from stdout"))
+}
+
+func TestTOMLExampleReportsFormatterFailure(t *testing.T) {
+	isolateDiskCache(t)
+	writeFakeTool(t, "taplo", "echo 'bad toml' >&2; exit 1")
+	dir, path := sourceFile(t, "config.toml.example", "a=1\n")
+
+	res := NewTOML().Format(t.Context(), dir, path)
+	qt.Check(t, qt.IsFalse(res.Skipped))
+	assertDiagnostic(t, res)
+	qt.Check(t, qt.Equals(string(readSource(t, path)), "a=1\n"))
+}
+
 func TestSQLFluffSkipsWhenMissing(t *testing.T) {
 	isolateDiskCache(t)
 	clearPath(t)
