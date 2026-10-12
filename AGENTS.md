@@ -40,9 +40,12 @@ Native formatters: JSON (`encoding/json.Indent`), shell (`mvdan.cc/sh/v3`),
 Go (`gofumpt` on `PATH`, otherwise `go/format.Source`; `goimports` runs first
 when it is on `PATH` and a parent `.golangci.yml` lists it). `go.mod` and
 `go.work` are `go mod edit -fmt` and `go work edit -fmt` on those exact
-filenames. `.json.example` uses that JSON formatter; `.yaml.example` and
-`.yml.example` use prettier with `--parser yaml`. `.toml.example` uses
-taplo with `--stdin-filepath`, because taplo only includes `*.toml`. A
+filenames. `.json.example` uses that JSON formatter. `.jsonc.example`
+uses biome, fed on stdin under a `.jsonc` name, because biome only reads
+the final suffix. `.yaml.example` and `.yml.example` use prettier with
+`--parser yaml`. `.toml.example` uses taplo with `--stdin-filepath`,
+because taplo only includes `*.toml`. `.sql.example` uses sqlfluff via
+stdin with `--stdin-filename`, because sqlfluff only collects `*.sql`. A
 bare `.example` is not registered. External tools
 invoked via `bunx` or system `PATH`.
 A formatter that shells out reports its candidate binaries via the optional

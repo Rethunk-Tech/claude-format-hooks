@@ -14,9 +14,9 @@ import (
 
 var supportedExtensions = []string{
 	".json", ".json.example", ".sh", ".bash", ".zsh", ".ksh", ".dash", ".go", ".mod", ".work",
-	".ts", ".tsx", ".js", ".jsx", ".mjs", ".cjs", ".mts", ".cts", ".css", ".jsonc",
+	".ts", ".tsx", ".js", ".jsx", ".mjs", ".cjs", ".mts", ".cts", ".css", ".jsonc", ".jsonc.example",
 	".md", ".mdx", ".markdown", ".toml", ".toml.example", ".yaml", ".yml", ".yaml.example", ".yml.example", ".html", ".scss", ".less",
-	".graphql", ".gql", ".sql", ".py", ".pyi", ".ipynb", ".rs", ".tf", ".tfvars",
+	".graphql", ".gql", ".sql", ".sql.example", ".py", ".pyi", ".ipynb", ".rs", ".tf", ".tfvars",
 	".tftest.hcl", ".tfmock.hcl", ".tfquery.hcl", ".proto",
 }
 
@@ -47,7 +47,7 @@ func TestSupportedRespectsDisabledFormatters(t *testing.T) {
 	cfg.DisabledFormatters = []string{"BIOME"}
 	r := NewRegistry(cfg)
 
-	for _, ext := range []string{".ts", ".tsx", ".js", ".jsx", ".jsonc"} {
+	for _, ext := range []string{".ts", ".tsx", ".js", ".jsx", ".jsonc", ".jsonc.example"} {
 		qt.Check(t, qt.IsFalse(r.Supported(ext)), qt.Commentf("biome ext=%q", ext))
 	}
 	for _, ext := range []string{".graphql", ".gql"} {
@@ -103,51 +103,53 @@ func TestName(t *testing.T) {
 	r := NewRegistry(config.Default())
 
 	want := map[string]string{
-		".json":         "json",
-		".json.example": "json",
-		".sh":           "shfmt",
-		".bash":         "shfmt",
-		".zsh":          "shfmt",
-		".ksh":          "shfmt",
-		".dash":         "shfmt",
-		".go":           "gofmt",
-		".mod":          "go mod edit",
-		".work":         "go work edit",
-		".ts":           "biome",
-		".tsx":          "biome",
-		".js":           "biome",
-		".jsx":          "biome",
-		".mjs":          "biome",
-		".cjs":          "biome",
-		".mts":          "biome",
-		".cts":          "biome",
-		".css":          "biome",
-		".jsonc":        "biome",
-		".md":           "markdownlint-cli2",
-		".mdx":          "markdownlint-cli2",
-		".markdown":     "markdownlint-cli2",
-		".toml":         "taplo",
-		".toml.example": "taplo",
-		".yaml":         "prettier",
-		".yml":          "prettier",
-		".yaml.example": "prettier",
-		".yml.example":  "prettier",
-		".html":         "prettier",
-		".scss":         "prettier",
-		".less":         "prettier",
-		".graphql":      "prettier",
-		".gql":          "prettier",
-		".sql":          "sqlfluff",
-		".py":           "ruff/black",
-		".pyi":          "ruff/black",
-		".ipynb":        "ruff/black-notebook",
-		".rs":           "rustfmt",
-		".tf":           "terraform",
-		".tfvars":       "terraform",
-		".tftest.hcl":   "terraform",
-		".tfmock.hcl":   "terraform",
-		".tfquery.hcl":  "terraform",
-		".proto":        "buf",
+		".json":          "json",
+		".json.example":  "json",
+		".sh":            "shfmt",
+		".bash":          "shfmt",
+		".zsh":           "shfmt",
+		".ksh":           "shfmt",
+		".dash":          "shfmt",
+		".go":            "gofmt",
+		".mod":           "go mod edit",
+		".work":          "go work edit",
+		".ts":            "biome",
+		".tsx":           "biome",
+		".js":            "biome",
+		".jsx":           "biome",
+		".mjs":           "biome",
+		".cjs":           "biome",
+		".mts":           "biome",
+		".cts":           "biome",
+		".css":           "biome",
+		".jsonc":         "biome",
+		".jsonc.example": "biome",
+		".md":            "markdownlint-cli2",
+		".mdx":           "markdownlint-cli2",
+		".markdown":      "markdownlint-cli2",
+		".toml":          "taplo",
+		".toml.example":  "taplo",
+		".yaml":          "prettier",
+		".yml":           "prettier",
+		".yaml.example":  "prettier",
+		".yml.example":   "prettier",
+		".html":          "prettier",
+		".scss":          "prettier",
+		".less":          "prettier",
+		".graphql":       "prettier",
+		".gql":           "prettier",
+		".sql":           "sqlfluff",
+		".sql.example":   "sqlfluff",
+		".py":            "ruff/black",
+		".pyi":           "ruff/black",
+		".ipynb":         "ruff/black-notebook",
+		".rs":            "rustfmt",
+		".tf":            "terraform",
+		".tfvars":        "terraform",
+		".tftest.hcl":    "terraform",
+		".tfmock.hcl":    "terraform",
+		".tfquery.hcl":   "terraform",
+		".proto":         "buf",
 	}
 	for _, ext := range supportedExtensions {
 		qt.Check(t, qt.Equals(r.Name(ext), want[ext]), qt.Commentf("ext=%q", ext))
@@ -200,20 +202,36 @@ func TestDispatchFormatsExampleSuffixes(t *testing.T) {
 		{"config.yaml.example", "prettier"},
 		{"config.yml.example", "prettier"},
 		{"config.toml.example", "taplo"},
+		{"config.jsonc.example", "biome"},
+		{"config.sql.example", "sqlfluff"},
 	} {
 		ext := ResolveExtension(tc.name)
 		qt.Check(t, qt.Equals(r.Name(ext), tc.want), qt.Commentf("path=%q", tc.name))
 		qt.Check(t, qt.IsTrue(r.Supported(ext)), qt.Commentf("path=%q", tc.name))
 	}
-	qt.Check(t, qt.IsFalse(r.Supported(ResolveExtension("notes.example"))))
+	notes := filepath.Join(dir, "notes.example")
+	qt.Assert(t, qt.IsNil(os.WriteFile(notes, []byte("keep\n"), 0o600)))
+	notesExt := ResolveExtension(notes)
+	qt.Assert(t, qt.Equals(notesExt, ".example"))
+	qt.Check(t, qt.IsFalse(r.Supported(notesExt)))
+	notesResult := r.Dispatch(t.Context(), dir, notes, notesExt)
+	qt.Check(t, qt.IsTrue(notesResult.Skipped))
+	notesOut, err := os.ReadFile(notes) //nolint:gosec // test path is created under t.TempDir
+	qt.Assert(t, qt.IsNil(err))
+	qt.Check(t, qt.Equals(string(notesOut), "keep\n"))
 
 	if runtime.GOOS == "windows" {
 		return
 	}
 	t.Setenv("CLAUDE_FORMAT_HOOKS_CACHE", t.TempDir())
+	t.Setenv("HOME", t.TempDir())
 	bin := t.TempDir()
 	script := "#!/bin/sh\nprintf 'a = 1\\n'\n"
 	qt.Assert(t, qt.IsNil(os.WriteFile(filepath.Join(bin, "taplo"), []byte(script), 0o755))) //nolint:gosec // test formatter fixture must be executable
+	biomeScript := "#!/bin/sh\nprintf '{\\n\\t\"a\": 1 // c\\n}\\n'\n"
+	qt.Assert(t, qt.IsNil(os.WriteFile(filepath.Join(bin, "biome"), []byte(biomeScript), 0o755))) //nolint:gosec // test formatter fixture must be executable
+	sqlScript := "#!/bin/sh\nif [ \"$1\" = render ]; then exit 0; fi\nprintf 'SELECT 1\\n'\n"
+	qt.Assert(t, qt.IsNil(os.WriteFile(filepath.Join(bin, "sqlfluff"), []byte(sqlScript), 0o755))) //nolint:gosec // test formatter fixture must be executable
 	t.Setenv("PATH", bin)
 
 	tomlPath := filepath.Join(dir, "config.toml.example")
@@ -226,6 +244,30 @@ func TestDispatchFormatsExampleSuffixes(t *testing.T) {
 	tomlOut, err := os.ReadFile(tomlPath) //nolint:gosec // test path is created under t.TempDir
 	qt.Assert(t, qt.IsNil(err))
 	qt.Assert(t, qt.Equals(string(tomlOut), "a = 1\n"))
+
+	jsoncPath := filepath.Join(dir, "config.jsonc.example")
+	qt.Assert(t, qt.IsNil(os.WriteFile(jsoncPath, []byte("{ \"a\":1, // c\n}\n"), 0o600)))
+	jsoncExt := ResolveExtension(jsoncPath)
+	qt.Assert(t, qt.Equals(jsoncExt, ".jsonc.example"))
+	qt.Assert(t, qt.Equals(r.Name(jsoncExt), "biome"))
+	jsoncResult := r.Dispatch(t.Context(), dir, jsoncPath, jsoncExt)
+	qt.Assert(t, qt.IsNil(jsoncResult.Err))
+	qt.Assert(t, qt.IsFalse(jsoncResult.Skipped))
+	jsoncOut, err := os.ReadFile(jsoncPath) //nolint:gosec // test path is created under t.TempDir
+	qt.Assert(t, qt.IsNil(err))
+	qt.Assert(t, qt.Equals(string(jsoncOut), "{\n\t\"a\": 1 // c\n}\n"))
+
+	sqlPath := filepath.Join(dir, "query.sql.example")
+	qt.Assert(t, qt.IsNil(os.WriteFile(sqlPath, []byte("SELECT  1\n"), 0o600)))
+	sqlExt := ResolveExtension(sqlPath)
+	qt.Assert(t, qt.Equals(sqlExt, ".sql.example"))
+	qt.Assert(t, qt.Equals(r.Name(sqlExt), "sqlfluff"))
+	sqlResult := r.Dispatch(t.Context(), dir, sqlPath, sqlExt)
+	qt.Assert(t, qt.IsNil(sqlResult.Err))
+	qt.Assert(t, qt.IsFalse(sqlResult.Skipped))
+	sqlOut, err := os.ReadFile(sqlPath) //nolint:gosec // test path is created under t.TempDir
+	qt.Assert(t, qt.IsNil(err))
+	qt.Assert(t, qt.Equals(string(sqlOut), "SELECT 1\n"))
 }
 
 func TestDispatchUsesCallerResolvedExtensionForExtensionlessPath(t *testing.T) {

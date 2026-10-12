@@ -93,8 +93,9 @@ JSON/shell/Go (`.go` via `gofumpt` when it is on `PATH`, with `goimports`
 first when a parent `.golangci.yml` enables it, otherwise native `gofmt`;
 `go.mod` via `go mod edit -fmt` and `go.work` via `go work edit -fmt`,
 each only when the file has that exact name;
-`.json.example` as JSON, `.yaml.example` / `.yml.example` as YAML, and
-`.toml.example` as TOML; a file named `notes.example` is not formatted;
+`.json.example` as JSON, `.jsonc.example` as JSONC, `.yaml.example` /
+`.yml.example` as YAML, `.toml.example` as TOML, and `.sql.example` as
+SQL; a file named `notes.example` is not formatted;
 `.sh`/`.bash`/`.zsh`/`.ksh`/`.dash`, plus extensionless
 or hidden rc files whose shebang names a supported interpreter, including
 `env -S`); TS/CSS/JSONC via biome; MD via markdownlint-cli2; TOML via taplo;

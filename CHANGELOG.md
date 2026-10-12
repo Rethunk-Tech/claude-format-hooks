@@ -9,6 +9,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- `.jsonc.example` uses the JSONC formatter. Biome only reads the final
+  suffix, so these copies are formatted via stdin with `--stdin-file-path`
+  named as `.jsonc`. A bare `.example` file is left untouched.
+- `.sql.example` uses the SQL formatter. SQLFluff only collects `*.sql`,
+  so these copies are formatted via stdin with `--stdin-filename`. A bare
+  `.example` file is left untouched.
 - `.toml.example` uses the TOML formatter. Taplo only includes `*.toml`,
   so these copies are formatted via stdin with `--stdin-filepath`. A bare
   `.example` file is left untouched.

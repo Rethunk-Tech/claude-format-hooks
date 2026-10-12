@@ -83,6 +83,9 @@ func NewRegistry(cfg config.Config) *Registry {
 		// biome unconditionally, since a project without a biome config still
 		// needs something that parses comments.
 		".jsonc": biome,
+		// Same document as .jsonc. Biome only reads the final suffix, so
+		// the formatter feeds these copies on stdin under a .jsonc name.
+		".jsonc.example": biome,
 
 		".md":       markdown,
 		".mdx":      markdown,
@@ -116,6 +119,9 @@ func NewRegistry(cfg config.Config) *Registry {
 		".gql":     graphql,
 
 		".sql": sql,
+		// Same document as .sql. sqlfluff only collects *.sql, so the
+		// formatter feeds these copies on stdin and names the file.
+		".sql.example": sql,
 
 		".py":          python,
 		".pyi":         python,

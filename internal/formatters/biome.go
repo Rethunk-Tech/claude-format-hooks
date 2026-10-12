@@ -5,6 +5,7 @@ import (
 	"os"
 	"path/filepath"
 	"slices"
+	"strings"
 	"time"
 
 	"github.com/Rethunk-Tech/claude-format-hooks/internal/diskcache"
@@ -56,14 +57,37 @@ func (biomeFormatter) Format(ctx context.Context, projectRoot, abs string) Resul
 		cfgDir = projectRoot
 	}
 
+	stdinPath := ""
+	args := []string{"format", "--write", "--no-errors-on-unmatched", "--", abs}
+	if jsoncExampleCopy(abs) {
+		// Biome picks the language from the final suffix and does not know
+		// .example, so an in-place format exits 0 having changed nothing.
+		// Stdin is parsed as the language of --stdin-file-path; dropping the
+		// .example suffix leaves a .jsonc name in the same directory.
+		stdinPath = abs
+		args = []string{
+			"format", "--write", "--no-errors-on-unmatched",
+			"--stdin-file-path", jsoncStdinFilePath(abs),
+		}
+	}
 	return runPathOrBunx(
 		ctx,
 		cfgDir,
 		"biome",
-		[]string{"format", "--write", "--no-errors-on-unmatched", "--", abs},
-		[]string{"@biomejs/biome", "format", "--write", "--no-errors-on-unmatched", "--", abs},
-		"",
+		args,
+		append([]string{"@biomejs/biome"}, args...),
+		stdinPath,
 	)
+}
+
+func jsoncExampleCopy(abs string) bool {
+	return strings.HasSuffix(strings.ToLower(filepath.Base(abs)), ".jsonc.example")
+}
+
+func jsoncStdinFilePath(abs string) string {
+	base := filepath.Base(abs)
+	trimmed := base[:len(base)-len(".example")]
+	return filepath.Join(filepath.Dir(abs), trimmed)
 }
 
 // findUpwardCacheTTL is how long a resolved (or unresolved) config

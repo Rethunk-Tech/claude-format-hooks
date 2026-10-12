@@ -1,8 +1,10 @@
 package formatters
 
 import (
+	"bytes"
 	"context"
 	"fmt"
+	"os"
 	"os/exec"
 	"path/filepath"
 	"strings"
@@ -27,7 +29,7 @@ import (
 // unfixable-lint output.
 type sqlfluffFormatter struct{}
 
-// NewSQLFluff returns the sqlfluffFormatter for .sql.
+// NewSQLFluff returns the sqlfluffFormatter for .sql and .sql.example.
 func NewSQLFluff() sqlfluffFormatter { return sqlfluffFormatter{} }
 
 func (sqlfluffFormatter) Name() string { return "sqlfluff" }
@@ -58,10 +60,58 @@ func (sqlfluffFormatter) Format(ctx context.Context, projectRoot, abs string) Re
 	// A failed render (no dialect, bad config) still yields RF03 below, and
 	// the fix call then reports the real error.
 	rendered, _ := render.CombinedOutput()
+	exclude := sqlfluffExcludeRules(string(rendered))
+	// sqlfluff's sql_file_exts stop at .sql, so a copy whose final suffix
+	// is .example is named on the command line and then skipped. Stdin is
+	// parsed as SQL; --stdin-filename keeps config lookup on the real file.
+	if sqlExampleCopy(abs) {
+		return sqlfluffFixExample(ctx, projectRoot, abs, exclude)
+	}
 	// No --force: it is the default as of sqlfluff 4, and passing it prints
 	// a deprecation warning that would itself become diagnostic noise.
 	ok, diag, raw := runExternalOutput(ctx, projectRoot, "sqlfluff",
-		[]string{"fix", "--exclude-rules", sqlfluffExcludeRules(string(rendered)), "--", abs})
+		[]string{"fix", "--exclude-rules", exclude, "--", abs})
+	return sqlfluffOutcome(projectRoot, ok, diag, raw)
+}
+
+func sqlExampleCopy(abs string) bool {
+	return strings.HasSuffix(strings.ToLower(filepath.Base(abs)), ".sql.example")
+}
+
+func sqlfluffFixExample(ctx context.Context, projectRoot, abs, exclude string) Result {
+	src, err := os.ReadFile(abs) //nolint:gosec // abs is the file this formatter was invoked to format, by design
+	if err != nil {
+		return Result{Err: fmt.Errorf("read: %w", err)}
+	}
+	cmd := exec.CommandContext(ctx, "sqlfluff", "fix", "--exclude-rules", exclude, "--stdin-filename", abs, "-") //nolint:gosec // external formatter by design; args are our own construction, never a shell
+	cmd.Dir = projectRoot
+	cmd.Stdin = bytes.NewReader(src)
+	var stdout, stderr bytes.Buffer
+	cmd.Stdout = &stdout
+	cmd.Stderr = &stderr
+	err = cmd.Run()
+	if err == nil {
+		return writeIfChanged(abs, src, stdout.Bytes(), 0o644)
+	}
+	if ctx.Err() != nil {
+		return Result{Diagnostic: context.Cause(ctx).Error()}
+	}
+	raw := stderr.String()
+	diag := err.Error()
+	if raw != "" {
+		diag = truncate(stderr.Bytes(), 10, 500)
+	}
+	// A non-zero exit with a rewritten stdout is the unfixable-violation
+	// case: the in-place path already treats that as success, and stdin
+	// has not written the file yet.
+	outcome := sqlfluffOutcome(projectRoot, false, diag, raw)
+	if outcome.Diagnostic != "" || stdout.Len() == 0 {
+		return outcome
+	}
+	return writeIfChanged(abs, src, stdout.Bytes(), 0o644)
+}
+
+func sqlfluffOutcome(projectRoot string, ok bool, diag, raw string) Result {
 	if ok {
 		return Result{}
 	}

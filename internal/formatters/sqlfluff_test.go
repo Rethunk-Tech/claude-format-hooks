@@ -118,6 +118,75 @@ echo "$@" > `+argsLog)
 	qt.Check(t, qt.StringContains(string(got), "fix --exclude-rules PG01,LT05,RF03 --"))
 }
 
+func TestSQLFluffExampleUsesStdin(t *testing.T) {
+	isolateDiskCache(t)
+	t.Setenv("HOME", t.TempDir())
+	dir := t.TempDir()
+	argsLog := filepath.Join(dir, "args")
+	abs := filepath.Join(dir, "query.sql.example")
+	qt.Assert(t, qt.IsNil(os.WriteFile(abs, []byte("SELECT  1\n"), 0o600)))
+	writeFakeTool(t, "sqlfluff", `if [ "$1" = render ]; then
+printf '    exclude_rules: LT01\n'
+exit 0
+fi
+printf '%s\n' "$@" > "`+argsLog+`"
+printf 'SELECT 1\n'
+`)
+
+	res := NewSQLFluff().Format(t.Context(), dir, abs)
+	assertFormatted(t, res)
+	qt.Check(t, qt.Equals(string(readSource(t, abs)), "SELECT 1\n"))
+	got := string(readSource(t, argsLog))
+	qt.Check(t, qt.StringContains(got, "--stdin-filename"))
+	qt.Check(t, qt.StringContains(got, abs))
+	qt.Check(t, qt.StringContains(got, "LT01,RF03"))
+}
+
+func TestSQLFluffExampleKeepsUnfixableRewrite(t *testing.T) {
+	isolateDiskCache(t)
+	t.Setenv("HOME", t.TempDir())
+	dir, abs := sourceFile(t, "query.sql.example", "SELECT  1\n")
+	writeFakeTool(t, "sqlfluff", `if [ "$1" = render ]; then exit 0; fi
+echo 'Unfixable violations detected.' >&2
+printf 'SELECT 1\n'
+exit 1
+`)
+
+	res := NewSQLFluff().Format(t.Context(), dir, abs)
+	assertFormatted(t, res)
+	qt.Check(t, qt.Equals(string(readSource(t, abs)), "SELECT 1\n"))
+}
+
+func TestSQLFluffExampleReportsParseFailure(t *testing.T) {
+	isolateDiskCache(t)
+	t.Setenv("HOME", t.TempDir())
+	dir, abs := sourceFile(t, "query.sql.example", "nope\n")
+	writeFakeTool(t, "sqlfluff", `if [ "$1" = render ]; then exit 0; fi
+echo 'Found unparsable section' >&2
+printf 'nope\n'
+exit 1
+`)
+
+	res := NewSQLFluff().Format(t.Context(), dir, abs)
+	assertDiagnostic(t, res)
+	qt.Check(t, qt.Equals(string(readSource(t, abs)), "nope\n"))
+}
+
+func TestSQLFluffExampleReportsMissingDialect(t *testing.T) {
+	isolateDiskCache(t)
+	t.Setenv("HOME", t.TempDir())
+	dir, abs := sourceFile(t, "query.sql.example", "SELECT 1\n")
+	writeFakeTool(t, "sqlfluff", `if [ "$1" = render ]; then exit 0; fi
+echo 'User Error: No dialect was specified' >&2
+exit 1
+`)
+
+	res := NewSQLFluff().Format(t.Context(), dir, abs)
+	assertDiagnostic(t, res)
+	qt.Check(t, qt.StringContains(res.Diagnostic, ".sqlfluff"))
+	qt.Check(t, qt.Equals(string(readSource(t, abs)), "SELECT 1\n"))
+}
+
 func TestSQLFluffExcludeRulesWithoutConfiguredList(t *testing.T) {
 	qt.Check(t, qt.Equals(sqlfluffExcludeRules(""), "RF03"))
 	qt.Check(t, qt.Equals(sqlfluffExcludeRules("    exclude_rules:                          \n"), "RF03"))
