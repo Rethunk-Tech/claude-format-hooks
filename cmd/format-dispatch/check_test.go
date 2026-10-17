@@ -312,6 +312,7 @@ func TestCheckHonorsProjectConfigDisablesBiomeForGraphQLRouter(t *testing.T) {
 
 	projectRoot := t.TempDir()
 	writeCheckFile(t, projectRoot, "biome.json", "{}\n")
+	writeCheckFile(t, projectRoot, ".prettierrc", "{}\n")
 	writeCheckFile(t, projectRoot, projectConfigFile, `{"disabledFormatters":["biome"]}`)
 	configPath := filepath.Join(t.TempDir(), "claude-format-hooks.json")
 	writeFile(t, configPath, `{}`)

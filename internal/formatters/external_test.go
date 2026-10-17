@@ -86,6 +86,7 @@ func TestBunxFormattersSkipWhenBunxMissing(t *testing.T) {
 func TestPathFormattersRunWithoutBunx(t *testing.T) {
 	isolateDiskCache(t)
 	dir := t.TempDir()
+	writePrettierConfig(t, dir)
 	cases := []struct {
 		name string
 		new  func() Formatter
@@ -110,6 +111,7 @@ func TestPathFormattersRunWithoutBunx(t *testing.T) {
 func TestBunxFormatterSuccessAndFailure(t *testing.T) {
 	isolateDiskCache(t)
 	dir := t.TempDir()
+	writePrettierConfig(t, dir)
 	abs := filepath.Join(dir, "f.md")
 
 	t.Run("success", func(t *testing.T) {
@@ -472,6 +474,7 @@ func TestPrettierNamesParserForExampleSuffixes(t *testing.T) {
 	writeFakeTool(t, "prettier", `printf '%s\n' "$@" > "$PRETTIER_ARGV"; exit 0`)
 
 	dir := t.TempDir()
+	writePrettierConfig(t, dir)
 	for _, name := range []string{"config.yaml.example", "config.yml.example"} {
 		abs := filepath.Join(dir, name)
 		res := NewPrettier().Format(t.Context(), dir, abs)
@@ -485,6 +488,50 @@ func TestPrettierNamesParserForExampleSuffixes(t *testing.T) {
 	assertArgv(t, argvPath, "--write\n--\n"+html+"\n")
 }
 
+func writePrettierConfig(t *testing.T, dir string) {
+	t.Helper()
+	qt.Assert(t, qt.IsNil(os.WriteFile(filepath.Join(dir, ".prettierrc"), []byte("{}\n"), 0o600)))
+}
+
+// Prettier's defaults rewrite files in repos that format with something else,
+// so it runs only where the file's project configured it.
+func TestPrettierRunsOnlyInProjectsThatConfigureIt(t *testing.T) {
+	cases := []struct {
+		name  string
+		files map[string]string
+		want  bool
+	}{
+		{"no config", map[string]string{"biome.jsonc": "{}"}, false},
+		{"package.json without prettier key", map[string]string{"package.json": `{"name":"x"}`}, false},
+		{".prettierrc", map[string]string{".prettierrc": "{}"}, true},
+		{"prettier.config.mjs", map[string]string{"prettier.config.mjs": "export default {}"}, true},
+		{"package.json prettier key", map[string]string{"package.json": `{"prettier":{"semi":false}}`}, true},
+		{"config in a parent of the file", map[string]string{".prettierrc.json": "{}", "site/.keep": ""}, true},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			isolateDiskCache(t)
+			argvPath := filepath.Join(t.TempDir(), "argv")
+			t.Setenv("PRETTIER_ARGV", argvPath)
+			writeFakeTool(t, "prettier", `printf '%s\n' "$@" > "$PRETTIER_ARGV"; exit 0`)
+
+			root := t.TempDir()
+			for name, body := range tc.files {
+				qt.Assert(t, qt.IsNil(os.MkdirAll(filepath.Dir(filepath.Join(root, name)), 0o700)))
+				qt.Assert(t, qt.IsNil(os.WriteFile(filepath.Join(root, name), []byte(body), 0o600)))
+			}
+			abs := filepath.Join(root, "site", "index.html")
+			qt.Assert(t, qt.IsNil(os.MkdirAll(filepath.Dir(abs), 0o700)))
+
+			res := NewPrettier().Format(t.Context(), root, abs)
+			qt.Check(t, qt.IsNil(res.Err))
+			qt.Check(t, qt.Equals(res.Skipped, !tc.want))
+			_, err := os.Stat(argvPath)
+			qt.Check(t, qt.Equals(err == nil, tc.want))
+		})
+	}
+}
+
 // Prettier is the formatter for .svelte and .astro, but only via a plugin
 // the project installs itself. Without one prettier exits non-zero saying
 // it has no parser -- reporting that as a failed format would put a
@@ -492,6 +539,7 @@ func TestPrettierNamesParserForExampleSuffixes(t *testing.T) {
 func TestPrettierSkipsWhenNoParserInferred(t *testing.T) {
 	isolateDiskCache(t)
 	dir, path := sourceFile(t, "a.svelte", "<div/>\n")
+	writePrettierConfig(t, dir)
 	writeFakeTool(t, "prettier", "echo '[error] No parser could be inferred for file' >&2; exit 2")
 
 	res := NewPrettier().Format(t.Context(), dir, path)
@@ -503,6 +551,7 @@ func TestPrettierSkipsWhenNoParserInferred(t *testing.T) {
 func TestPrettierReportsOtherFailures(t *testing.T) {
 	isolateDiskCache(t)
 	dir, path := sourceFile(t, "a.yaml", "a: 1\n")
+	writePrettierConfig(t, dir)
 	writeFakeTool(t, "prettier", "echo '[error] unexpected token' >&2; exit 2")
 
 	res := NewPrettier().Format(t.Context(), dir, path)

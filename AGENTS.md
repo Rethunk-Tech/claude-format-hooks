@@ -70,7 +70,9 @@ formatter reads as native.
 - Skips `node_modules/`, `.git/`, `vendor/`, `.venv/`, and peers; files outside `$CLAUDE_PROJECT_DIR`.
 - Skips generated files by name (`*.min.js`, `*-lock.json`, peers) even in a
   source directory. Config `skipDirs` / `skipFiles` extend both lists.
-- No formatter requires project config to exist first.
+- No formatter requires project config to exist first, except prettier: it runs
+  only where the file's project has a prettier config (`.prettierrc*`,
+  `prettier.config.*`, or a package.json `prettier` key up to the project root).
 
 ## Conventions
 

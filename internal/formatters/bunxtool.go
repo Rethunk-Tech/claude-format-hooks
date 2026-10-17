@@ -2,6 +2,8 @@ package formatters
 
 import (
 	"context"
+	"encoding/json"
+	"os"
 	"path/filepath"
 	"strings"
 )
@@ -24,6 +26,9 @@ type bunxFormatter struct {
 	// stdinFromFile reports paths the tool will not rewrite in place. The
 	// file is fed on stdin and stdout is written back.
 	stdinFromFile func(abs string) bool
+	// configured reports whether the file's project opted into this tool.
+	// Nil means the tool formats any project.
+	configured func(projectRoot, abs string) bool
 }
 
 // NewMarkdown returns the bunxFormatter for .md/.mdx, via markdownlint-cli2.
@@ -97,7 +102,44 @@ func NewPrettier() bunxFormatter {
 		skipIf: func(diagnostic string) bool {
 			return strings.Contains(diagnostic, prettierNoParserMarker)
 		},
+		configured: hasPrettierConfig,
 	}
+}
+
+var prettierConfigNames = []string{
+	".prettierrc",
+	".prettierrc.json", ".prettierrc.yaml", ".prettierrc.yml", ".prettierrc.json5", ".prettierrc.toml",
+	".prettierrc.js", ".prettierrc.cjs", ".prettierrc.mjs", ".prettierrc.ts", ".prettierrc.cts", ".prettierrc.mts",
+	"prettier.config.js", "prettier.config.cjs", "prettier.config.mjs",
+	"prettier.config.ts", "prettier.config.cts", "prettier.config.mts",
+}
+
+// hasPrettierConfig reports whether a prettier config applies to abs: a config
+// file or a package.json "prettier" key in its directory or any ancestor up to
+// projectRoot. Prettier's defaults rewrite hand-formatted and generated files
+// in repos that format with something else (biome), so a repo that never
+// configured prettier does not get it.
+func hasPrettierConfig(projectRoot, abs string) bool {
+	root := filepath.Clean(projectRoot)
+	for dir := filepath.Dir(abs); ; dir = filepath.Dir(dir) {
+		if findUpward(dir, dir, prettierConfigNames...) != "" || packageJSONHasPrettier(filepath.Join(dir, "package.json")) {
+			return true
+		}
+		if dir == root || dir == filepath.Dir(dir) {
+			return false
+		}
+	}
+}
+
+func packageJSONHasPrettier(path string) bool {
+	raw, err := os.ReadFile(path) //nolint:gosec // path is built from the edited file's ancestors
+	if err != nil {
+		return false
+	}
+	var pkg struct {
+		Prettier json.RawMessage `json:"prettier"`
+	}
+	return json.Unmarshal(raw, &pkg) == nil && pkg.Prettier != nil
 }
 
 // prettierWriteArgs is prettier's --write invocation. Prettier picks a parser
@@ -119,6 +161,9 @@ func (b bunxFormatter) Name() string { return b.name }
 func (b bunxFormatter) Tools() []string { return []string{b.name, "bunx"} }
 
 func (b bunxFormatter) Format(ctx context.Context, projectRoot, abs string) Result {
+	if b.configured != nil && !b.configured(projectRoot, abs) {
+		return Result{Skipped: true}
+	}
 	stdinPath := ""
 	if b.stdinFromFile != nil && b.stdinFromFile(abs) {
 		stdinPath = abs

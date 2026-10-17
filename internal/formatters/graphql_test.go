@@ -69,6 +69,7 @@ func TestGraphQLRouterPicksAFormatter(t *testing.T) {
 			marker := filepath.Join(dir, "marker")
 			t.Setenv("GRAPHQL_MARKER", marker)
 			writeGraphQLTools(t, tc.tools...)
+			qt.Assert(t, qt.IsNil(os.WriteFile(filepath.Join(dir, ".prettierrc"), []byte("{}\n"), 0o600)))
 			if tc.biomeConfig {
 				qt.Assert(t, qt.IsNil(os.WriteFile(filepath.Join(dir, "biome.json"), []byte("{}\n"), 0o600)))
 			}

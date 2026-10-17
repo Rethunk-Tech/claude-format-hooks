@@ -727,6 +727,7 @@ func TestRunProjectConfigDisablesBiomeForGraphQLRouter(t *testing.T) {
 	t.Setenv("CLAUDE_PROJECT_DIR", projectRoot)
 	t.Setenv("CLAUDE_FORMAT_HOOKS_CONFIG", configPath)
 	writeFile(t, filepath.Join(projectRoot, "biome.json"), "{}\n")
+	writeFile(t, filepath.Join(projectRoot, ".prettierrc"), "{}\n")
 	writeFile(t, filepath.Join(projectRoot, projectConfigFile), `{"disabledFormatters":["biome"]}`)
 
 	for _, ext := range []string{".graphql", ".gql"} {
