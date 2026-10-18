@@ -10,6 +10,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"net/url"
 	"os"
 	"path/filepath"
 	"runtime"
@@ -343,24 +344,59 @@ func fetchLatestRelease(client *http.Client, baseURL string) (githubRelease, err
 	return release, nil
 }
 
-func fetchHTTP(client *http.Client, url string) ([]byte, error) {
-	req, err := http.NewRequestWithContext(context.Background(), http.MethodGet, url, nil)
+func allowedFetchScheme(scheme string) error {
+	if scheme != "http" && scheme != "https" {
+		return fmt.Errorf("refusing URL scheme %q", scheme)
+	}
+	return nil
+}
+
+func fetchClient(client *http.Client) *http.Client {
+	c := *client
+	prev := c.CheckRedirect
+	c.CheckRedirect = func(req *http.Request, via []*http.Request) error {
+		if err := allowedFetchScheme(req.URL.Scheme); err != nil {
+			return err
+		}
+		if prev != nil {
+			return prev(req, via)
+		}
+		if len(via) >= 10 {
+			return fmt.Errorf("stopped after 10 redirects")
+		}
+		return nil
+	}
+	return &c
+}
+
+func fetchHTTP(client *http.Client, rawURL string) ([]byte, error) {
+	parsed, err := url.Parse(rawURL)
+	if err != nil {
+		return nil, err
+	}
+	if err := allowedFetchScheme(parsed.Scheme); err != nil {
+		return nil, err
+	}
+	req, err := http.NewRequestWithContext(context.Background(), http.MethodGet, rawURL, nil)
 	if err != nil {
 		return nil, err
 	}
 	req.Header.Set("Accept", "application/vnd.github+json")
 	req.Header.Set("User-Agent", "format-dispatch")
 
-	resp, err := client.Do(req)
+	resp, err := fetchClient(client).Do(req)
 	if err != nil {
 		return nil, err
 	}
 	defer func() { _ = resp.Body.Close() }()
 
 	if resp.StatusCode < http.StatusOK || resp.StatusCode >= http.StatusMultipleChoices {
-		body, _ := io.ReadAll(io.LimitReader(resp.Body, maxUpgradeErrorBodyBytes))
+		body, readErr := io.ReadAll(io.LimitReader(resp.Body, maxUpgradeErrorBodyBytes))
 		detail := strings.TrimSpace(string(body))
 		if detail == "" {
+			if readErr != nil {
+				return nil, fmt.Errorf("HTTP %s: %w", resp.Status, readErr)
+			}
 			detail = resp.Status
 		}
 		return nil, fmt.Errorf("HTTP %s: %s", resp.Status, detail)

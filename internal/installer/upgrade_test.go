@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"crypto/sha256"
 	"encoding/hex"
+	"errors"
 	"fmt"
 	"net/http"
 	"net/http/httptest"
@@ -185,6 +186,51 @@ func TestUpgradeUsesReleaseAPIEnvironmentOverride(t *testing.T) {
 	}
 
 	assertFileIs(t, target, binary, "upgraded binary")
+}
+
+func TestFetchHTTPRejectsNonHTTPURL(t *testing.T) {
+	_, err := fetchHTTP(http.DefaultClient, "file:///etc/passwd")
+	if err == nil || !strings.Contains(err.Error(), "refusing") {
+		t.Fatalf("fetchHTTP error = %v, want refusing non-HTTP scheme", err)
+	}
+}
+
+func TestFetchHTTPRejectsNonHTTPRedirect(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		w.Header().Set("Location", "file:///etc/passwd")
+		w.WriteHeader(http.StatusFound)
+	}))
+	defer server.Close()
+
+	_, err := fetchHTTP(server.Client(), server.URL)
+	if err == nil || !strings.Contains(err.Error(), "refusing") {
+		t.Fatalf("fetchHTTP error = %v, want refusing file redirect", err)
+	}
+}
+
+type errBody struct{}
+
+func (errBody) Read([]byte) (int, error) { return 0, errors.New("read body failed") }
+func (errBody) Close() error             { return nil }
+
+type errBodyTransport struct{}
+
+func (errBodyTransport) RoundTrip(req *http.Request) (*http.Response, error) {
+	return &http.Response{
+		Status:     "500 Internal Server Error",
+		StatusCode: http.StatusInternalServerError,
+		Body:       errBody{},
+		Header:     make(http.Header),
+		Request:    req,
+	}, nil
+}
+
+func TestFetchHTTPReportsErrorBodyReadFailure(t *testing.T) {
+	client := &http.Client{Transport: errBodyTransport{}}
+	_, err := fetchHTTP(client, "http://upgrade.test/")
+	if err == nil || !strings.Contains(err.Error(), "read body failed") {
+		t.Fatalf("fetchHTTP error = %v, want body read failure", err)
+	}
 }
 
 func TestFetchHTTPRejectsOversizedContentLength(t *testing.T) {
