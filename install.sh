@@ -5,13 +5,15 @@
 #
 # Usage:
 #   ./install.sh              # build + install
-#   ./install.sh --dry-run    # print the settings.json diff, write nothing
-#   ./install.sh --upgrade    # build + upgrade to the latest release
-#   ./install.sh --upgrade --dry-run # build + preview the latest release upgrade
+#   ./install.sh --dry-run    # preview Claude and Cursor hook diffs, write nothing
+#   ./install.sh --upgrade    # latest release binary (builds from source if none is installed yet)
+#   ./install.sh --upgrade --dry-run # preview the latest release upgrade
 #
-# Env overrides (mainly for testing):
+# Env overrides (mainly for testing; CLAUDE_SETTINGS_FILE and CURSOR_HOOKS_FILE
+# are read by format-dispatch, not this script):
 #   CLAUDE_HOOKS_BIN_DIR   default: ~/.claude/hooks
 #   CLAUDE_SETTINGS_FILE   default: ~/.claude/settings.json
+#   CURSOR_HOOKS_FILE      default: ~/.cursor/hooks.json
 #   CLAUDE_FORMAT_HOOKS_RELEASE_API
 #       override GitHub Releases API base URL for --upgrade (default:
 #       https://api.github.com); intended for tests/mirrors. The configured

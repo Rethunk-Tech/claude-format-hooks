@@ -32,10 +32,10 @@ Install, prerequisites, config, and uninstall: [HUMANS.md](HUMANS.md).
 ## Highlights
 
 - **Native JSON, shell, Go** — in-process; JSON preserves key order.
-- **`--check` for CI** — reports files needing format; distinct exit codes. `--write` applies them.
-- **`--doctor`** — every formatter, the extensions it owns, and whether its tool is installed.
-- **Real tools for everything else** — honors project config; no config-presence gate.
-- **Silent on success, always exits 0** — failures reach both the operator and the model.
+- **`--check` for CI** — reports files needing format (exit 1); usage/I/O errors exit 2. `--write` applies them.
+- **`--doctor`** — every formatter, its tools, extensions, and whether the hook is wired.
+- **Real tools for everything else** — honors project config. Prettier runs only where the project has a prettier config.
+- **Hook path silent on success, always exits 0** — failures reach both the operator and the model.
 - **One `./install.sh`** — wires Claude and Cursor hooks globally.
 
 ## Documentation

@@ -38,9 +38,16 @@ unrelated keys are preserved exactly; only their order changes, once.
 
 ## Env
 
-`CLAUDE_HOOKS_BIN_DIR`, `CLAUDE_SETTINGS_FILE`, `CURSOR_HOOKS_FILE`,
-`CLAUDE_FORMAT_HOOKS_RELEASE_API` (test/mirror override).
-`CLAUDE_FORMAT_HOOKS_LOG=/path/to/log` for per-invocation debug lines.
+Install/wiring (defaults in parentheses): `CLAUDE_HOOKS_BIN_DIR`
+(`~/.claude/hooks`), `CLAUDE_SETTINGS_FILE` (`~/.claude/settings.json`),
+`CURSOR_HOOKS_FILE` (`~/.cursor/hooks.json`),
+`CLAUDE_FORMAT_HOOKS_RELEASE_API` (GitHub Releases API; test/mirror).
+
+Runtime: `CLAUDE_PROJECT_DIR` (Claude Code sets this; files outside it are
+skipped), `CLAUDE_FORMAT_HOOKS_CONFIG` (user config path; default
+`~/.claude/claude-format-hooks.json`), `CLAUDE_FORMAT_HOOKS_CACHE` (disk
+cache directory; default OS user cache/`claude-format-hooks`),
+`CLAUDE_FORMAT_HOOKS_LOG` (if set, append one debug line per invocation).
 
 ## Usage
 
@@ -53,8 +60,12 @@ Unsupported extensions and skipped paths are no-ops — see
 [AGENTS.md § Invariants](AGENTS.md#invariants).
 
 ```bash
+format-dispatch                        # stdin hook payload (what Claude/Cursor invoke)
+format-dispatch --help                 # also -h
 format-dispatch --version
-format-dispatch --check .              # CI: exit 1 if formatting needed
+format-dispatch --install [--dry-run]
+format-dispatch --uninstall [--dry-run]
+format-dispatch --check .              # CI: exit 1 if formatting needed; 2 on usage/I/O error
 format-dispatch --check . --write      # apply what --check reported
 format-dispatch --doctor               # formatters, tools, and whether the hook is wired
 format-dispatch --upgrade [--dry-run]
@@ -79,13 +90,28 @@ two applied. Pointing `CLAUDE_FORMAT_HOOKS_RELEASE_API` elsewhere skips the
 `gh` step, since `gh` would be judging a different origin's bytes. `--dry-run` prints
 the planned asset and path without going near the network.
 
-**Config:** `~/.claude/claude-format-hooks.json` (`$CLAUDE_FORMAT_HOOKS_CONFIG`);
-project `.claude-format-hooks.json` for `disabled` / `disabledFormatters` /
-`skipDirs` / `skipFiles` (extra generated directory names and filename
-globs, added to the built-in lists);
-`.editorconfig` wins indent. Markdown base:
-`~/.claude/claude-format-hooks.markdownlint-cli2.jsonc` (created on first use).
-SQL: `~/.sqlfluff` bootstrap on first `.sql` write.
+**Config:** `$CLAUDE_FORMAT_HOOKS_CONFIG` or `~/.claude/claude-format-hooks.json`.
+The same file shape is accepted as a project `.claude-format-hooks.json`.
+`disabled` / `disabledFormatters` / `skipDirs` / `skipFiles` apply at both
+levels (`skipDirs` / `skipFiles` add generated directory names and filename
+globs to the built-in lists). Native indent is user config only; a project's
+indent keys are ignored and `.editorconfig` wins over the user file. Defaults:
+
+```json
+{
+  "json": { "indentSize": 2, "useTabs": false },
+  "shell": { "indentSize": 2, "useTabs": false, "switchCaseIndent": true },
+  "disabled": [],
+  "disabledFormatters": [],
+  "skipDirs": [],
+  "skipFiles": []
+}
+```
+
+`disabled` is extensions (e.g. `".sql"`). `disabledFormatters` is `--doctor`
+FORMATTER names (case-insensitive; `"biome"` skips biome-owned types).
+Markdown base: `~/.claude/claude-format-hooks.markdownlint-cli2.jsonc`
+(created on first use). SQL: `~/.sqlfluff` bootstrap on first `.sql` write.
 
 ## Supported extensions
 
@@ -102,7 +128,9 @@ each only when the file has that exact name;
 `.sh`/`.bash`/`.zsh`/`.ksh`/`.dash`, plus extensionless
 or hidden rc files whose shebang names a supported interpreter, including
 `env -S`); TS/JS/CSS/JSONC via biome; MD via markdownlint-cli2; TOML via taplo;
-YAML/HTML/SCSS/Less/Vue/Svelte/Astro via prettier; GraphQL (`.graphql`/`.gql`)
+YAML/HTML/SCSS/Less/Vue/Svelte/Astro via prettier (only when the project has
+a prettier config: `.prettierrc*`, `prettier.config.*`, or a package.json
+`prettier` key); GraphQL (`.graphql`/`.gql`)
 via biome or prettier; SQL via sqlfluff; Python via ruff/black;
 notebooks via ruff/black; Rust via rustfmt; Terraform via terraform/tofu; proto
 via buf; C/C++/Objective-C via clang-format; Java; Kotlin (`.kt`/`.kts`);

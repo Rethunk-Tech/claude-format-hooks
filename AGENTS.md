@@ -30,13 +30,13 @@ Single package: `go test -race -v ./internal/formatters/...`.
 
 | Path | Role |
 | ---- | ---- |
-| [`cmd/format-dispatch/`](cmd/format-dispatch/) | Entrypoint, `--install`/`--uninstall`/`--upgrade`/`--check`/`--doctor` |
+| [`cmd/format-dispatch/`](cmd/format-dispatch/) | Entrypoint, `--install`/`--uninstall`/`--upgrade`/`--check` (`--write`)/`--doctor`/`--version`/`--help`/`-h` |
 | [`internal/hookio/`](internal/hookio/) | Stdin → file path (Claude + Cursor schemas) |
-| [`internal/diskcache/`](internal/diskcache/) | TTL disk cache shared by config + formatters |
-| [`internal/config/`](internal/config/) | Indent: defaults → user config → `.editorconfig` |
-| [`internal/dispatch/`](internal/dispatch/) | Extension registry, non-source skip list (built-in + config `skipDirs`) |
+| [`internal/diskcache/`](internal/diskcache/) | TTL disk cache (`$CLAUDE_FORMAT_HOOKS_CACHE` or OS user cache/`claude-format-hooks`) |
+| [`internal/config/`](internal/config/) | Indent: defaults → user config (`json`/`shell`) → `.editorconfig`; also `disabled`, `disabledFormatters`, `skipDirs`, `skipFiles` |
+| [`internal/dispatch/`](internal/dispatch/) | Extension registry, non-source skip list (built-in + config `skipDirs`/`skipFiles`) |
 | [`internal/formatters/`](internal/formatters/) | Per-type formatters (native + external) |
-| [`internal/installer/`](internal/installer/) | Hook wiring, upgrade, bunx tool provisioning |
+| [`internal/installer/`](internal/installer/) | Hook wiring, upgrade, bunx tool provisioning (`$CLAUDE_HOOKS_BIN_DIR`, `$CLAUDE_SETTINGS_FILE`, `$CURSOR_HOOKS_FILE`, `$CLAUDE_FORMAT_HOOKS_RELEASE_API`) |
 
 `dispatch.NewRegistry` extensions: `.json` (biome when the project has a
 biome config and a usable launcher, otherwise native `encoding/json.Indent`),
@@ -76,7 +76,7 @@ still falls back to the native formatter.
   whole name (`.bashrc`), is first peeked at for a shebang naming a
   shell, python, ruby, node, php, or lua interpreter. `env -S` and other env flags
   are skipped so the real interpreter is seen.
-- Missing external tools cached briefly (`internal/diskcache`); self-heals within TTL.
+- Missing external tools cached 30s (`internal/diskcache`); self-heals within TTL.
 - Skips `node_modules/`, `.git/`, `vendor/`, `.venv/`, and peers; files outside `$CLAUDE_PROJECT_DIR`.
 - Skips generated files by name (`*.min.js`, `*-lock.json`, peers) even in a
   source directory. Config `skipDirs` / `skipFiles` extend both lists.
@@ -95,4 +95,4 @@ still falls back to the native formatter.
 
 ## Gate budget
 
-Measured 2026-10-09 at load 5-30 on 32 cores. Detection found build, golangci-lint (which covers gofumpt and vet), `go test ./...`, govulncheck, actionlint and shellcheck. CI also runs the suite with `-race` and a 75% coverage floor, `go mod verify` and a `--check` dogfood of the freshly built binary, so `.gate.toml` replaces the plain test with the race and coverage run and adds the other two. Warm: 2 s wall and 7 s CPU before the race run was added, 7.8 s wall and 16 s CPU after (the coverage run is uncached; measured at load 21). Cold (fresh copy, throwaway Go build, module and lint caches, so the go1.27.2 toolchain download is included): 25 s wall and 193 s CPU at load 26-33. Warm is under the 10 s bar; cold is under 30 s wall but its CPU is the toolchain download and a full `-race` build, which a second cold run would not repeat.
+Measured 2026-10-09 at load 5-30 on 32 cores. Detection found build, golangci-lint (which covers gofumpt and vet), `go test ./...`, govulncheck, actionlint and shellcheck. CI also runs the suite with `-race` and a 75% coverage floor, `go mod verify` and a `--check` dogfood of the freshly built binary, so `.gate.toml` replaces the plain test with the race and coverage run and adds the other two. Warm: 7.8 s wall and 16 s CPU (coverage run uncached; measured at load 21). Cold (fresh copy, throwaway Go build, module and lint caches, so the go1.27.2 toolchain download is included): 25 s wall and 193 s CPU at load 26-33. Warm is under the 10 s bar; cold is under 30 s wall but its CPU is the toolchain download and a full `-race` build, which a second cold run would not repeat.

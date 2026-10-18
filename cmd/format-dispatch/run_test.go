@@ -116,6 +116,9 @@ func TestDispatchArgsHelp(t *testing.T) {
 			stdout := captureStdout(t, func() { code = dispatchArgs([]string{flag}) })
 			qt.Check(t, qt.Equals(code, 0))
 			qt.Check(t, qt.StringContains(stdout, "Usage:"))
+			qt.Check(t, qt.StringContains(stdout, "--uninstall --dry-run"))
+			qt.Check(t, qt.StringContains(stdout, "--help, -h"))
+			qt.Check(t, qt.StringContains(stdout, "whether the hook is wired"))
 		})
 	}
 }
