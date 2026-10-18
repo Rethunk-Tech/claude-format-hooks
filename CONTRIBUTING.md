@@ -1,54 +1,34 @@
 # Contributing
 
-Thanks for helping improve **claude-format-hooks**.
-
-## Before you start
-
-- **Architecture and conventions:** [AGENTS.md](AGENTS.md)
-- **Operators (install, config, troubleshooting):** [HUMANS.md](HUMANS.md)
-
 ## Prerequisites
 
-- [Go](https://go.dev/) (see the `go` version in [go.mod](go.mod))
-- [`golangci-lint`](https://golangci-lint.run/) v2 (the config
-  schema in [`.golangci.yml`](.golangci.yml); CI's lint version comes from
-  `Rethunk-Tech/gh-actions/setup-go`)
-- Optional: `bun` (`bunx`) and `sqlfluff` if you're changing an external
-  formatter and want to exercise it locally — see
-  [HUMANS.md](HUMANS.md#prerequisites)
+- [Go](https://go.dev/) ([go.mod](go.mod))
+- [`golangci-lint`](https://golangci-lint.run/) v2 ([`.golangci.yml`](.golangci.yml);
+  CI version from `Rethunk-Tech/gh-actions/setup-go`)
+- Optional formatters when changing one: [HUMANS.md](HUMANS.md#install)
 
 ## Build and test
 
-Build, vet, format, lint, and test commands (plus what CI runs and how to
-scope a single package/test) are canonical in
-[AGENTS.md § Commands](AGENTS.md#commands) — don't duplicate them here.
+[AGENTS.md § Commands](AGENTS.md#commands).
 
 ## Pull requests
 
-Use the PR template. No unrelated refactors or scope creep — match the
-style of the file being touched (see [AGENTS.md](AGENTS.md#conventions)).
-If you add or change a formatter, update the
-[supported-extensions table](HUMANS.md#supported-extensions) in
-HUMANS.md and the [layout table](AGENTS.md#layout) in AGENTS.md if the
-package layout changed, and add a `CHANGELOG.md` entry under
-`[Unreleased]`.
+Use the PR template. Match the file being touched
+([AGENTS.md](AGENTS.md#conventions)). Formatter or install changes:
+[HUMANS.md](HUMANS.md#supported-extensions) and, if the package layout
+changed, [AGENTS.md](AGENTS.md#layout). `CHANGELOG.md` under `[Unreleased]`.
 
 ## Releasing
 
-Update `CHANGELOG.md` (move `[Unreleased]` into a new dated version
-section, add the compare links at the bottom) and push a matching
-annotated `vX.Y.Z` tag. The tag push triggers
-[`.github/workflows/release.yml`](.github/workflows/release.yml), which
-cross-compiles `format-dispatch` for linux/darwin/windows (amd64+arm64) and
-publishes a GitHub Release with the binaries and their sha256sums — no
-manual build/upload step.
+Move `[Unreleased]` in `CHANGELOG.md` into a dated version (compare links
+at the bottom) and push annotated tag `vX.Y.Z`. That triggers
+[`.github/workflows/release.yml`](.github/workflows/release.yml)
+(linux/darwin/windows, amd64+arm64, sha256sums).
 
 ## Security
 
-Report vulnerabilities via [SECURITY.md](SECURITY.md) (private advisory),
-not a public issue.
+[SECURITY.md](SECURITY.md), not a public issue.
 
 ## License
 
-By contributing, you agree that your contributions are licensed under the
-[MIT License](LICENSE) that applies to this project.
+Contributions are [MIT](LICENSE).
