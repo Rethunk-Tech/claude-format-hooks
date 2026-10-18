@@ -1,3 +1,8 @@
+# Same scan lefthook pre-commit runs, against the whole tree so GitHub UI
+# commits and --no-verify still hit .gitleaks.toml.
+[gates.gitleaks]
+run = "gitleaks detect --no-banner --redact"
+
 # CI runs the suite with -race and a 75% coverage floor, which detection's plain `go test ./...` does not.
 [gates.test]
 run = '''

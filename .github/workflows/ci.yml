@@ -95,12 +95,15 @@ jobs:
           run-fmt: "true"
           run-govulncheck: "true"
 
-      # gate --list also runs these; the test job restates Go checks so
-      # Windows still exercises the suite without a gate binary.
-      - name: actionlint
+      # Same suite as lefthook pre-push (`gate --list`). The test job still
+      # restates the Go checks so Windows exercises them without a gate binary.
+      - name: Install gate tools
         if: ${{ !cancelled() }}
-        run: go run github.com/rhysd/actionlint/cmd/actionlint@latest
+        run: |
+          go install github.com/rhysd/actionlint/cmd/actionlint@v1.7.12
+          go install github.com/gitleaks/gitleaks/v8@v8.30.1
+          go install github.com/Rethunk-Tech/rethunk-gate-cli/cmd/gate@v0.6.7
 
-      - name: shellcheck
+      - name: gate
         if: ${{ !cancelled() }}
-        run: shellcheck -x install.sh
+        run: gate
