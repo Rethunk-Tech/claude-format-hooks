@@ -29,6 +29,12 @@ func TestShebangExt(t *testing.T) {
 		{"env -u VAR python", "#!/usr/bin/env -u FOO python3\n", ".py", true},
 		{"env NAME=VALUE python", "#!/usr/bin/env FOO=bar python3\n", ".py", true},
 		{"env -S with no command", "#!/usr/bin/env -S\n", "", false},
+		{"hashbang only", "#!\n", "", false},
+		{"env with no operand", "#!/usr/bin/env\n", "", false},
+		{"env dash before python", "#!/usr/bin/env - python3\n", ".py", true},
+		{"env -u equals form", "#!/usr/bin/env -u=FOO python3\n", ".py", true},
+		{"env --chdir equals form", "#!/usr/bin/env --chdir=/tmp python3\n", ".py", true},
+		{"env -u dangling", "#!/usr/bin/env -u\n", "", false},
 		{"ruby", "#!/usr/bin/env ruby\n", ".rb", true},
 		{"php", "#!/usr/bin/env php\n", ".php", true},
 		{"lua", "#!/usr/bin/env lua\n", ".lua", true},
@@ -53,6 +59,12 @@ func TestShebangExt(t *testing.T) {
 			qt.Check(t, qt.Equals(ok, tc.ok))
 		})
 	}
+
+	t.Run("missing file", func(t *testing.T) {
+		ext, ok := shebangExt(filepath.Join(t.TempDir(), "absent"))
+		qt.Check(t, qt.Equals(ext, ""))
+		qt.Check(t, qt.IsFalse(ok))
+	})
 }
 
 func TestResolveDispatchExt(t *testing.T) {

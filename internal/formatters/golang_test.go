@@ -391,6 +391,40 @@ func TestParseGolangciFormatters(t *testing.T) {
 			src:         "formatters:\r\n  settings:\r\n    gofumpt:\r\n      extra:\r\n        group-params: true\r\n",
 			groupParams: true,
 		},
+		{
+			name:      "document start",
+			src:       "---\nformatters:\n  enable: [goimports]\n",
+			goimports: true,
+		},
+		{
+			name: "tabs skipped",
+			src:  "formatters:\n\tenable:\n\t- goimports\n",
+		},
+		{
+			name:      "hash inside quoted value",
+			src:       "formatters:\n  note: \"keep # this\"\n  enable: [goimports]\n",
+			goimports: true,
+		},
+		{
+			name: "empty key",
+			src:  "formatters:\n  : [goimports]\n",
+		},
+		{
+			name: "goimports not under enable",
+			src: `formatters:
+  disable:
+    - goimports
+`,
+		},
+		{
+			name:      "single-quoted list item",
+			src:       "formatters:\n  enable:\n    - 'goimports'\n",
+			goimports: true,
+		},
+		{
+			name: "inline enable without goimports",
+			src:  "formatters:\n  enable: [gofumpt]\n",
+		},
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
