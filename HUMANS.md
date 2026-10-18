@@ -36,6 +36,40 @@ build provenance with
 biome/prettier/taplo/markdownlint-cli2. Restart Claude Code or open
 `/hooks`. Rewriting either file sorts top-level keys; values stay.
 
+Completions (bash, zsh, fish, PowerShell) and a man page are
+`format-dispatch-completions-man.tar.gz` (also in `SHA256SUMS`):
+
+```sh
+curl -fsSLO https://github.com/Rethunk-Tech/claude-format-hooks/releases/latest/download/format-dispatch-completions-man.tar.gz
+curl -fsSLO https://github.com/Rethunk-Tech/claude-format-hooks/releases/latest/download/format-dispatch-completions-man.tar.gz.sha256
+sha256sum -c format-dispatch-completions-man.tar.gz.sha256
+mkdir -p /tmp/format-dispatch-assets
+tar -xzf format-dispatch-completions-man.tar.gz -C /tmp/format-dispatch-assets
+```
+
+```bash
+install -Dm644 /tmp/format-dispatch-assets/format-dispatch.bash ~/.local/share/bash-completion/completions/format-dispatch
+```
+
+```zsh
+install -Dm644 /tmp/format-dispatch-assets/_format-dispatch ~/.local/share/zsh/site-functions/_format-dispatch
+```
+
+```fish
+install -Dm644 /tmp/format-dispatch-assets/format-dispatch.fish ~/.config/fish/completions/format-dispatch.fish
+```
+
+```sh
+install -Dm644 /tmp/format-dispatch-assets/format-dispatch.1 ~/.local/share/man/man1/format-dispatch.1
+```
+
+```powershell
+$dest = Join-Path (Split-Path $PROFILE) 'Completions'
+New-Item -ItemType Directory -Force $dest | Out-Null
+Copy-Item /tmp/format-dispatch-assets/format-dispatch.ps1 (Join-Path $dest 'format-dispatch.ps1')
+Add-Content $PROFILE ". '$(Join-Path $dest 'format-dispatch.ps1')'"
+```
+
 ## Env
 
 | Variable | Default / role |

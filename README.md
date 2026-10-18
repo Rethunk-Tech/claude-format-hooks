@@ -39,6 +39,28 @@ cd claude-format-hooks
 
 Config and uninstall: [HUMANS.md](HUMANS.md).
 
+Each `v*` release attaches `format-dispatch-completions-man.tar.gz` (listed in
+`SHA256SUMS`). After extracting it:
+
+```bash
+install -Dm644 format-dispatch.bash ~/.local/share/bash-completion/completions/format-dispatch
+```
+
+```zsh
+install -Dm644 _format-dispatch ~/.local/share/zsh/site-functions/_format-dispatch
+```
+
+```fish
+install -Dm644 format-dispatch.fish ~/.config/fish/completions/format-dispatch.fish
+```
+
+```powershell
+$dest = Join-Path (Split-Path $PROFILE) 'Completions'
+New-Item -ItemType Directory -Force $dest | Out-Null
+Copy-Item format-dispatch.ps1 (Join-Path $dest 'format-dispatch.ps1')
+Add-Content $PROFILE ". '$(Join-Path $dest 'format-dispatch.ps1')'"
+```
+
 ## Highlights
 
 - **`--check` / `--write`** — CI: exit 1 if formatting is needed, 2 on
