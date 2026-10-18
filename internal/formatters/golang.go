@@ -3,28 +3,30 @@ package formatters
 import (
 	"bytes"
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"go/format"
 	"os"
 	"os/exec"
 	"path/filepath"
+	"slices"
 	"strings"
 )
 
 // goFormatter reformats Go source. When gofumpt is on PATH it prints the
 // formatted file to stdout (never -w) and the hook writes that result, so
 // the bytes match what golangci-lint fmt would apply. goimports runs first
-// only when it is also on PATH and a parent .golangci.yml lists it under
-// formatters.enable. -extra=group_params is passed only when that same file
-// sets formatters.settings.gofumpt.extra.group-params: true.
+// only when it is also on PATH and a parent golangci-lint config lists it
+// under formatters.enable. -extra=group_params is passed only when that
+// same file sets formatters.settings.gofumpt.extra.group-params: true.
 //
 // Without gofumpt, formatting is go/format.Source, the engine gofmt uses.
 // There is no Prober: a missing gofumpt is a fallback, not a skip, and
 // --doctor would otherwise report the formatter as missing.
 type goFormatter struct{}
 
-// goFormatOpts is the slice of a parent .golangci.yml this formatter honors.
+// goFormatOpts is the slice of a parent golangci-lint config this formatter honors.
 type goFormatOpts struct {
 	goimports   bool
 	groupParams bool
@@ -133,19 +135,29 @@ func toolDiagnostic(ctx context.Context, err error) string {
 	return err.Error()
 }
 
-// golangciGoFormat reads the nearest parent .golangci.yml of abs. A missing
-// file, or one that does not mention these keys, leaves the zero value: no
-// goimports, no group_params. The walk stops at the first config it can
-// read, which is the file golangci-lint itself would use.
+// golangciConfigNames is golangci-lint's search order in a directory.
+var golangciConfigNames = []string{
+	".golangci.yml",
+	".golangci.yaml",
+	".golangci.toml",
+	".golangci.json",
+}
+
+// golangciGoFormat reads the nearest parent golangci-lint config of abs.
+// A missing file, or one that does not mention these keys, leaves the zero
+// value: no goimports, no group_params. The walk stops at the first config
+// it can read, which is the file golangci-lint itself would use.
 func golangciGoFormat(abs string) goFormatOpts {
 	dir := filepath.Dir(abs)
 	for {
-		body, err := os.ReadFile(filepath.Join(dir, ".golangci.yml")) //nolint:gosec // dir is an ancestor of the source file being formatted
-		if err == nil {
-			return parseGolangciFormatters(body)
-		}
-		if !os.IsNotExist(err) {
-			return goFormatOpts{}
+		for _, name := range golangciConfigNames {
+			body, err := os.ReadFile(filepath.Join(dir, name)) //nolint:gosec // dir is an ancestor of the source file being formatted
+			if err == nil {
+				return parseGolangciConfig(name, body)
+			}
+			if !os.IsNotExist(err) {
+				return goFormatOpts{}
+			}
 		}
 		parent := filepath.Dir(dir)
 		if parent == dir {
@@ -153,6 +165,77 @@ func golangciGoFormat(abs string) goFormatOpts {
 		}
 		dir = parent
 	}
+}
+
+func parseGolangciConfig(name string, body []byte) goFormatOpts {
+	switch filepath.Ext(name) {
+	case ".json":
+		return parseGolangciJSON(body)
+	case ".toml":
+		return parseGolangciTOML(body)
+	default:
+		return parseGolangciFormatters(body)
+	}
+}
+
+func parseGolangciJSON(src []byte) goFormatOpts {
+	var cfg struct {
+		Formatters struct {
+			Enable   []string `json:"enable"`
+			Settings struct {
+				Gofumpt struct {
+					Extra struct {
+						GroupParams bool `json:"group-params"`
+					} `json:"extra"`
+				} `json:"gofumpt"`
+			} `json:"settings"`
+		} `json:"formatters"`
+	}
+	if json.Unmarshal(src, &cfg) != nil {
+		return goFormatOpts{}
+	}
+	return goFormatOpts{
+		goimports:   slices.Contains(cfg.Formatters.Enable, "goimports"),
+		groupParams: cfg.Formatters.Settings.Gofumpt.Extra.GroupParams,
+	}
+}
+
+func parseGolangciTOML(src []byte) goFormatOpts {
+	var opts goFormatOpts
+	section := ""
+	for line := range strings.SplitSeq(string(src), "\n") {
+		line = strings.TrimSpace(strings.TrimRight(line, "\r"))
+		if line == "" || strings.HasPrefix(line, "#") {
+			continue
+		}
+		if strings.HasPrefix(line, "[") && strings.HasSuffix(line, "]") {
+			section = strings.TrimSpace(line[1 : len(line)-1])
+			continue
+		}
+		key, val, ok := strings.Cut(line, "=")
+		if !ok {
+			continue
+		}
+		key = strings.TrimSpace(key)
+		val = strings.TrimSpace(val)
+		if key == "enable" && section == "formatters" && tomlListHas(val, "goimports") {
+			opts.goimports = true
+		}
+		if key == "group-params" && strings.Contains(section, "gofumpt") && val == "true" {
+			opts.groupParams = true
+		}
+	}
+	return opts
+}
+
+func tomlListHas(val, item string) bool {
+	val = strings.Trim(val, "[]")
+	for part := range strings.SplitSeq(val, ",") {
+		if unquoteYAML(strings.TrimSpace(part)) == item {
+			return true
+		}
+	}
+	return false
 }
 
 type yamlFrame struct {

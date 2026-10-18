@@ -460,3 +460,42 @@ formatters:
 	qt.Check(t, qt.IsTrue(far.goimports))
 	qt.Check(t, qt.IsTrue(far.groupParams))
 }
+
+func TestGolangciGoFormatReadsLintConfigNames(t *testing.T) {
+	const jsonCfg = `{"formatters":{"enable":["goimports"],"settings":{"gofumpt":{"extra":{"group-params":true}}}}}`
+	const tomlCfg = `[formatters]
+enable = ["goimports"]
+[formatters.settings.gofumpt.extra]
+group-params = true
+`
+	cases := []struct {
+		name string
+		body string
+	}{
+		{".golangci.yaml", goimportsAndGofumptYML},
+		{".golangci.toml", tomlCfg},
+		{".golangci.json", jsonCfg},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			dir := t.TempDir()
+			pkg := filepath.Join(dir, "pkg")
+			qt.Assert(t, qt.IsNil(os.Mkdir(pkg, 0o750)))
+			qt.Assert(t, qt.IsNil(os.WriteFile(filepath.Join(dir, tc.name), []byte(tc.body), 0o600)))
+			opts := golangciGoFormat(filepath.Join(pkg, "t.go"))
+			qt.Check(t, qt.IsTrue(opts.goimports))
+			qt.Check(t, qt.IsTrue(opts.groupParams))
+		})
+	}
+}
+
+func TestGolangciGoFormatPrefersYmlOverYaml(t *testing.T) {
+	dir := t.TempDir()
+	pkg := filepath.Join(dir, "pkg")
+	qt.Assert(t, qt.IsNil(os.Mkdir(pkg, 0o750)))
+	qt.Assert(t, qt.IsNil(os.WriteFile(filepath.Join(dir, ".golangci.yml"), []byte(gofumptOnlyYML), 0o600)))
+	qt.Assert(t, qt.IsNil(os.WriteFile(filepath.Join(dir, ".golangci.yaml"), []byte(goimportsAndGofumptYML), 0o600)))
+	opts := golangciGoFormat(filepath.Join(pkg, "t.go"))
+	qt.Check(t, qt.IsFalse(opts.goimports))
+	qt.Check(t, qt.IsFalse(opts.groupParams))
+}
