@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.5.1] - 2026-10-18
+
 ### Added
 
 - Homebrew (`brew install rethunk-tech/tap/format-dispatch`) and Scoop
@@ -40,6 +42,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `.zsh`, `.ksh`, and `.dash` route to the native shell formatter. Those
   interpreters already formatted when the file had no extension and a
   matching shebang; a `tool.zsh` write was a silent no-op.
+- Extensionless Deno scripts (`#!/usr/bin/env deno`, `deno run`) format
+  as JavaScript, matching the existing node and bun shebang routes.
+
+### Changed
+
+- Generated-file skips also cover `*.min.ts`, `*.min.tsx`, `*.min.mts`,
+  and `*.min.cts`, matching the existing minified JS/CSS rule.
+- Operator and agent docs list every `NewRegistry` extension and the
+  JSON biome handoff. Static analysis is documented as the ubuntu `lint`
+  job, not as running on Windows.
+- Prettier runs only when the project has a prettier config
+  (`.prettierrc*`, `prettier.config.*`, or package.json `prettier`).
 
 ### Fixed
 
@@ -60,7 +74,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `formatters.settings.gofumpt.extra.group-params: true`. `goimports` runs
   first when it is on `PATH` and that file's `formatters.enable` lists it.
   Invalid Go stays a silent skip. Without `gofumpt`, formatting stays
-  `go/format.Source`.
+  `go/format.Source`. golangci config is recognised under every name
+  golangci-lint itself reads.
 - `sqlfluff fix` no longer applies RF03 (`references.consistent`), whose
   qualification fix could retarget an outer-table column in a correlated
   subquery (e.g. a `CREATE POLICY ... USING (EXISTS ...)`) to the inner
@@ -72,14 +87,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Hidden Unix rc files (`.bashrc`, `.zshrc`) are shebang-peeked. Go's
   `filepath.Ext` returns the whole name, so they used to look like an
   unsupported extension and skip without opening the file.
+- Versioned PHP shebangs (`php8.3`) and PHP/Lua shebangs map to those
+  formatters instead of being skipped.
+- Unreadable hook stdin exits 0 (silent no-op) instead of failing the
+  PostToolUse path.
+- `--check` rejects unknown dash-flags. `--doctor` and `--version` reject
+  extra arguments.
 
-### Changed
+### Security
 
-- Generated-file skips also cover `*.min.ts`, `*.min.tsx`, `*.min.mts`,
-  and `*.min.cts`, matching the existing minified JS/CSS rule.
-- Operator and agent docs list every `NewRegistry` extension and the
-  JSON biome handoff. Static analysis is documented as the ubuntu `lint`
-  job, not as running on Windows.
+- `--upgrade` refuses non-HTTP fetch URLs.
+- Hook stdin is size-bounded. Config file reads cap at 64KiB. Untrusted
+  indent width is clamped.
 
 ## [0.5.0] - 2026-09-09
 
@@ -609,7 +628,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 Initial release.
 
-[Unreleased]: https://github.com/Rethunk-Tech/claude-format-hooks/compare/v0.5.0...HEAD
+[Unreleased]: https://github.com/Rethunk-Tech/claude-format-hooks/compare/v0.5.1...HEAD
+[0.5.1]: https://github.com/Rethunk-Tech/claude-format-hooks/compare/v0.5.0...v0.5.1
 [0.5.0]: https://github.com/Rethunk-Tech/claude-format-hooks/compare/v0.4.0...v0.5.0
 [0.4.0]: https://github.com/Rethunk-Tech/claude-format-hooks/compare/v0.3.0...v0.4.0
 [0.3.0]: https://github.com/Rethunk-Tech/claude-format-hooks/compare/v0.2.0...v0.3.0
