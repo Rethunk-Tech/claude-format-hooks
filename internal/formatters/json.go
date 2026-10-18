@@ -87,7 +87,7 @@ func (f jsonFormatter) Format(_ context.Context, _, abs string) Result {
 	spec := config.ResolveJSONIndent(f.cfg, abs)
 	indent := "\t"
 	if !spec.UseTabs {
-		indent = strings.Repeat(" ", max(spec.Size, 1))
+		indent = strings.Repeat(" ", clampedIndentWidth(spec.Size))
 	}
 
 	var buf bytes.Buffer
@@ -106,4 +106,19 @@ func (f jsonFormatter) Format(_ context.Context, _, abs string) Result {
 	// time it's formatted — a non-idempotent, ever-growing bug.
 	out := append(bytes.TrimRight(buf.Bytes(), "\n\t \r"), '\n')
 	return writeIfChanged(abs, src, out, 0o644)
+}
+
+// maxIndentWidth caps spaces taken from untrusted config / .editorconfig.
+// strings.Repeat and shfmt's Indent would otherwise accept a multi-gigabyte
+// width from a hostile indentSize.
+const maxIndentWidth = 32
+
+func clampedIndentWidth(size int) int {
+	if size < 1 {
+		return 1
+	}
+	if size > maxIndentWidth {
+		return maxIndentWidth
+	}
+	return size
 }

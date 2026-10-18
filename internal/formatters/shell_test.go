@@ -75,6 +75,20 @@ func TestShellFormatterClampsNonPositiveIndentSize(t *testing.T) {
 	}
 }
 
+func TestShellFormatterClampsHugeIndentSize(t *testing.T) {
+	src := "#!/bin/sh\nif true; then\necho hi\nfi\n"
+	cfgCap := config.Default()
+	cfgCap.Shell.IndentSize = maxIndentWidth
+	cfgHuge := config.Default()
+	cfgHuge.Shell.IndentSize = maxIndentWidth * 10
+
+	_, pathCap := sourceFile(t, "t.sh", src)
+	_, pathHuge := sourceFile(t, "t.sh", src)
+	qt.Assert(t, qt.IsNil(NewShell(cfgCap).Format(t.Context(), filepath.Dir(pathCap), pathCap).Err))
+	qt.Assert(t, qt.IsNil(NewShell(cfgHuge).Format(t.Context(), filepath.Dir(pathHuge), pathHuge).Err))
+	qt.Check(t, qt.Equals(string(readSource(t, pathHuge)), string(readSource(t, pathCap))))
+}
+
 func TestShellFormatterSkipsInvalidSyntax(t *testing.T) {
 	dir := t.TempDir()
 	path := filepath.Join(dir, "t.sh")

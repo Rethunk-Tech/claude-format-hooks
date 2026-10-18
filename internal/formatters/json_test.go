@@ -54,6 +54,20 @@ func TestJSONFormatterInvalidJSONIsDiagnostic(t *testing.T) {
 	qt.Check(t, qt.Equals(string(readSource(t, path)), `{"a": `))
 }
 
+func TestJSONFormatterClampsHugeIndentSize(t *testing.T) {
+	src := `{"a":1}`
+	cfgCap := config.Default()
+	cfgCap.JSON.IndentSize = maxIndentWidth
+	cfgHuge := config.Default()
+	cfgHuge.JSON.IndentSize = maxIndentWidth * 10
+
+	_, pathCap := sourceFile(t, "t.json", src)
+	_, pathHuge := sourceFile(t, "t.json", src)
+	qt.Assert(t, qt.IsNil(NewJSON(cfgCap).Format(t.Context(), filepath.Dir(pathCap), pathCap).Err))
+	qt.Assert(t, qt.IsNil(NewJSON(cfgHuge).Format(t.Context(), filepath.Dir(pathHuge), pathHuge).Err))
+	qt.Check(t, qt.Equals(string(readSource(t, pathHuge)), string(readSource(t, pathCap))))
+}
+
 func TestJSONFormatterPreservesKeyOrder(t *testing.T) {
 	dir := t.TempDir()
 	path := filepath.Join(dir, "t.json")
