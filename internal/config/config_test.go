@@ -1,6 +1,7 @@
 package config
 
 import (
+	"bytes"
 	"os"
 	"path/filepath"
 	"strconv"
@@ -48,6 +49,18 @@ func TestLoad(t *testing.T) {
 		dir := t.TempDir()
 		cfg, err := Load(dir)
 		qt.Check(t, qt.IsNotNil(err))
+		qt.Check(t, qt.DeepEquals(cfg, Default()))
+	})
+
+	t.Run("oversized file returns defaults and an error", func(t *testing.T) {
+		path := filepath.Join(t.TempDir(), "cfg.json")
+		body := append([]byte(`{"json":{"indentSize":4},"pad":"`), bytes.Repeat([]byte("x"), maxConfigBytes)...)
+		body = append(body, []byte(`"}`)...)
+		qt.Assert(t, qt.IsNil(os.WriteFile(path, body, 0o600)))
+
+		cfg, err := Load(path)
+		qt.Check(t, qt.IsNotNil(err))
+		qt.Check(t, qt.StringContains(err.Error(), "exceeds"))
 		qt.Check(t, qt.DeepEquals(cfg, Default()))
 	})
 

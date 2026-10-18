@@ -19,6 +19,8 @@ package config
 
 import (
 	"encoding/json"
+	"fmt"
+	"io"
 	"os"
 	"slices"
 	"strconv"
@@ -29,6 +31,10 @@ import (
 
 	"github.com/Rethunk-Tech/claude-format-hooks/internal/diskcache"
 )
+
+// maxConfigBytes bounds a config file so a hostile project
+// .claude-format-hooks.json cannot force the hook to slurp gigabytes.
+const maxConfigBytes = 64 << 10
 
 // JSON holds the user's indent preference for the native JSON formatter.
 type JSON struct {
@@ -74,12 +80,20 @@ func Default() Config {
 // silent formatting hook into something that blocks every file write.
 func Load(path string) (Config, error) {
 	cfg := Default()
-	raw, err := os.ReadFile(path) //nolint:gosec // path is the caller-controlled config location (env override or fixed default), by design
+	f, err := os.Open(path) //nolint:gosec // path is the caller-controlled config location (env override or fixed default), by design
 	if err != nil {
 		if os.IsNotExist(err) {
 			return cfg, nil
 		}
 		return cfg, err
+	}
+	defer func() { _ = f.Close() }()
+	raw, err := io.ReadAll(io.LimitReader(f, maxConfigBytes+1))
+	if err != nil {
+		return cfg, err
+	}
+	if len(raw) > maxConfigBytes {
+		return Default(), fmt.Errorf("config file exceeds %d bytes", maxConfigBytes)
 	}
 	if err := json.Unmarshal(raw, &cfg); err != nil {
 		return Default(), err
