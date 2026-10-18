@@ -32,7 +32,7 @@ func (s systemFormatter) Name() string { return s.name }
 func (s systemFormatter) Tools() []string { return s.bins }
 
 func (s systemFormatter) Format(ctx context.Context, projectRoot, abs string) Result {
-	if s.onlyBase != "" && originalBase(abs) != s.onlyBase {
+	if s.onlyBase != "" && !matchesOnlyBase(abs, s.onlyBase) {
 		return Result{Skipped: true}
 	}
 	for _, bin := range s.bins {
@@ -48,6 +48,14 @@ func (s systemFormatter) Format(ctx context.Context, projectRoot, abs string) Re
 // .fmtcheck-<8 hex>-<original> (cmd/format-dispatch copyBeside) so the
 // tool still sees the extension; that copy has to count as the original
 // name or the check reports the tool as missing and never compares bytes.
+func matchesOnlyBase(abs, onlyBase string) bool {
+	base := originalBase(abs)
+	if base == onlyBase {
+		return true
+	}
+	return strings.EqualFold(base, onlyBase+".example")
+}
+
 func originalBase(abs string) string {
 	base := filepath.Base(abs)
 	rest, ok := strings.CutPrefix(base, ".fmtcheck-")

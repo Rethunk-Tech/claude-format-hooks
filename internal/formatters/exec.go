@@ -6,8 +6,20 @@ import (
 	"fmt"
 	"os"
 	"os/exec"
+	"path/filepath"
+	"strings"
 	"unicode/utf8"
 )
+
+// exampleStdinFilePath is the name tools that pick a language from the
+// final suffix should see: the real path with a trailing .example removed.
+func exampleStdinFilePath(abs string) string {
+	base := filepath.Base(abs)
+	if !strings.HasSuffix(strings.ToLower(base), ".example") {
+		return abs
+	}
+	return filepath.Join(filepath.Dir(abs), base[:len(base)-len(".example")])
+}
 
 // runExternal runs name with args in dir and, on failure, truncates its
 // combined output to a safe diagnostic size.

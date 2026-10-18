@@ -61,12 +61,25 @@ func NewRegistry(cfg config.Config) *Registry {
 		".zsh":  shell,
 		".ksh":  shell,
 		".dash": shell,
+		// Native shfmt reads bytes; the suffix does not pick a language.
+		".sh.example":   shell,
+		".bash.example": shell,
+		".zsh.example":  shell,
+		".ksh.example":  shell,
+		".dash.example": shell,
 
 		".go": golang,
+		// Same document as .go. gofumpt/goimports print stdout from a path
+		// they are given; native go/format.Source does not inspect the name.
+		".go.example": golang,
 		// .mod and .work are broader than the two files these commands
 		// may rewrite. The formatters skip every other basename.
 		".mod":  gomod,
 		".work": gowork,
+		// Same document as go.mod / go.work. The formatters still skip any
+		// other basename; go.mod.example is the copy of that file.
+		".mod.example":  gomod,
+		".work.example": gowork,
 
 		".ts":  biome,
 		".tsx": biome,
@@ -79,6 +92,17 @@ func NewRegistry(cfg config.Config) *Registry {
 		".mts": biome,
 		".cts": biome,
 		".css": biome,
+		// Same documents. Biome only reads the final suffix, so the
+		// formatter feeds these copies on stdin under the real language name.
+		".ts.example":  biome,
+		".tsx.example": biome,
+		".js.example":  biome,
+		".jsx.example": biome,
+		".mjs.example": biome,
+		".cjs.example": biome,
+		".mts.example": biome,
+		".cts.example": biome,
+		".css.example": biome,
 		// .jsonc keeps comments, which json.Indent can't handle safely —
 		// biome unconditionally, since a project without a biome config still
 		// needs something that parses comments.
@@ -92,7 +116,10 @@ func NewRegistry(cfg config.Config) *Registry {
 		".markdown": markdown,
 		// Cursor rule files: YAML frontmatter over markdown, which
 		// markdownlint-cli2 already handles.
-		".mdc": markdown,
+		".mdc":              markdown,
+		".mdx.example":      markdown,
+		".markdown.example": markdown,
+		".mdc.example":      markdown,
 		// Same document as .md. markdownlint-cli2 fixes an explicit path,
 		// so the .example suffix does not need a renamed copy.
 		".md.example": markdown,
@@ -109,17 +136,26 @@ func NewRegistry(cfg config.Config) *Registry {
 		".yaml.example": prettier,
 		".yml.example":  prettier,
 		".html":         prettier,
+		// Same document as .html. Prettier only inspects the final suffix.
+		".html.example": prettier,
 		// biome's CSS parser doesn't support the SCSS/Less supersets;
 		// prettier does natively.
-		".scss": prettier,
-		".less": prettier,
+		".scss":         prettier,
+		".less":         prettier,
+		".scss.example": prettier,
+		".less.example": prettier,
 		// .vue is a prettier core parser; .svelte and .astro need the
 		// project's own prettier plugin, and skip cleanly without one.
-		".vue":     prettier,
-		".svelte":  prettier,
-		".astro":   prettier,
-		".graphql": graphql,
-		".gql":     graphql,
+		".vue":             prettier,
+		".svelte":          prettier,
+		".astro":           prettier,
+		".vue.example":     prettier,
+		".svelte.example":  prettier,
+		".astro.example":   prettier,
+		".graphql":         graphql,
+		".gql":             graphql,
+		".graphql.example": graphql,
+		".gql.example":     graphql,
 
 		".sql": sql,
 		// Same document as .sql. sqlfluff only collects *.sql, so the
@@ -130,43 +166,72 @@ func NewRegistry(cfg config.Config) *Registry {
 		// Same document as .py. Black's include stops at *.py and *.pyi,
 		// so a copy whose final suffix is .example is skipped in place.
 		// Stdin is formatted as Python under the name with .example removed.
-		".py.example":  python,
-		".pyi":         python,
-		".ipynb":       notebook,
-		".rs":          rust,
-		".tf":          terraform,
-		".tfvars":      terraform,
-		".tftest.hcl":  terraform,
-		".tfmock.hcl":  terraform,
-		".tfquery.hcl": terraform,
-		".proto":       proto,
+		".py.example":          python,
+		".pyi":                 python,
+		".pyi.example":         python,
+		".ipynb":               notebook,
+		".ipynb.example":       notebook,
+		".rs":                  rust,
+		".rs.example":          rust,
+		".tf":                  terraform,
+		".tfvars":              terraform,
+		".tftest.hcl":          terraform,
+		".tfmock.hcl":          terraform,
+		".tfquery.hcl":         terraform,
+		".tf.example":          terraform,
+		".tfvars.example":      terraform,
+		".tftest.hcl.example":  terraform,
+		".tfmock.hcl.example":  terraform,
+		".tfquery.hcl.example": terraform,
+		".proto":               proto,
+		".proto.example":       proto,
 
 		// clang-format parses C, C++, and Objective-C from one binary.
-		".c":   clang,
-		".h":   clang,
-		".cc":  clang,
-		".cpp": clang,
-		".cxx": clang,
-		".hpp": clang,
-		".hh":  clang,
-		".hxx": clang,
-		".m":   clang,
-		".mm":  clang,
+		".c":           clang,
+		".h":           clang,
+		".cc":          clang,
+		".cpp":         clang,
+		".cxx":         clang,
+		".hpp":         clang,
+		".hh":          clang,
+		".hxx":         clang,
+		".m":           clang,
+		".mm":          clang,
+		".c.example":   clang,
+		".h.example":   clang,
+		".cc.example":  clang,
+		".cpp.example": clang,
+		".cxx.example": clang,
+		".hpp.example": clang,
+		".hh.example":  clang,
+		".hxx.example": clang,
+		".m.example":   clang,
+		".mm.example":  clang,
 
-		".java": java,
+		".java":         java,
+		".java.example": java,
 
-		".kt":  kotlin,
-		".kts": kotlin,
+		".kt":          kotlin,
+		".kts":         kotlin,
+		".kt.example":  kotlin,
+		".kts.example": kotlin,
 
-		".swift": swift,
+		".swift":         swift,
+		".swift.example": swift,
 
-		".rb":      ruby,
-		".rake":    ruby,
-		".gemspec": ruby,
+		".rb":              ruby,
+		".rake":            ruby,
+		".gemspec":         ruby,
+		".rb.example":      ruby,
+		".rake.example":    ruby,
+		".gemspec.example": ruby,
 
-		".php": php,
-		".nix": nix,
-		".lua": lua,
+		".php":         php,
+		".nix":         nix,
+		".lua":         lua,
+		".php.example": php,
+		".nix.example": nix,
+		".lua.example": lua,
 	}
 	maps.DeleteFunc(all, func(ext string, f formatters.Formatter) bool {
 		return cfg.IsDisabled(ext) || cfg.IsFormatterDisabled(f.Name())

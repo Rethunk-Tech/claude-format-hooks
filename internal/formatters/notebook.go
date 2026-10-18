@@ -2,6 +2,7 @@ package formatters
 
 import (
 	"context"
+	"path/filepath"
 	"strings"
 )
 
@@ -10,18 +11,36 @@ import (
 // support enabled.
 type notebookFormatter struct{}
 
-// NewNotebook returns the notebookFormatter for .ipynb.
+// NewNotebook returns the notebookFormatter for .ipynb and .ipynb.example.
 func NewNotebook() notebookFormatter { return notebookFormatter{} }
 
 func (notebookFormatter) Name() string { return "ruff/black-notebook" }
 
 func (notebookFormatter) Tools() []string { return []string{"ruff", "black"} }
 
+func notebookExampleCopy(abs string) bool {
+	return strings.HasSuffix(strings.ToLower(filepath.Base(abs)), ".ipynb.example")
+}
+
 func (notebookFormatter) Format(ctx context.Context, projectRoot, abs string) Result {
+	named := ""
+	if notebookExampleCopy(abs) {
+		named = exampleStdinFilePath(abs)
+	}
 	if _, err := lookPath("ruff"); err == nil {
+		if named != "" {
+			return runExternalStdin(ctx, projectRoot, "ruff", []string{
+				"format", "--stdin-filename", named, "-",
+			}, abs)
+		}
 		return runExternalResult(ctx, projectRoot, "ruff", []string{"format", "--", abs})
 	}
 	if _, err := lookPath("black"); err == nil {
+		if named != "" {
+			return runExternalStdin(ctx, projectRoot, "black", []string{
+				"--quiet", "--stdin-filename", named, "-",
+			}, abs)
+		}
 		ok, diagnostic, raw := runExternalOutput(ctx, projectRoot, "black", []string{"--quiet", "--", abs})
 		if ok {
 			return Result{}

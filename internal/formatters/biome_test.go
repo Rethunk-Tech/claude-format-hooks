@@ -43,6 +43,23 @@ printf '{\n\t"a": 1 // c\n}\n'`)
 	qt.Check(t, qt.Equals(string(readSource(t, abs)), "{\n\t\"a\": 1 // c\n}\n"))
 }
 
+func TestBiomeNamesTSExampleOnStdin(t *testing.T) {
+	isolateDiskCache(t)
+	dir := t.TempDir()
+	abs := filepath.Join(dir, "app.ts.example")
+	qt.Assert(t, qt.IsNil(os.WriteFile(abs, []byte("export const x=1\n"), 0o600)))
+	argvPath := filepath.Join(t.TempDir(), "argv")
+	t.Setenv("BIOME_ARGV", argvPath)
+	writeFakeTool(t, "biome", `printf '%s\n' "$@" > "$BIOME_ARGV"
+printf 'export const x = 1\n'`)
+
+	res := NewBiome().Format(t.Context(), dir, abs)
+	assertFormatted(t, res)
+	named := abs[:len(abs)-len(".example")]
+	assertArgv(t, argvPath, "format\n--write\n--no-errors-on-unmatched\n--stdin-file-path\n"+named+"\n")
+	qt.Check(t, qt.Equals(string(readSource(t, abs)), "export const x = 1\n"))
+}
+
 func TestBiomeBunxUsesFormatSubcommand(t *testing.T) {
 	isolateDiskCache(t)
 	dir := t.TempDir()

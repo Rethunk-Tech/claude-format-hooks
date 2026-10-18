@@ -49,6 +49,22 @@ func TestResolveExtensionPrefersLongestRegisteredSuffix(t *testing.T) {
 		{"app.PY.EXAMPLE", ".py.example"},
 		{"config.TOML.EXAMPLE", ".toml.example"},
 		{"config.YAML.EXAMPLE", ".yaml.example"},
+		{"app.ts.example", ".ts.example"},
+		{"app.TS.EXAMPLE", ".ts.example"},
+		{"page.html.example", ".html.example"},
+		{"main.go.example", ".go.example"},
+		{"script.sh.example", ".sh.example"},
+		{"app.pyi.example", ".pyi.example"},
+		{"go.mod.example", ".mod.example"},
+		{"go.work.example", ".work.example"},
+		{"nb.ipynb.example", ".ipynb.example"},
+		{"lib.rs.example", ".rs.example"},
+		{"main.tf.example", ".tf.example"},
+		{"fixture.tftest.hcl.example", ".tftest.hcl.example"},
+		{"api.proto.example", ".proto.example"},
+		{"Main.java.example", ".java.example"},
+		{"a.lua.example", ".lua.example"},
+		{"page.vue.example", ".vue.example"},
 	}
 	for _, tc := range cases {
 		qt.Check(t, qt.Equals(ResolveExtension(tc.path), tc.want), qt.Commentf("path=%q", tc.path))

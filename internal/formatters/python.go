@@ -6,7 +6,7 @@ import (
 	"strings"
 )
 
-// pythonFormatter shells out to ruff or black for .py, .pyi, and .py.example.
+// pythonFormatter shells out to ruff or black for .py, .pyi, and their .example copies.
 // Python has no Go equivalent, so this stays external. ruff format is
 // preferred: it's a much faster, actively-developed drop-in for black's own
 // formatting mode and has become the de facto standard; black is tried as a
@@ -14,7 +14,7 @@ import (
 // runs; if both are, ruff wins.
 type pythonFormatter struct{}
 
-// NewPython returns the pythonFormatter for .py, .pyi, and .py.example.
+// NewPython returns the pythonFormatter for .py, .pyi, and their .example copies.
 func NewPython() pythonFormatter { return pythonFormatter{} }
 
 func (pythonFormatter) Name() string { return "ruff/black" }
@@ -50,11 +50,10 @@ func (pythonFormatter) Format(ctx context.Context, projectRoot, abs string) Resu
 }
 
 func pyExampleCopy(abs string) bool {
-	return strings.HasSuffix(strings.ToLower(filepath.Base(abs)), ".py.example")
+	base := strings.ToLower(filepath.Base(abs))
+	return strings.HasSuffix(base, ".py.example") || strings.HasSuffix(base, ".pyi.example")
 }
 
 func pyStdinFilePath(abs string) string {
-	base := filepath.Base(abs)
-	trimmed := base[:len(base)-len(".example")]
-	return filepath.Join(filepath.Dir(abs), trimmed)
+	return exampleStdinFilePath(abs)
 }

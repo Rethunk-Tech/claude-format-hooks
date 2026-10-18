@@ -51,7 +51,7 @@ func TestDoctorReportsToolPresence(t *testing.T) {
 // exactly the confusion it exists to resolve.
 func TestDoctorReportsDisabledExtensions(t *testing.T) {
 	cfg := filepath.Join(t.TempDir(), "config.json")
-	qt.Assert(t, qt.IsNil(os.WriteFile(cfg, []byte(`{"disabled":[".rs"]}`), 0o600)))
+	qt.Assert(t, qt.IsNil(os.WriteFile(cfg, []byte(`{"disabled":[".rs",".rs.example"]}`), 0o600)))
 	t.Setenv("CLAUDE_FORMAT_HOOKS_CONFIG", cfg)
 	fakePath(t)
 
@@ -59,7 +59,8 @@ func TestDoctorReportsDisabledExtensions(t *testing.T) {
 	qt.Assert(t, qt.Equals(runDoctor(&out, &errOut, false), 0))
 	got := out.String()
 
-	qt.Check(t, qt.StringContains(got, "disabled by config: .rs"))
+	qt.Check(t, qt.StringContains(got, "disabled by config:"))
+	qt.Check(t, qt.StringContains(got, ".rs"))
 	qt.Check(t, qt.Not(qt.StringContains(got, "rustfmt")))
 }
 

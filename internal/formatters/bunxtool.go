@@ -102,7 +102,8 @@ func NewPrettier() bunxFormatter {
 		skipIf: func(diagnostic string) bool {
 			return strings.Contains(diagnostic, prettierNoParserMarker)
 		},
-		configured: hasPrettierConfig,
+		configured:    hasPrettierConfig,
+		stdinFromFile: prettierPluginExampleCopy,
 	}
 }
 
@@ -142,14 +143,43 @@ func packageJSONHasPrettier(path string) bool {
 	return json.Unmarshal(raw, &pkg) == nil && pkg.Prettier != nil
 }
 
+// prettierExampleParsers names the core parser for copies whose final suffix
+// is .example. Prettier only inspects that suffix, and .example is not a
+// language it knows. svelte/astro are plugin parsers and go through stdin
+// with a stripped --stdin-filepath instead.
+var prettierExampleParsers = []struct {
+	suffix string
+	parser string
+}{
+	{".yaml.example", "yaml"},
+	{".yml.example", "yaml"},
+	{".html.example", "html"},
+	{".scss.example", "scss"},
+	{".less.example", "less"},
+	{".vue.example", "vue"},
+	{".graphql.example", "graphql"},
+	{".gql.example", "graphql"},
+}
+
+func prettierPluginExampleCopy(abs string) bool {
+	base := strings.ToLower(filepath.Base(abs))
+	return strings.HasSuffix(base, ".svelte.example") || strings.HasSuffix(base, ".astro.example")
+}
+
 // prettierWriteArgs is prettier's --write invocation. Prettier picks a parser
-// from the final suffix, and .example is not one it knows, so a YAML copy
-// has to name the parser or every write of it is reported as "no parser".
+// from the final suffix, and .example is not one it knows, so a YAML/HTML/…
+// copy has to name the parser or every write of it is reported as "no parser".
 func prettierWriteArgs(abs string) []string {
+	if prettierPluginExampleCopy(abs) {
+		return []string{"--stdin-filepath", exampleStdinFilePath(abs)}
+	}
 	args := []string{"--write"}
 	base := strings.ToLower(filepath.Base(abs))
-	if strings.HasSuffix(base, ".yaml.example") || strings.HasSuffix(base, ".yml.example") {
-		args = append(args, "--parser", "yaml")
+	for _, p := range prettierExampleParsers {
+		if strings.HasSuffix(base, p.suffix) {
+			args = append(args, "--parser", p.parser)
+			break
+		}
 	}
 	return append(args, "--", abs)
 }

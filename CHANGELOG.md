@@ -7,6 +7,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- Remaining registered source types have a `.ext.example` sibling, formatted
+  by the same tool as `.ext`. Biome copies use `--stdin-file-path` with the
+  `.example` suffix stripped. Prettier copies name a core parser (or stdin
+  for svelte/astro plugins). `notes.example` stays unknown.
+
 ## [0.5.1] - 2026-10-18
 
 ### Added

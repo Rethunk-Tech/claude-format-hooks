@@ -130,6 +130,13 @@ func TestGoModAndWorkEditOnlyTheirOwnFile(t *testing.T) {
 	assertFormatted(t, res)
 	assertArgv(t, argv, "mod edit -fmt "+scratch)
 
+	exampleMod := filepath.Join(dir, "go.mod.example")
+	qt.Assert(t, qt.IsNil(os.WriteFile(exampleMod, []byte("x\n"), 0o600)))
+	qt.Assert(t, qt.IsNil(os.Remove(argv)))
+	res = NewGoMod().Format(t.Context(), dir, exampleMod)
+	assertFormatted(t, res)
+	assertArgv(t, argv, "mod edit -fmt "+exampleMod)
+
 	lookalike := filepath.Join(dir, "notgo.mod")
 	qt.Assert(t, qt.IsNil(os.WriteFile(lookalike, []byte("x\n"), 0o600)))
 	qt.Assert(t, qt.IsNil(os.Remove(argv)))

@@ -59,15 +59,15 @@ func (biomeFormatter) Format(ctx context.Context, projectRoot, abs string) Resul
 
 	stdinPath := ""
 	args := []string{"format", "--write", "--no-errors-on-unmatched", "--", abs}
-	if jsoncExampleCopy(abs) {
+	if biomeExampleCopy(abs) {
 		// Biome picks the language from the final suffix and does not know
 		// .example, so an in-place format exits 0 having changed nothing.
 		// Stdin is parsed as the language of --stdin-file-path; dropping the
-		// .example suffix leaves a .jsonc name in the same directory.
+		// .example suffix leaves a .ts/.jsonc/… name in the same directory.
 		stdinPath = abs
 		args = []string{
 			"format", "--write", "--no-errors-on-unmatched",
-			"--stdin-file-path", jsoncStdinFilePath(abs),
+			"--stdin-file-path", exampleStdinFilePath(abs),
 		}
 	}
 	return runPathOrBunx(
@@ -80,14 +80,19 @@ func (biomeFormatter) Format(ctx context.Context, projectRoot, abs string) Resul
 	)
 }
 
-func jsoncExampleCopy(abs string) bool {
-	return strings.HasSuffix(strings.ToLower(filepath.Base(abs)), ".jsonc.example")
+var biomeExampleLangs = []string{
+	".ts", ".tsx", ".js", ".jsx", ".mjs", ".cjs", ".mts", ".cts",
+	".css", ".jsonc", ".graphql", ".gql",
 }
 
-func jsoncStdinFilePath(abs string) string {
-	base := filepath.Base(abs)
-	trimmed := base[:len(base)-len(".example")]
-	return filepath.Join(filepath.Dir(abs), trimmed)
+func biomeExampleCopy(abs string) bool {
+	base := strings.ToLower(filepath.Base(abs))
+	for _, ext := range biomeExampleLangs {
+		if strings.HasSuffix(base, ext+".example") {
+			return true
+		}
+	}
+	return false
 }
 
 // findUpwardCacheTTL is how long a resolved (or unresolved) config
