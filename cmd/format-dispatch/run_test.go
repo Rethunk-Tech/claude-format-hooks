@@ -460,6 +460,15 @@ func TestRunEmptyPayloadIsNoop(t *testing.T) {
 	qt.Check(t, qt.Equals(run(strings.NewReader(`{}`)), 0))
 }
 
+func TestRunOversizedStdinIsNoop(t *testing.T) {
+	var code int
+	stderr := captureStderr(t, func() {
+		code = run(strings.NewReader(strings.Repeat("x", maxHookPayloadBytes+1)))
+	})
+	qt.Check(t, qt.Equals(code, 0))
+	qt.Check(t, qt.StringContains(stderr, "exceeds"))
+}
+
 func TestRunUnsupportedExtensionIsNoop(t *testing.T) {
 	abs := filepath.Join(t.TempDir(), "f.xyz")
 	writeFile(t, abs, "irrelevant")
