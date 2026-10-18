@@ -103,8 +103,13 @@ func dispatchArgs(args []string) int {
 	case "--check":
 		return runCheck(args[1:], os.Stdout, os.Stderr)
 	case "--doctor":
-		if !parseNoExtra(args[1:], "--doctor") {
+		rest, help := stripHelp(args[1:])
+		if !parseNoExtra(rest, "--doctor") {
 			return 1
+		}
+		if help {
+			fmt.Print(usage)
+			return 0
 		}
 		return runDoctor(os.Stdout, os.Stderr)
 	case "--version":
@@ -173,9 +178,14 @@ func runInstall(args []string, uninstall bool) int {
 		action = installer.Uninstall
 	}
 
-	dryRun, ok := parseDryRun(args, label)
+	rest, help := stripHelp(args)
+	dryRun, ok := parseDryRun(rest, label)
 	if !ok {
 		return 1
+	}
+	if help {
+		fmt.Print(usage)
+		return 0
 	}
 
 	if !runInstallerAction(label, dryRun, action) {
@@ -227,6 +237,19 @@ func runInstallerAction(label string, dryRun bool, action func(installer.Options
 	return true
 }
 
+// stripHelp drops --help/-h from args so a subcommand can print the same
+// usage block as top-level --help without treating those flags as typos.
+func stripHelp(args []string) (rest []string, help bool) {
+	for _, a := range args {
+		if a == "--help" || a == "-h" {
+			help = true
+			continue
+		}
+		rest = append(rest, a)
+	}
+	return rest, help
+}
+
 // parseNoExtra rejects leftover arguments on flags that take none, the
 // same way parseDryRun rejects a typo of --dry-run instead of ignoring it.
 func parseNoExtra(args []string, label string) bool {
@@ -266,9 +289,14 @@ func parseDryRun(args []string, label string) (dryRun, ok bool) {
 // settings.json. `--dry-run` previews the plan without writing.
 func runUpgrade(args []string) int {
 	const label = "--upgrade"
-	dryRun, ok := parseDryRun(args, label)
+	rest, help := stripHelp(args)
+	dryRun, ok := parseDryRun(rest, label)
 	if !ok {
 		return 1
+	}
+	if help {
+		fmt.Print(usage)
+		return 0
 	}
 
 	if !runInstallerAction(label, dryRun, installer.Upgrade) {

@@ -112,6 +112,26 @@ func TestDispatchArgsHelp(t *testing.T) {
 	}
 }
 
+func TestDispatchArgsSubcommandHelp(t *testing.T) {
+	cases := [][]string{
+		{"--install", "--help"},
+		{"--check", "--help"},
+		{"--doctor", "--help"},
+		{"--upgrade", "-h"},
+		{"--check", "somewhere", "--help"},
+	}
+	for _, args := range cases {
+		t.Run(strings.Join(args, " "), func(t *testing.T) {
+			_, settingsPath := hookEnv(t)
+			var code int
+			stdout := captureStdout(t, func() { code = dispatchArgs(args) })
+			qt.Check(t, qt.Equals(code, 0))
+			qt.Check(t, qt.StringContains(stdout, "Usage:"))
+			assertNotWritten(t, settingsPath, "--install --help must not write settings.json")
+		})
+	}
+}
+
 func TestDispatchArgsVersion(t *testing.T) {
 	var code int
 	stdout := captureStdout(t, func() { code = dispatchArgs([]string{"--version"}) })

@@ -41,10 +41,15 @@ const checkTimeout = 15 * time.Minute
 // leave violations it declines to fix, and failing CI on them would gate
 // pushes on something no local write would ever repair.
 func runCheck(args []string, out, errOut io.Writer) int {
-	paths, write, err := parseCheckArgs(args)
+	rest, help := stripHelp(args)
+	paths, write, err := parseCheckArgs(rest)
 	if err != nil {
 		_, _ = fmt.Fprintf(errOut, "format-dispatch --check: %v\n\n%s", err, usage)
 		return 2
+	}
+	if help {
+		_, _ = fmt.Fprint(out, usage)
+		return 0
 	}
 	if len(paths) == 0 {
 		_, _ = fmt.Fprintf(errOut, "format-dispatch --check: no paths given\n\n%s", usage)

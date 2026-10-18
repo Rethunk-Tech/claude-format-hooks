@@ -845,5 +845,8 @@ func TestCheckRejectsUnknownFlags(t *testing.T) {
 	var out, errOut bytes.Buffer
 	qt.Check(t, qt.Equals(runCheck([]string{dir, "--dry-run"}, &out, &errOut), 2))
 	qt.Check(t, qt.StringContains(errOut.String(), `unrecognized argument "--dry-run"`))
+	errOut.Reset()
+	qt.Check(t, qt.Equals(runCheck([]string{"--bogus"}, &out, &errOut), 2))
+	qt.Check(t, qt.StringContains(errOut.String(), `unrecognized argument "--bogus"`))
 	qt.Check(t, qt.Equals(out.String(), ""))
 }
