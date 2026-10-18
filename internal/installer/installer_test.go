@@ -614,4 +614,10 @@ func TestWiredCursorReadsState(t *testing.T) {
 	wired, err = WiredCursor(hooks, bin)
 	qt.Assert(t, qt.IsNil(err))
 	qt.Check(t, qt.IsTrue(wired))
+
+	agentOnly := `{"version":1,"hooks":{"afterFileEdit":[{"command":"` + bin + `","timeout":5}]}}`
+	qt.Assert(t, qt.IsNil(os.WriteFile(hooks, []byte(agentOnly), 0o600)))
+	wired, err = WiredCursor(hooks, bin)
+	qt.Assert(t, qt.IsNil(err))
+	qt.Check(t, qt.IsFalse(wired), qt.Commentf("afterFileEdit alone is not a complete Cursor install"))
 }

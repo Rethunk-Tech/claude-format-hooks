@@ -26,10 +26,20 @@ func TestWireCursorPreservesCapturedShape(t *testing.T) {
 	qt.Assert(t, qt.HasLen(sessionStart, 1))
 	qt.Check(t, qt.Equals(sessionStart[0].Command, "session-start"))
 
-	afterFileEdit := cursorEventHooks(t, after, cursorEvent)
-	qt.Assert(t, qt.HasLen(afterFileEdit, 1))
-	qt.Check(t, qt.Equals(afterFileEdit[0].Command, binPath))
-	qt.Check(t, qt.Equals(afterFileEdit[0].Timeout, hookTimeout))
+	assertOurCursorEvents(t, after)
+}
+
+func TestWireCursorIsIdempotentForAgentAndTab(t *testing.T) {
+	path := cursorFile(t, capturedCursorDoc)
+
+	_, after, err := WireCursor(path, binPath)
+	qt.Assert(t, qt.IsNil(err))
+	assertOurCursorEvents(t, after)
+	qt.Assert(t, qt.IsNil(os.WriteFile(path, after, 0o600)))
+
+	_, again, err := WireCursor(path, binPath)
+	qt.Assert(t, qt.IsNil(err))
+	assertOurCursorEvents(t, again)
 }
 
 func TestWireCursorMissingFileCreatesVersionOne(t *testing.T) {
@@ -67,6 +77,11 @@ func TestUnwireCursorRemovesOnlyFormatDispatch(t *testing.T) {
 				{"command": "format-docs", "timeout": 5},
 				{"command": "` + binPath + `", "timeout": 5},
 				{"command": "format-dispatch.exe", "timeout": 5}
+			],
+			"afterTabFileEdit": [
+				{"command": "format-docs", "timeout": 5},
+				{"command": "` + binPath + `", "timeout": 5},
+				{"command": "format-dispatch.exe", "timeout": 5}
 			]
 		}
 	}`
@@ -77,9 +92,11 @@ func TestUnwireCursorRemovesOnlyFormatDispatch(t *testing.T) {
 
 	sessionStart := cursorEventHooks(t, after, "sessionStart")
 	qt.Check(t, qt.HasLen(sessionStart, 1))
-	afterFileEdit := cursorEventHooks(t, after, cursorEvent)
-	qt.Assert(t, qt.HasLen(afterFileEdit, 1))
-	qt.Check(t, qt.Equals(afterFileEdit[0].Command, "format-docs"))
+	for _, event := range cursorEvents {
+		entries := cursorEventHooks(t, after, event)
+		qt.Assert(t, qt.HasLen(entries, 1), qt.Commentf("%s", event))
+		qt.Check(t, qt.Equals(entries[0].Command, "format-docs"), qt.Commentf("%s", event))
+	}
 }
 
 func TestUnwireCursorDoesNotMatchBinBasenameAlone(t *testing.T) {
@@ -204,7 +221,7 @@ func TestUnwireCursorWithoutEventOmitsEventKey(t *testing.T) {
 
 func TestUnwireCursorDropsAnEmptiedHooksContainer(t *testing.T) {
 	for _, tc := range []struct{ name, doc string }{
-		{"our hook was the only child", `{"version":1,"hooks":{"afterFileEdit":[{"command":"` + binPath + `","timeout":5}]}}`},
+		{"our hook was the only child", `{"version":1,"hooks":{"afterFileEdit":[{"command":"` + binPath + `","timeout":5}],"afterTabFileEdit":[{"command":"` + binPath + `","timeout":5}]}}`},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			path := cursorFile(t, tc.doc)
@@ -257,14 +274,24 @@ func assertCursorHasOnlyOurHook(t *testing.T, path string, installed bool) {
 	t.Helper()
 	raw := readFile(t, path)
 	qt.Check(t, qt.HasLen(cursorEventHooks(t, raw, "sessionStart"), 1))
-
-	afterFileEdit := cursorEventHooks(t, raw, cursorEvent)
 	if !installed {
-		qt.Check(t, qt.HasLen(afterFileEdit, 0), qt.Commentf("uninstall must leave no afterFileEdit hook"))
+		for _, event := range cursorEvents {
+			qt.Check(t, qt.HasLen(cursorEventHooks(t, raw, event), 0),
+				qt.Commentf("uninstall must leave no %s hook", event))
+		}
 		return
 	}
-	qt.Assert(t, qt.HasLen(afterFileEdit, 1))
-	qt.Check(t, qt.Equals(afterFileEdit[0].Command, binPath))
+	assertOurCursorEvents(t, raw)
+}
+
+func assertOurCursorEvents(t *testing.T, raw []byte) {
+	t.Helper()
+	for _, event := range cursorEvents {
+		entries := cursorEventHooks(t, raw, event)
+		qt.Assert(t, qt.HasLen(entries, 1), qt.Commentf("%s", event))
+		qt.Check(t, qt.Equals(entries[0].Command, binPath), qt.Commentf("%s", event))
+		qt.Check(t, qt.Equals(entries[0].Timeout, hookTimeout), qt.Commentf("%s", event))
+	}
 }
 
 func assertCursorHasNoVersion(t *testing.T, raw []byte) {

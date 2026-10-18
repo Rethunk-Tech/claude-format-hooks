@@ -46,7 +46,8 @@ import (
 // the write of the diagnostic itself.
 const formatterTimeout = 4 * time.Second
 
-// maxHookPayloadBytes bounds the PostToolUse / afterFileEdit envelope.
+// maxHookPayloadBytes bounds the PostToolUse, afterFileEdit, and
+// afterTabFileEdit envelopes.
 // The payload is a handful of string fields; anything larger is not a
 // hook envelope and must not be slurped into memory.
 const maxHookPayloadBytes = 1 << 20

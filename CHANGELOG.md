@@ -9,6 +9,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- `--install` also wires Cursor `afterTabFileEdit` (Tab writes) to the
+  same format-dispatch command as `afterFileEdit`. Uninstall removes both.
+  Tab payloads use the same top-level `file_path` as Agent edits.
 - Remaining registered source types have a `.ext.example` sibling, formatted
   by the same tool as `.ext`. Biome copies use `--stdin-file-path` with the
   `.example` suffix stripped. Prettier copies name a core parser (or stdin

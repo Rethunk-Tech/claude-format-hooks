@@ -261,14 +261,17 @@ func TestRunInstallWiresAndUninstallsSettings(t *testing.T) {
 		Hooks map[string]json.RawMessage `json:"hooks"`
 	}
 	qt.Assert(t, qt.IsNil(json.Unmarshal([]byte(cursorHooks), &cursorDoc)))
-	var afterFileEdit []struct {
-		Command string `json:"command"`
-		Timeout int    `json:"timeout"`
+	wantBin := installer.HookBinaryPath(filepath.Join(dir, "bin"))
+	for _, event := range []string{"afterFileEdit", "afterTabFileEdit"} {
+		var hooks []struct {
+			Command string `json:"command"`
+			Timeout int    `json:"timeout"`
+		}
+		qt.Assert(t, qt.IsNil(json.Unmarshal(cursorDoc.Hooks[event], &hooks)), qt.Commentf("%s", event))
+		qt.Check(t, qt.Equals(len(hooks), 1), qt.Commentf("%s", event))
+		qt.Check(t, qt.Equals(hooks[0].Command, wantBin), qt.Commentf("%s", event))
+		qt.Check(t, qt.Equals(hooks[0].Timeout, 5), qt.Commentf("%s", event))
 	}
-	qt.Assert(t, qt.IsNil(json.Unmarshal(cursorDoc.Hooks["afterFileEdit"], &afterFileEdit)))
-	qt.Check(t, qt.Equals(len(afterFileEdit), 1))
-	qt.Check(t, qt.Equals(afterFileEdit[0].Command, installer.HookBinaryPath(filepath.Join(dir, "bin"))))
-	qt.Check(t, qt.Equals(afterFileEdit[0].Timeout, 5))
 	var sessionStart []struct {
 		Command string `json:"command"`
 	}
@@ -283,8 +286,10 @@ func TestRunInstallWiresAndUninstallsSettings(t *testing.T) {
 		Hooks map[string]json.RawMessage `json:"hooks"`
 	}{}
 	qt.Assert(t, qt.IsNil(json.Unmarshal([]byte(cursorHooks), &cursorDoc)))
-	_, ok := cursorDoc.Hooks["afterFileEdit"]
-	qt.Check(t, qt.IsFalse(ok))
+	for _, event := range []string{"afterFileEdit", "afterTabFileEdit"} {
+		_, ok := cursorDoc.Hooks[event]
+		qt.Check(t, qt.IsFalse(ok), qt.Commentf("%s", event))
+	}
 	qt.Assert(t, qt.IsNil(json.Unmarshal(cursorDoc.Hooks["sessionStart"], &sessionStart)))
 	qt.Check(t, qt.Equals(len(sessionStart), 1))
 	qt.Check(t, qt.Equals(sessionStart[0].Command, "session-start"))

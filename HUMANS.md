@@ -32,7 +32,8 @@ build provenance with
 `gh attestation verify <binary> --repo Rethunk-Tech/claude-format-hooks`.
 
 `--install` wires `PostToolUse` (`~/.claude/settings.json`) and
-`afterFileEdit` (`~/.cursor/hooks.json`). `bun` on PATH also provisions
+`afterFileEdit` plus `afterTabFileEdit` (`~/.cursor/hooks.json`). `bun`
+on PATH also provisions
 biome/prettier/taplo/markdownlint-cli2. Restart Claude Code or open
 `/hooks`. Rewriting either file sorts top-level keys; values stay.
 

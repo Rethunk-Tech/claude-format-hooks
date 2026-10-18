@@ -299,7 +299,7 @@ func Install(opts Options, dryRun bool, out io.Writer) error {
 	if opts.CursorHooksPath != "" {
 		cursorOpts := opts
 		cursorOpts.SettingsPath = opts.CursorHooksPath
-		if err := applyChange(cursorOpts, cursorBefore, cursorAfter, dryRun, out, "Wired afterFileEdit hook into"); err != nil {
+		if err := applyChange(cursorOpts, cursorBefore, cursorAfter, dryRun, out, "Wired afterFileEdit and afterTabFileEdit hooks into"); err != nil {
 			if !dryRun && claudeChanged {
 				rollbackBefore, rollbackAfter, rollbackErr := Unwire(opts.SettingsPath, opts.BinPath)
 				if rollbackErr == nil {
@@ -336,7 +336,7 @@ func Uninstall(opts Options, dryRun bool, out io.Writer) error {
 	if opts.CursorHooksPath != "" {
 		cursorOpts := opts
 		cursorOpts.SettingsPath = opts.CursorHooksPath
-		if err := applyChange(cursorOpts, cursorBefore, cursorAfter, dryRun, out, "Removed afterFileEdit hook from"); err != nil {
+		if err := applyChange(cursorOpts, cursorBefore, cursorAfter, dryRun, out, "Removed afterFileEdit and afterTabFileEdit hooks from"); err != nil {
 			if !dryRun && !bytes.Equal(before, after) {
 				rollbackErr := applyChange(opts, after, before, false, io.Discard, "Restored PostToolUse hook in")
 				if rollbackErr != nil {

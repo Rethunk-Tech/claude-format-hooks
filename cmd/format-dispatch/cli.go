@@ -29,7 +29,7 @@ var commands = []commandDef{
 	},
 	{
 		name:    "--install",
-		summary: "wire this binary into ~/.claude/settings.json (PostToolUse) and ~/.cursor/hooks.json (afterFileEdit)",
+		summary: "wire this binary into ~/.claude/settings.json (PostToolUse) and ~/.cursor/hooks.json (afterFileEdit, afterTabFileEdit)",
 		flags: []flagDef{{
 			name:    "--dry-run",
 			summary: "preview the Claude and Cursor hook diffs, without writing",

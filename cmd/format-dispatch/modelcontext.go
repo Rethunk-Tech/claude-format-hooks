@@ -24,8 +24,9 @@ type hookOutput struct {
 // emitModelContext writes one JSON line carrying text back to the model.
 //
 // It is a no-op unless the payload came from Claude: Cursor's afterFileEdit
-// envelope does not define this channel, and writing it there would put a
-// stray JSON line into stdout for a contract that never asked for one.
+// and afterTabFileEdit envelopes do not define this channel, and writing it
+// there would put a stray JSON line into stdout for a contract that never
+// asked for one.
 //
 // Silent on a marshal failure. Every caller is already on a failure path
 // reporting to stderr, and a hook that cannot format a file must not then

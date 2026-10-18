@@ -1,15 +1,15 @@
 // Package hookio parses the Claude Code PostToolUse JSON envelope and the
-// Cursor afterFileEdit envelope, which carries its path in top-level
-// file_path. The payload is tiny (a handful of string fields, well under
-// 1KB) — standard library encoding/json is already far faster than the
+// Cursor afterFileEdit / afterTabFileEdit envelopes, which carry the path in
+// top-level file_path. The payload is tiny (a handful of string fields, well
+// under 1KB) — standard library encoding/json is already far faster than the
 // ~1-3ms process startup cost it's measured against, so there is no case for
 // a third-party JSON library here.
 package hookio
 
 import "encoding/json"
 
-// Payload is the subset of Claude PostToolUse and Cursor afterFileEdit JSON
-// this package reads.
+// Payload is the subset of Claude PostToolUse and Cursor afterFileEdit /
+// afterTabFileEdit JSON this package reads.
 type Payload struct {
 	CursorFilePath string `json:"file_path"`
 	ToolInput      struct {
@@ -30,8 +30,8 @@ type Payload struct {
 
 // FilePath returns the file that was written or edited, matching the same
 // field-fallback order: tool_response.filePath, tool_result.filePath,
-// tool_input.file_path, tool_input.notebook_path, then Cursor afterFileEdit's
-// top-level file_path.
+// tool_input.file_path, tool_input.notebook_path, then Cursor afterFileEdit
+// and afterTabFileEdit's top-level file_path.
 func (p Payload) FilePath() string {
 	path, _ := p.resolve()
 	return path
@@ -40,9 +40,9 @@ func (p Payload) FilePath() string {
 // IsClaude reports whether the path came from a field only the Claude
 // PostToolUse envelope defines, rather than Cursor's top-level file_path.
 // Only that contract defines a JSON channel on stdout back to the model, so
-// a caller must ask before writing one: Cursor's afterFileEdit does not
-// read it, and writing it there would put a stray JSON line into whatever
-// Cursor does with the hook's stdout.
+// a caller must ask before writing one: Cursor's afterFileEdit and
+// afterTabFileEdit envelopes do not read it, and writing it there would put
+// a stray JSON line into whatever Cursor does with the hook's stdout.
 //
 // It shares resolve with FilePath rather than repeating the switch, so the
 // two can never disagree about which envelope a payload came from.

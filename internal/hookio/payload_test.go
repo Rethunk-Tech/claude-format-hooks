@@ -43,6 +43,11 @@ func TestFilePathFallbackOrder(t *testing.T) {
 			want: "/cursor.go",
 		},
 		{
+			name: "Cursor afterTabFileEdit uses top-level file_path",
+			raw:  `{"file_path":"/tab.go","edits":[{"old_string":"x","new_string":"y","range":{"start_line_number":10,"start_column":5,"end_line_number":10,"end_column":20},"old_line":"x","new_line":"y"}]}`,
+			want: "/tab.go",
+		},
+		{
 			name: "Claude fields win over top-level file_path",
 			raw:  `{"file_path":"/cursor.go","tool_input":{"file_path":"/input.go"}}`,
 			want: "/input.go",
