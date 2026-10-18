@@ -1062,6 +1062,8 @@ func TestRunSkipsGeneratedFiles(t *testing.T) {
 	}{
 		{name: "npm lockfile", file: "package-lock.json", content: "{\"a\":1}\n"},
 		{name: "minified bundle", file: "app.min.js", content: "const a=1;\n"},
+		{name: "minified typescript", file: "app.min.ts", content: "const a=1;\n"},
+		{name: "minified tsx", file: "app.min.tsx", content: "const a=1;\n"},
 		{name: "pnpm lockfile", file: "pnpm-lock.yaml", content: "{\"a\":1}\n"},
 		{name: "real source", file: "app.json", content: "{\"a\":1}\n", wantFormatted: true},
 	}
@@ -1117,6 +1119,7 @@ func TestCheckSkipsGeneratedFiles(t *testing.T) {
 	dir := t.TempDir()
 	writeCheckFile(t, dir, "package-lock.json", unformattedJSON)
 	writeCheckFile(t, dir, "app.min.js", "const a=1;\n")
+	writeCheckFile(t, dir, "app.min.ts", "const a=1;\n")
 
 	var out, errOut strings.Builder
 	qt.Check(t, qt.Equals(runCheck([]string{dir}, &out, &errOut), 0))

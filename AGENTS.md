@@ -79,7 +79,7 @@ still falls back to the native formatter.
   are skipped so the real interpreter is seen.
 - Missing external tools cached 30s (`internal/diskcache`); self-heals within TTL.
 - Skips `node_modules/`, `.git/`, `vendor/`, `.venv/`, and peers; files outside `$CLAUDE_PROJECT_DIR`.
-- Skips generated files by name (`*.min.js`, `*-lock.json`, peers) even in a
+- Skips generated files by name (`*.min.js`, `*.min.ts`, `*-lock.json`, peers) even in a
   source directory. Config `skipDirs` / `skipFiles` extend both lists.
 - No formatter requires project config to exist first, except prettier: it runs
   only where the file's project has a prettier config (`.prettierrc*`,

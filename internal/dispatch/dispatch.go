@@ -223,6 +223,10 @@ var skipFilePatterns = []string{
 	"*.min.mjs",
 	"*.min.cjs",
 	"*.min.css",
+	"*.min.ts",
+	"*.min.tsx",
+	"*.min.mts",
+	"*.min.cts",
 	// Lockfiles whose extension a formatter actually claims. The rest
 	// (yarn.lock, Cargo.lock, flake.lock) carry no registered extension
 	// and never reach a formatter to begin with.
