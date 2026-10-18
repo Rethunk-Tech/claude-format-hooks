@@ -1,17 +1,10 @@
 # HUMANS.md — Using claude-format-hooks
 
-Operator setup and troubleshooting. Developers: [AGENTS.md](AGENTS.md).
+Operator setup. Developers: [AGENTS.md](AGENTS.md). Flags: `--help`.
 
 ## Install
 
-### Prerequisites
-
-Go ([go.mod](go.mod)); optional `bun` (bunx formatters),
-`sqlfluff`, `ruff`/`black`, `rustfmt`, `terraform`/`tofu`, `buf`,
-`gofumpt`/`goimports` (`.go` stays `gofmt` when `gofumpt` is absent),
-`clang-format`, `google-java-format`, `ktlint`, `swift-format`/`swiftformat`,
-`rubocop`/`standardrb`, `php-cs-fixer`/`pint`, `nixfmt`, `stylua`.
-`format-dispatch --doctor` reports which of these are actually reachable.
+Go ([go.mod](go.mod)). Reachable formatters: `--doctor`.
 
 ```bash
 git clone git@github.com:Rethunk-Tech/claude-format-hooks.git
@@ -19,124 +12,63 @@ cd claude-format-hooks
 ./install.sh              # build, wire Claude + Cursor hooks
 ./install.sh --dry-run    # preview hook diffs
 ./install.sh --upgrade    # latest release binary
-./install.sh --uninstall  # unwire Claude and Cursor hooks (no rebuild)
+./install.sh --uninstall  # unwire hooks (no rebuild)
 ```
 
-Without Go: download the platform binary from
-[releases](https://github.com/Rethunk-Tech/claude-format-hooks/releases/latest),
-place at `~/.claude/hooks/format-dispatch` (`chmod +x`), run `--install`.
-The `.sha256` sidecar ships in the same release as the binary, so it proves
-transit only. Check where the bytes were built before trusting them, with
+Without Go: release binary at `~/.claude/hooks/format-dispatch`
+(`chmod +x`), then `--install`. `.sha256` proves transit only; check
+build provenance with
 `gh attestation verify <binary> --repo Rethunk-Tech/claude-format-hooks`.
 
-`--install` wires `PostToolUse` in `~/.claude/settings.json` and
-`afterFileEdit` in `~/.cursor/hooks.json`. With `bun` on PATH, it also
-provisions biome/prettier/taplo/markdownlint-cli2 globally. Restart Claude
-Code or open `/hooks` after install.
-
-Rewriting either file sorts its top-level keys alphabetically. Values and
-unrelated keys are preserved exactly; only their order changes, once.
+`--install` wires `PostToolUse` (`~/.claude/settings.json`) and
+`afterFileEdit` (`~/.cursor/hooks.json`). `bun` on PATH also provisions
+biome/prettier/taplo/markdownlint-cli2. Restart Claude Code or open
+`/hooks`. Rewriting either file sorts top-level keys; values stay.
 
 ## Env
 
-Install/wiring (defaults in parentheses): `CLAUDE_HOOKS_BIN_DIR`
-(`~/.claude/hooks`), `CLAUDE_SETTINGS_FILE` (`~/.claude/settings.json`),
-`CURSOR_HOOKS_FILE` (`~/.cursor/hooks.json`),
-`CLAUDE_FORMAT_HOOKS_RELEASE_API` (GitHub Releases API; test/mirror).
-
-Runtime: `CLAUDE_PROJECT_DIR` (Claude Code sets this; files outside it are
-skipped), `CLAUDE_FORMAT_HOOKS_CONFIG` (user config path; default
-`~/.claude/claude-format-hooks.json`), `CLAUDE_FORMAT_HOOKS_CACHE` (disk
-cache directory; default OS user cache/`claude-format-hooks`),
-`CLAUDE_FORMAT_HOOKS_LOG` (if set, append one debug line per invocation).
+| Variable | Default / role |
+| -------- | -------------- |
+| `CLAUDE_HOOKS_BIN_DIR` | `~/.claude/hooks` |
+| `CLAUDE_SETTINGS_FILE` | `~/.claude/settings.json` |
+| `CURSOR_HOOKS_FILE` | `~/.cursor/hooks.json` |
+| `CLAUDE_FORMAT_HOOKS_RELEASE_API` | GitHub Releases API (test/mirror) |
+| `CLAUDE_PROJECT_DIR` | set by Claude Code; files outside skipped |
+| `CLAUDE_FORMAT_HOOKS_CONFIG` | `~/.claude/claude-format-hooks.json` |
+| `CLAUDE_FORMAT_HOOKS_CACHE` | OS user cache/`claude-format-hooks` |
+| `CLAUDE_FORMAT_HOOKS_LOG` | if set, one debug line per invocation |
 
 ## Usage
 
-Formats supported extensions on each Write/Edit/MultiEdit/NotebookEdit.
-When a formatter reports a real failure (a syntax error, say), the message
-goes to stderr for you and back to Claude as hook context, so the model
-learns the file it just wrote is broken. A skipped file -- unsupported type,
-missing tool -- stays silent.
-Unsupported extensions and skipped paths are no-ops — see
-[AGENTS.md § Invariants](AGENTS.md#invariants).
+Hook path: silent on success, always exit 0. Formatter failure → stderr
+and, for Claude payloads, hook context to the model. Skips stay silent.
 
-```bash
-format-dispatch                        # stdin hook payload (what Claude/Cursor invoke)
-format-dispatch --help                 # also -h
-format-dispatch --version
-format-dispatch --install [--dry-run]
-format-dispatch --uninstall [--dry-run]
-format-dispatch --check .              # CI: exit 1 if formatting needed; 2 on usage/I/O error
-format-dispatch --check . --write      # apply what --check reported
-format-dispatch --doctor               # formatters, tools, and whether the hook is wired
-format-dispatch --upgrade [--dry-run]
-```
+`--upgrade` refreshes bunx formatters with the binary. It checks
+`.sha256`, then a build-provenance attestation bound to
+`.github/workflows/release.yml`; anything else is refused. Authenticated
+`gh` also runs `gh attestation verify --signer-workflow` (DSSE, Fulcio,
+Rekor) and that verdict decides. Without `gh` (token required even for
+a public repo) the attestation check trusts TLS to `api.github.com`.
+`--upgrade` says which applied. A custom `CLAUDE_FORMAT_HOOKS_RELEASE_API`
+skips `gh`. `--dry-run` prints asset and path, no network.
 
-`--upgrade` also refreshes the globally-provisioned bunx formatters, so the
-binary and the tools it shells out to move together.
-
-`--upgrade` checks the release `.sha256`, then requires a build-provenance
-attestation binding the downloaded bytes to `.github/workflows/release.yml`
-in this repository. Anything else is refused rather than installed.
-
-With the GitHub CLI installed and authenticated, it also runs
-`gh attestation verify --signer-workflow` over the download, which is the
-full cryptographic check: DSSE signature, Fulcio certificate chain, and
-Rekor transparency-log inclusion. That verdict decides the upgrade.
-
-Without `gh` -- it needs a token even for a public repository -- the
-attestation check stands alone, trusting TLS to `api.github.com`, the same
-anchor the release metadata already rests on. `--upgrade` says which of the
-two applied. Pointing `CLAUDE_FORMAT_HOOKS_RELEASE_API` elsewhere skips the
-`gh` step, since `gh` would be judging a different origin's bytes. `--dry-run` prints
-the planned asset and path without going near the network.
-
-**Config:** `$CLAUDE_FORMAT_HOOKS_CONFIG` or `~/.claude/claude-format-hooks.json`.
-The same file shape is accepted as a project `.claude-format-hooks.json`.
-`disabled` / `disabledFormatters` / `skipDirs` / `skipFiles` apply at both
-levels (`skipDirs` / `skipFiles` add generated directory names and filename
-globs to the built-in lists). Native indent is user config only; a project's
-indent keys are ignored and `.editorconfig` wins over the user file. Defaults:
-
-```json
-{
-  "json": { "indentSize": 2, "useTabs": false },
-  "shell": { "indentSize": 2, "useTabs": false, "switchCaseIndent": true },
-  "disabled": [],
-  "disabledFormatters": [],
-  "skipDirs": [],
-  "skipFiles": []
-}
-```
-
-`disabled` is extensions (e.g. `".sql"`). `disabledFormatters` is `--doctor`
-FORMATTER names (case-insensitive; `"biome"` skips biome-owned types).
-Markdown base: `~/.claude/claude-format-hooks.markdownlint-cli2.jsonc`
-(created on first use). SQL: `~/.sqlfluff` bootstrap on first `.sql` write.
+**Config** (`$CLAUDE_FORMAT_HOOKS_CONFIG` or
+`~/.claude/claude-format-hooks.json`; same shape as project
+`.claude-format-hooks.json`): `disabled` (extensions),
+`disabledFormatters` (`--doctor` names; `"biome"` skips biome-owned
+types), `skipDirs`/`skipFiles` (add to built-in lists) at both levels.
+Native indent is user-only; project indent keys are ignored;
+`.editorconfig` wins over the user file. Markdown base
+`~/.claude/claude-format-hooks.markdownlint-cli2.jsonc` on first use;
+`~/.sqlfluff` on first `.sql` write.
 
 ## Supported extensions
 
-JSON: biome when the project has a biome config, otherwise native
-`encoding/json.Indent` (`.json.example` is always native).
-Shell/Go (`.go` via `gofumpt` when it is on `PATH`, with `goimports`
-first when a parent `.golangci.yml` enables it, otherwise native `gofmt`;
-`go.mod` via `go mod edit -fmt` and `go.work` via `go work edit -fmt`,
-each only when the file has that exact name;
-`.jsonc.example` as JSONC, `.yaml.example` /
-`.yml.example` as YAML, `.toml.example` as TOML, `.sql.example` as SQL,
-`.md.example` as Markdown, and `.py.example` as Python; a file named
-`notes.example` is not formatted;
-`.sh`/`.bash`/`.zsh`/`.ksh`/`.dash`, plus extensionless
-or hidden rc files whose shebang names a supported interpreter, including
-`env -S`); TS/JS/CSS/JSONC via biome; MD via markdownlint-cli2; TOML via taplo;
-YAML/HTML/SCSS/Less/Vue/Svelte/Astro via prettier (only when the project has
-a prettier config: `.prettierrc*`, `prettier.config.*`, or a package.json
-`prettier` key); GraphQL (`.graphql`/`.gql`)
-via biome or prettier; SQL via sqlfluff; Python via ruff/black;
-notebooks via ruff/black; Rust via rustfmt; Terraform via terraform/tofu; proto
-via buf; C/C++/Objective-C via clang-format; Java; Kotlin (`.kt`/`.kts`);
-Swift; Ruby (`.rb`/`.rake`/`.gemspec`); PHP; Nix; Lua. Non-native formatters
-need `bunx` or the tool on `PATH`.
+[AGENTS.md](AGENTS.md#layout) and `--doctor`. Traps: `.json.example`
+always native JSON; `go.mod`/`go.work` only under those names; a bare
+`notes.example` is not formatted; extensionless/hidden rc files need a
+supported shebang (`env -S` flags skipped); prettier only with a project
+prettier config.
 
 ## Verify
 
@@ -153,16 +85,11 @@ format-dispatch --check path/to/file
 rm ~/.claude/hooks/format-dispatch
 ```
 
-Removes only this binary's hook entries from Claude and Cursor settings.
+Removes this binary's hook entries only.
 
 ## Troubleshooting
 
-- **Nothing formatted:** extension unsupported/disabled, skipped dir, or missing
-  formatter (`bunx`/tool not on PATH; 30s tool-absence cache).
-- **stderr diagnostic:** formatter failed; hook still exits 0. Run the underlying
-  tool for full output.
-- **Hook not running:** re-run `./install.sh`, restart Claude Code.
-
-## See also
-
-[AGENTS.md](AGENTS.md), [CONTRIBUTING.md](CONTRIBUTING.md), [SECURITY.md](SECURITY.md).
+- **Nothing formatted:** unsupported/disabled, skipped dir, or missing
+  tool (30s absence cache).
+- **stderr:** formatter failed; hook still exits 0.
+- **Hook not running:** `./install.sh`, restart Claude Code.
