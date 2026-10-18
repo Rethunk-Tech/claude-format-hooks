@@ -37,6 +37,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- `--check` fails when `Dispatch` returns `Err` or `Diagnostic`. An
+  unchanged scratch copy is no longer treated as already formatted, and
+  invalid JSON is a formatter failure rather than a missing tool.
+- `--doctor` reports the JSON router as biome/bunx with a native fallback
+  instead of labeling it `native`.
+- `--uninstall` restores the previous Claude settings document if the
+  Cursor hooks write fails, matching `--install` rollback.
+- CI check steps keep running after an earlier failure
+  (`if: ${{ !cancelled() }}`). The ubuntu lint job also runs actionlint
+  and `shellcheck -x install.sh`. Lefthook runs `gate` on pre-push.
 - `.go` files format with `gofumpt` when it is on `PATH`, so a hook pass
   matches `golangci-lint fmt` instead of stopping at `gofmt`.
   `-extra=group_params` is added only when a parent `.golangci.yml` sets
@@ -55,6 +65,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Hidden Unix rc files (`.bashrc`, `.zshrc`) are shebang-peeked. Go's
   `filepath.Ext` returns the whole name, so they used to look like an
   unsupported extension and skip without opening the file.
+
+### Changed
+
+- Operator and agent docs list every `NewRegistry` extension and the
+  JSON biome handoff. Static analysis is documented as the ubuntu `lint`
+  job, not as running on Windows.
 
 ## [0.5.0] - 2026-09-09
 

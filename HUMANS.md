@@ -89,20 +89,25 @@ SQL: `~/.sqlfluff` bootstrap on first `.sql` write.
 
 ## Supported extensions
 
-JSON/shell/Go (`.go` via `gofumpt` when it is on `PATH`, with `goimports`
+JSON: biome when the project has a biome config, otherwise native
+`encoding/json.Indent` (`.json.example` is always native).
+Shell/Go (`.go` via `gofumpt` when it is on `PATH`, with `goimports`
 first when a parent `.golangci.yml` enables it, otherwise native `gofmt`;
 `go.mod` via `go mod edit -fmt` and `go.work` via `go work edit -fmt`,
 each only when the file has that exact name;
-`.json.example` as JSON, `.jsonc.example` as JSONC, `.yaml.example` /
+`.jsonc.example` as JSONC, `.yaml.example` /
 `.yml.example` as YAML, `.toml.example` as TOML, `.sql.example` as SQL,
 `.md.example` as Markdown, and `.py.example` as Python; a file named
 `notes.example` is not formatted;
 `.sh`/`.bash`/`.zsh`/`.ksh`/`.dash`, plus extensionless
 or hidden rc files whose shebang names a supported interpreter, including
-`env -S`); TS/CSS/JSONC via biome; MD via markdownlint-cli2; TOML via taplo;
-YAML/HTML/etc via prettier; SQL via sqlfluff; Python via ruff/black;
+`env -S`); TS/JS/CSS/JSONC via biome; MD via markdownlint-cli2; TOML via taplo;
+YAML/HTML/SCSS/Less/Vue/Svelte/Astro via prettier; GraphQL (`.graphql`/`.gql`)
+via biome or prettier; SQL via sqlfluff; Python via ruff/black;
 notebooks via ruff/black; Rust via rustfmt; Terraform via terraform/tofu; proto
-via buf. Non-native formatters need `bunx` or the tool on `PATH`.
+via buf; C/C++/Objective-C via clang-format; Java; Kotlin (`.kt`/`.kts`);
+Swift; Ruby (`.rb`/`.rake`/`.gemspec`); PHP; Nix; Lua. Non-native formatters
+need `bunx` or the tool on `PATH`.
 
 ## Verify
 

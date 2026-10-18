@@ -6,9 +6,11 @@ Operators: [HUMANS.md](HUMANS.md).
 
 ## Stack
 
-Go 1.27+. CI ([`.github/workflows/ci.yml`](.github/workflows/ci.yml)): build,
-vet, gofmt, test (75% coverage floor), golangci-lint, govulncheck on
-`ubuntu-latest`/`windows-latest`. Tag `v*` triggers
+Go 1.27+. CI ([`.github/workflows/ci.yml`](.github/workflows/ci.yml)): the
+`test` matrix (build, vet, gofmt, race tests, 75% coverage floor, `--check`)
+runs on `ubuntu-latest`/`windows-latest`. Static analysis (golangci-lint,
+govulncheck, actionlint, `shellcheck -x install.sh`) is the ubuntu `lint`
+job. Tag `v*` triggers
 [`.github/workflows/release.yml`](.github/workflows/release.yml) cross-compile
 release binaries.
 
@@ -36,23 +38,31 @@ Single package: `go test -race -v ./internal/formatters/...`.
 | [`internal/formatters/`](internal/formatters/) | Per-type formatters (native + external) |
 | [`internal/installer/`](internal/installer/) | Hook wiring, upgrade, bunx tool provisioning |
 
-Native formatters: JSON (`encoding/json.Indent`), shell (`mvdan.cc/sh/v3`),
-Go (`gofumpt` on `PATH`, otherwise `go/format.Source`; `goimports` runs first
-when it is on `PATH` and a parent `.golangci.yml` lists it). `go.mod` and
-`go.work` are `go mod edit -fmt` and `go work edit -fmt` on those exact
-filenames. `.json.example` uses that JSON formatter. `.jsonc.example`
-uses biome, fed on stdin under a `.jsonc` name, because biome only reads
-the final suffix. `.yaml.example` and `.yml.example` use prettier with
-`--parser yaml`. `.toml.example` uses taplo with `--stdin-filepath`,
-because taplo only includes `*.toml`. `.sql.example` uses sqlfluff via
-stdin with `--stdin-filename`, because sqlfluff only collects `*.sql`.
-`.md.example` uses markdownlint-cli2; an explicit path is fixed in place.
-`.py.example` uses ruff or black, fed on stdin under a `.py` name, because
-black's include stops at `*.py` and `*.pyi`. A bare `.example` is not
-registered. External tools invoked via `bunx` or system `PATH`.
+`dispatch.NewRegistry` extensions: `.json` (biome when the project has a
+biome config and a usable launcher, otherwise native `encoding/json.Indent`),
+`.json.example` (always native JSON), `.sh`/`.bash`/`.zsh`/`.ksh`/`.dash`
+(native `mvdan.cc/sh/v3`), `.go` (`gofumpt` on `PATH`, otherwise
+`go/format.Source`; `goimports` runs first when it is on `PATH` and a parent
+`.golangci.yml` lists it), `.mod`/`go.mod` via `go mod edit -fmt` and
+`.work`/`go.work` via `go work edit -fmt` on those exact filenames, biome
+for `.ts`/`.tsx`/`.js`/`.jsx`/`.mjs`/`.cjs`/`.mts`/`.cts`/`.css`/`.jsonc`/
+`.jsonc.example` (stdin under a `.jsonc` name), markdownlint-cli2 for
+`.md`/`.mdx`/`.markdown`/`.mdc`/`.md.example`, taplo for `.toml`/
+`.toml.example` (`--stdin-filepath`), prettier for `.yaml`/`.yml`/
+`.yaml.example`/`.yml.example` (`--parser yaml`), `.html`/`.scss`/`.less`/
+`.vue`/`.svelte`/`.astro`, GraphQL router (biome or prettier) for
+`.graphql`/`.gql`, sqlfluff for `.sql`/`.sql.example` (`--stdin-filename`),
+ruff/black for `.py`/`.py.example`/`.pyi` (stdin under a `.py` name) and
+notebooks (`.ipynb`), rustfmt (`.rs`), terraform/tofu (`.tf`/`.tfvars`/
+`.tftest.hcl`/`.tfmock.hcl`/`.tfquery.hcl`), buf (`.proto`), clang-format
+(`.c`/`.h`/`.cc`/`.cpp`/`.cxx`/`.hpp`/`.hh`/`.hxx`/`.m`/`.mm`), Java
+(`.java`), Kotlin (`.kt`/`.kts`), Swift (`.swift`), Ruby (`.rb`/`.rake`/
+`.gemspec`), PHP (`.php`), Nix (`.nix`), Lua (`.lua`). A bare `.example`
+is not registered. External tools invoked via `bunx` or system `PATH`.
 A formatter that shells out reports its candidate binaries via the optional
 `formatters.Prober` interface, which is what `--doctor` reads; without one a
-formatter reads as native.
+formatter reads as native. `json` implements `Prober` (biome, bunx) and
+still falls back to the native formatter.
 
 ## Invariants
 
