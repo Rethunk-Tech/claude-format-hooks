@@ -39,7 +39,24 @@ func TestMain(m *testing.M) {
 		}
 		os.Exit(0)
 	}
-	os.Exit(m.Run())
+	os.Exit(runIsolated(m))
+}
+
+// runIsolated gives the whole test process its own missing-tool cache, so a
+// "biome missing" entry written by another run on the same machine (CI's
+// --check dogfood runs beside these tests) cannot hide a test's fake tool.
+func runIsolated(m *testing.M) int {
+	cache, err := os.MkdirTemp("", "format-dispatch-cache-")
+	if err != nil {
+		fmt.Fprintln(os.Stderr, err)
+		return 1
+	}
+	defer func() { _ = os.RemoveAll(cache) }()
+	if err := os.Setenv("CLAUDE_FORMAT_HOOKS_CACHE", cache); err != nil {
+		fmt.Fprintln(os.Stderr, err)
+		return 1
+	}
+	return m.Run()
 }
 
 // fakeTool installs a copy of this test binary in dir as an executable
