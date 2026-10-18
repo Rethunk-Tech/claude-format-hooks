@@ -105,4 +105,4 @@ jobs:
 
       - name: gate
         if: ${{ !cancelled() }}
-        run: gate
+        run: gate --tail 400
