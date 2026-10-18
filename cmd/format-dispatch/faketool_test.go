@@ -29,7 +29,12 @@ func TestMain(m *testing.M) {
 		if name == "bunx" {
 			name = "prettier"
 		}
-		if err := os.WriteFile(os.Getenv("FORMATTER_MARKER"), []byte(name), 0o600); err != nil {
+		// The marker sits beside the stub binary, in a directory the test owns.
+		self, err := os.Executable()
+		if err != nil {
+			os.Exit(1)
+		}
+		if err := os.WriteFile(filepath.Join(filepath.Dir(self), "formatter-marker"), []byte(name), 0o600); err != nil {
 			os.Exit(1)
 		}
 		os.Exit(0)

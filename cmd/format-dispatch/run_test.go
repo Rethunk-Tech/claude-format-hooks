@@ -62,12 +62,11 @@ func hookEnv(t *testing.T) (dir, settingsPath string) {
 func fakeRouterTools(t *testing.T) string {
 	t.Helper()
 	toolDir := t.TempDir()
-	marker := filepath.Join(t.TempDir(), "formatter")
+	marker := filepath.Join(toolDir, "formatter-marker")
 	fakeTool(t, toolDir, "biome")
 	fakeTool(t, toolDir, "bunx")
 	t.Setenv(fakeToolEnv, "marker")
 	t.Setenv("CLAUDE_FORMAT_HOOKS_CACHE", filepath.Join(t.TempDir(), "cache"))
-	t.Setenv("FORMATTER_MARKER", marker)
 	t.Setenv("PATH", toolDir)
 	return marker
 }
