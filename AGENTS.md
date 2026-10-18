@@ -7,10 +7,11 @@ Operators: [HUMANS.md](HUMANS.md).
 ## Stack
 
 Go 1.27+. CI ([`.github/workflows/ci.yml`](.github/workflows/ci.yml)): the
-`test` matrix (build, vet, gofmt, race tests, 75% coverage floor, `--check`)
-runs on `ubuntu-latest`/`windows-latest`. Static analysis (golangci-lint,
-govulncheck, actionlint, `shellcheck -x install.sh`) is the ubuntu `lint`
-job. Tag `v*` triggers
+`test` matrix (build, vet, race tests, 75% coverage floor, `--check`)
+runs on `ubuntu-latest`/`windows-latest`. The ubuntu `lint` job runs
+`golangci-lint` / `golangci-lint fmt` (gofumpt), govulncheck, then `gate`
+(actionlint, shellcheck, gitleaks, and the restated `.gate.toml` checks).
+Tag `v*` triggers
 [`.github/workflows/release.yml`](.github/workflows/release.yml) cross-compile
 release binaries.
 
@@ -19,7 +20,7 @@ release binaries.
 ```bash
 go build ./...
 go vet ./...
-gofmt -l .
+golangci-lint fmt
 golangci-lint run ./...
 go test -race -cover ./...
 ```
@@ -74,7 +75,7 @@ still falls back to the native formatter.
 - Unsupported extension: instant no-op — no stat, exec, or config read.
   An extensionless file, or a hidden basename whose only suffix is the
   whole name (`.bashrc`), is first peeked at for a shebang naming a
-  shell, python, ruby, node, php, or lua interpreter. `env -S` and other env flags
+  shell, python, ruby, node, bun, deno, php, or lua interpreter. `env -S` and other env flags
   are skipped so the real interpreter is seen.
 - Missing external tools cached 30s (`internal/diskcache`); self-heals within TTL.
 - Skips `node_modules/`, `.git/`, `vendor/`, `.venv/`, and peers; files outside `$CLAUDE_PROJECT_DIR`.
