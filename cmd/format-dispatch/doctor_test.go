@@ -1,6 +1,7 @@
 package main
 
 import (
+	"encoding/json"
 	"io"
 	"os"
 	"path/filepath"
@@ -28,7 +29,7 @@ func TestDoctorReportsToolPresence(t *testing.T) {
 	fakePath(t, "rustfmt")
 
 	var out, errOut strings.Builder
-	qt.Assert(t, qt.Equals(runDoctor(&out, &errOut), 0))
+	qt.Assert(t, qt.Equals(runDoctor(&out, &errOut, false), 0))
 	got := out.String()
 
 	qt.Check(t, qt.StringContains(got, "FORMATTER"))
@@ -55,7 +56,7 @@ func TestDoctorReportsDisabledExtensions(t *testing.T) {
 	fakePath(t)
 
 	var out, errOut strings.Builder
-	qt.Assert(t, qt.Equals(runDoctor(&out, &errOut), 0))
+	qt.Assert(t, qt.Equals(runDoctor(&out, &errOut, false), 0))
 	got := out.String()
 
 	qt.Check(t, qt.StringContains(got, "disabled by config: .rs"))
@@ -77,7 +78,7 @@ func TestDoctorReportsHookWiring(t *testing.T) {
 
 	t.Run("absent files are not wired", func(t *testing.T) {
 		var out, errOut strings.Builder
-		qt.Assert(t, qt.Equals(runDoctor(&out, &errOut), 0))
+		qt.Assert(t, qt.Equals(runDoctor(&out, &errOut, false), 0))
 		qt.Check(t, qt.StringContains(out.String(), "hook wiring"))
 		qt.Check(t, qt.StringContains(out.String(), "NOT WIRED"))
 	})
@@ -90,7 +91,7 @@ func TestDoctorReportsHookWiring(t *testing.T) {
 		qt.Assert(t, qt.IsNil(installer.Install(opts, false, io.Discard)))
 
 		var out, errOut strings.Builder
-		qt.Assert(t, qt.Equals(runDoctor(&out, &errOut), 0))
+		qt.Assert(t, qt.Equals(runDoctor(&out, &errOut, false), 0))
 		got := out.String()
 		// Column padding is tabwriter's business, so match the line, not
 		// the spacing between path and state.
@@ -102,10 +103,53 @@ func TestDoctorReportsHookWiring(t *testing.T) {
 	t.Run("malformed file is unreadable, not unwired", func(t *testing.T) {
 		qt.Assert(t, qt.IsNil(os.WriteFile(settings, []byte("{not json"), 0o600)))
 		var out, errOut strings.Builder
-		qt.Assert(t, qt.Equals(runDoctor(&out, &errOut), 0))
+		qt.Assert(t, qt.Equals(runDoctor(&out, &errOut, false), 0))
 		qt.Check(t, qt.StringContains(out.String(), "UNREADABLE"),
 			qt.Commentf("--install would fail on this, not fix it"))
 	})
+}
+
+func TestDoctorJSONReportsFormattersToolsAndWiring(t *testing.T) {
+	t.Setenv("CLAUDE_FORMAT_HOOKS_CONFIG", filepath.Join(t.TempDir(), "absent.json"))
+	t.Setenv("CLAUDE_HOOKS_BIN_DIR", t.TempDir())
+	t.Setenv("CLAUDE_SETTINGS_FILE", filepath.Join(t.TempDir(), "settings.json"))
+	t.Setenv("CURSOR_HOOKS_FILE", filepath.Join(t.TempDir(), "hooks.json"))
+	fakePath(t, "rustfmt")
+
+	var code int
+	stdout := captureStdout(t, func() { code = dispatchArgs([]string{"--doctor", "--json"}) })
+	qt.Check(t, qt.Equals(code, 0))
+	qt.Check(t, qt.Not(qt.StringContains(stdout, "FORMATTER")))
+
+	var got struct {
+		Formatters []struct {
+			Name       string   `json:"name"`
+			Tool       string   `json:"tool"`
+			Extensions []string `json:"extensions"`
+		} `json:"formatters"`
+		Wiring struct {
+			Bin   string `json:"bin"`
+			Hooks []struct {
+				Path  string `json:"path"`
+				State string `json:"state"`
+			} `json:"hooks"`
+		} `json:"wiring"`
+	}
+	qt.Assert(t, qt.IsNil(json.Unmarshal([]byte(stdout), &got)))
+	qt.Check(t, qt.Not(qt.Equals(len(got.Formatters), 0)))
+	qt.Check(t, qt.Not(qt.Equals(got.Wiring.Bin, "")))
+	qt.Check(t, qt.Not(qt.Equals(len(got.Wiring.Hooks), 0)))
+	var sawGofmt, sawRustfmt bool
+	for _, f := range got.Formatters {
+		if f.Name == "gofmt" && strings.Contains(f.Tool, "native") {
+			sawGofmt = true
+		}
+		if f.Name == "rustfmt" && strings.Contains(f.Tool, "ok: rustfmt") {
+			sawRustfmt = true
+		}
+	}
+	qt.Check(t, qt.IsTrue(sawGofmt))
+	qt.Check(t, qt.IsTrue(sawRustfmt))
 }
 
 // wiringLineSays reports whether the --doctor line naming path ends in

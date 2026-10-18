@@ -75,7 +75,9 @@ Usage:
   format-dispatch --upgrade --dry-run    preview the binary upgrade without writing
   format-dispatch --check PATH...    report files a formatter would change, without changing them (exit 1 if any; exit 2 on usage or I/O error)
   format-dispatch --check --write PATH...  format those files in place instead of reporting them
+  format-dispatch --check --json PATH...  same report as one JSON document on stdout
   format-dispatch --doctor           report each formatter, its tools, extensions, and whether the hook is wired
+  format-dispatch --doctor --json    same report as one JSON document on stdout
   format-dispatch --version          print version and build info
   format-dispatch --help, -h         show this help
 `
@@ -104,14 +106,15 @@ func dispatchArgs(args []string) int {
 		return runCheck(args[1:], os.Stdout, os.Stderr)
 	case "--doctor":
 		rest, help := stripHelp(args[1:])
-		if !parseNoExtra(rest, "--doctor") {
+		asJSON, ok := parseJSONFlag(rest, "--doctor")
+		if !ok {
 			return 1
 		}
 		if help {
 			fmt.Print(usage)
 			return 0
 		}
-		return runDoctor(os.Stdout, os.Stderr)
+		return runDoctor(os.Stdout, os.Stderr, asJSON)
 	case "--version":
 		if !parseNoExtra(args[1:], "--version") {
 			return 1
@@ -248,6 +251,25 @@ func stripHelp(args []string) (rest []string, help bool) {
 		rest = append(rest, a)
 	}
 	return rest, help
+}
+
+// parseJSONFlag reads a subcommand's only accepted extra argument. --json
+// is the one dash-prefix --doctor takes; anything else is still a usage
+// error, matching parseNoExtra.
+func parseJSONFlag(args []string, label string) (asJSON, ok bool) {
+	switch len(args) {
+	case 0:
+		return false, true
+	case 1:
+		if args[0] != "--json" {
+			fmt.Fprintf(os.Stderr, "format-dispatch %s: unrecognized argument %q\n\n%s", label, args[0], usage)
+			return false, false
+		}
+		return true, true
+	default:
+		fmt.Fprintf(os.Stderr, "format-dispatch %s: unexpected arguments %q\n\n%s", label, args, usage)
+		return false, false
+	}
 }
 
 // parseNoExtra rejects leftover arguments on flags that take none, the

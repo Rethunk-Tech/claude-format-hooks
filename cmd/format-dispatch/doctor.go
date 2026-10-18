@@ -1,6 +1,7 @@
 package main
 
 import (
+	"encoding/json"
 	"fmt"
 	"io"
 	"maps"
@@ -24,7 +25,7 @@ import (
 //
 // It exits 0 regardless of what it finds: an incomplete toolchain is a
 // normal state, not a failure. --check is the flag that gates CI.
-func runDoctor(out, errOut io.Writer) int {
+func runDoctor(out, errOut io.Writer, asJSON bool) int {
 	registry, _ := buildRegistry(errOut)
 
 	type entry struct {
@@ -44,35 +45,72 @@ func runDoctor(out, errOut io.Writer) int {
 		e.exts = append(e.exts, ext)
 	}
 
-	w := tabwriter.NewWriter(out, 0, 0, 2, ' ', 0)
-	_, _ = fmt.Fprintln(w, "FORMATTER\tTOOL\tEXTENSIONS")
+	type formatterRow struct {
+		Name       string   `json:"name"`
+		Tool       string   `json:"tool"`
+		Extensions []string `json:"extensions"`
+	}
+	formattersOut := make([]formatterRow, 0, len(byName))
 	for _, name := range slices.Sorted(maps.Keys(byName)) {
 		e := byName[name]
 		slices.Sort(e.exts)
-		_, _ = fmt.Fprintf(w, "%s\t%s\t%s\n", name, toolStatus(name, e.tools), strings.Join(e.exts, " "))
+		formattersOut = append(formattersOut, formatterRow{
+			Name: name, Tool: toolStatus(name, e.tools), Extensions: e.exts,
+		})
+	}
+	disabled := disabledExtensions(registry)
+	if disabled == nil {
+		disabled = []string{}
+	}
+	wiring := collectWiring()
+
+	if asJSON {
+		if err := json.NewEncoder(out).Encode(struct {
+			Formatters []formatterRow `json:"formatters"`
+			Disabled   []string       `json:"disabled"`
+			Wiring     doctorWiring   `json:"wiring"`
+		}{Formatters: formattersOut, Disabled: disabled, Wiring: wiring}); err != nil {
+			_, _ = fmt.Fprintf(errOut, "format-dispatch --doctor: %v\n", err)
+			return 1
+		}
+		return 0
+	}
+
+	w := tabwriter.NewWriter(out, 0, 0, 2, ' ', 0)
+	_, _ = fmt.Fprintln(w, "FORMATTER\tTOOL\tEXTENSIONS")
+	for _, row := range formattersOut {
+		_, _ = fmt.Fprintf(w, "%s\t%s\t%s\n", row.Name, row.Tool, strings.Join(row.Extensions, " "))
 	}
 	_ = w.Flush()
 
-	if disabled := disabledExtensions(registry); len(disabled) > 0 {
+	if len(disabled) > 0 {
 		_, _ = fmt.Fprintf(out, "\ndisabled by config: %s\n", strings.Join(disabled, " "))
 	}
-	reportWiring(out)
+	writeWiring(out, wiring)
 	return 0
 }
 
-// reportWiring answers the other half of "why is nothing happening when I
+type doctorWiring struct {
+	Bin   string             `json:"bin,omitempty"`
+	Error string             `json:"error,omitempty"`
+	Hooks []doctorWiringHook `json:"hooks,omitempty"`
+}
+
+type doctorWiringHook struct {
+	Path  string `json:"path"`
+	State string `json:"state"`
+}
+
+// collectWiring answers the other half of "why is nothing happening when I
 // save". A complete toolchain is useless if the binary was never wired into
 // the harness, and the two questions look identical from the outside:
 // files simply stay unformatted.
-func reportWiring(out io.Writer) {
+func collectWiring() doctorWiring {
 	opts, err := installer.DefaultOptions()
 	if err != nil {
-		_, _ = fmt.Fprintf(out, "\nhook wiring: unknown (%v)\n", err)
-		return
+		return doctorWiring{Error: err.Error()}
 	}
-
-	_, _ = fmt.Fprintf(out, "\nhook wiring (%s):\n", opts.BinPath)
-	w := tabwriter.NewWriter(out, 0, 0, 2, ' ', 0)
+	out := doctorWiring{Bin: opts.BinPath}
 	for _, h := range []struct {
 		path  string
 		wired func(string, string) (bool, error)
@@ -83,7 +121,22 @@ func reportWiring(out io.Writer) {
 		if h.path == "" {
 			continue
 		}
-		_, _ = fmt.Fprintf(w, "  %s\t%s\n", h.path, wiringState(h.wired(h.path, opts.BinPath)))
+		out.Hooks = append(out.Hooks, doctorWiringHook{
+			Path: h.path, State: wiringState(h.wired(h.path, opts.BinPath)),
+		})
+	}
+	return out
+}
+
+func writeWiring(out io.Writer, wiring doctorWiring) {
+	if wiring.Error != "" {
+		_, _ = fmt.Fprintf(out, "\nhook wiring: unknown (%s)\n", wiring.Error)
+		return
+	}
+	_, _ = fmt.Fprintf(out, "\nhook wiring (%s):\n", wiring.Bin)
+	w := tabwriter.NewWriter(out, 0, 0, 2, ' ', 0)
+	for _, h := range wiring.Hooks {
+		_, _ = fmt.Fprintf(w, "  %s\t%s\n", h.Path, h.State)
 	}
 	_ = w.Flush()
 }

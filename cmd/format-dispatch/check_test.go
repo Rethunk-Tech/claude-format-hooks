@@ -3,6 +3,7 @@ package main
 import (
 	"bytes"
 	"context"
+	"encoding/json"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -827,15 +828,53 @@ func TestCheckWriteSkipsGeneratedFiles(t *testing.T) {
 }
 
 func TestParseCheckArgs(t *testing.T) {
-	paths, write, err := parseCheckArgs([]string{"a", "--write", "b"})
+	paths, write, asJSON, err := parseCheckArgs([]string{"a", "--write", "b"})
 	qt.Assert(t, qt.IsNil(err))
 	qt.Check(t, qt.DeepEquals(paths, []string{"a", "b"}))
 	qt.Check(t, qt.IsTrue(write))
+	qt.Check(t, qt.IsFalse(asJSON))
 
-	paths, write, err = parseCheckArgs([]string{"a"})
+	paths, write, asJSON, err = parseCheckArgs([]string{"a"})
 	qt.Assert(t, qt.IsNil(err))
 	qt.Check(t, qt.DeepEquals(paths, []string{"a"}))
 	qt.Check(t, qt.IsFalse(write))
+	qt.Check(t, qt.IsFalse(asJSON))
+
+	paths, write, asJSON, err = parseCheckArgs([]string{"a", "--json"})
+	qt.Assert(t, qt.IsNil(err))
+	qt.Check(t, qt.DeepEquals(paths, []string{"a"}))
+	qt.Check(t, qt.IsFalse(write))
+	qt.Check(t, qt.IsTrue(asJSON))
+}
+
+func TestCheckJSONNamesChangedFiles(t *testing.T) {
+	dir := t.TempDir()
+	path := writeCheckFile(t, dir, "bad.json", unformattedJSON)
+	writeCheckFile(t, dir, "ok.json", formattedJSON)
+
+	var out, errOut bytes.Buffer
+	qt.Assert(t, qt.Equals(runCheck([]string{dir, "--json"}, &out, &errOut), 1))
+	qt.Check(t, qt.Equals(errOut.String(), ""))
+	qt.Check(t, qt.Not(qt.StringContains(out.String(), "would reformat")))
+
+	var got struct {
+		Changed []string `json:"changed"`
+	}
+	qt.Assert(t, qt.IsNil(json.Unmarshal(out.Bytes(), &got)))
+	qt.Check(t, qt.DeepEquals(got.Changed, []string{path}))
+}
+
+func TestCheckJSONExitsZeroWhenClean(t *testing.T) {
+	dir := t.TempDir()
+	writeCheckFile(t, dir, "ok.json", formattedJSON)
+
+	var out, errOut bytes.Buffer
+	qt.Assert(t, qt.Equals(runCheck([]string{dir, "--json"}, &out, &errOut), 0))
+	var got struct {
+		Changed []string `json:"changed"`
+	}
+	qt.Assert(t, qt.IsNil(json.Unmarshal(out.Bytes(), &got)))
+	qt.Check(t, qt.DeepEquals(got.Changed, []string{}))
 }
 
 func TestCheckRejectsUnknownFlags(t *testing.T) {

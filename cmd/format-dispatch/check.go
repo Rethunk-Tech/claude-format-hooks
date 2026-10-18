@@ -5,6 +5,7 @@ import (
 	"context"
 	"crypto/rand"
 	"encoding/hex"
+	"encoding/json"
 	"fmt"
 	"io"
 	"io/fs"
@@ -42,7 +43,7 @@ const checkTimeout = 15 * time.Minute
 // pushes on something no local write would ever repair.
 func runCheck(args []string, out, errOut io.Writer) int {
 	rest, help := stripHelp(args)
-	paths, write, err := parseCheckArgs(rest)
+	paths, write, asJSON, err := parseCheckArgs(rest)
 	if err != nil {
 		_, _ = fmt.Fprintf(errOut, "format-dispatch --check: %v\n\n%s", err, usage)
 		return 2
@@ -110,14 +111,26 @@ func runCheck(args []string, out, errOut io.Writer) int {
 		}
 	}
 
-	verb := "would reformat"
-	if write {
-		verb = "reformatted"
+	if asJSON {
+		if wouldChange == nil {
+			wouldChange = []string{}
+		}
+		if err := json.NewEncoder(out).Encode(struct {
+			Changed []string `json:"changed"`
+		}{Changed: wouldChange}); err != nil {
+			_, _ = fmt.Fprintf(errOut, "format-dispatch --check: %v\n", err)
+			return 2
+		}
+	} else {
+		verb := "would reformat"
+		if write {
+			verb = "reformatted"
+		}
+		for _, path := range wouldChange {
+			_, _ = fmt.Fprintf(out, "%s: %s\n", verb, path)
+		}
+		_, _ = fmt.Fprintf(out, "format-dispatch --check: %s\n", tally.summary(len(wouldChange), write))
 	}
-	for _, path := range wouldChange {
-		_, _ = fmt.Fprintf(out, "%s: %s\n", verb, path)
-	}
-	_, _ = fmt.Fprintf(out, "format-dispatch --check: %s\n", tally.summary(len(wouldChange), write))
 	// --write fixed what it found, so there is nothing left to fail over.
 	// Without it the whole point is a non-zero exit CI can gate on.
 	if write || len(wouldChange) == 0 {
@@ -130,18 +143,22 @@ func runCheck(args []string, out, errOut io.Writer) int {
 // anywhere among the paths rather than only first, because "--check .
 // --write" is what people type. Any other dash-prefix is a typo, not a
 // path: --install already refuses those instead of ignoring them.
-func parseCheckArgs(args []string) (paths []string, write bool, err error) {
+func parseCheckArgs(args []string) (paths []string, write, asJSON bool, err error) {
 	for _, a := range args {
-		if a == "--write" {
+		switch a {
+		case "--write":
 			write = true
+			continue
+		case "--json":
+			asJSON = true
 			continue
 		}
 		if strings.HasPrefix(a, "-") {
-			return nil, false, fmt.Errorf("unrecognized argument %q", a)
+			return nil, false, false, fmt.Errorf("unrecognized argument %q", a)
 		}
 		paths = append(paths, a)
 	}
-	return paths, write, nil
+	return paths, write, asJSON, nil
 }
 
 // checkJob is one file that survived classification: a known, enabled
