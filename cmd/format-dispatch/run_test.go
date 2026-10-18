@@ -456,7 +456,12 @@ func TestRunUpgradeReportsDefaultOptionsError(t *testing.T) {
 }
 
 func TestRunReadStdinError(t *testing.T) {
-	qt.Check(t, qt.Equals(run(errReader{}), 1))
+	var code int
+	stderr := captureStderr(t, func() {
+		code = run(errReader{})
+	})
+	qt.Check(t, qt.Equals(code, 0))
+	qt.Check(t, qt.StringContains(stderr, "read stdin"))
 }
 
 func TestRunEmptyPayloadIsNoop(t *testing.T) {

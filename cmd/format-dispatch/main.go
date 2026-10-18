@@ -281,12 +281,12 @@ func runUpgrade(args []string) int {
 	return provisionAfter(label, dryRun)
 }
 
-// run contains all logic and always returns 0, except for a genuine
-// inability to even read stdin (which should never happen under Claude
-// Code, but exiting non-zero there is at least diagnosable rather than
-// silently swallowed). It reads as a sequence of guard checks, each
-// setting logOutcome before returning; resolveTarget, projectDisables,
-// and buildRegistry hold the checks' actual logic so each is independently
+// run contains all logic and always returns 0. A genuine inability to
+// read stdin still prints a stderr diagnostic so the miss is visible,
+// then exits 0 so the PostToolUse hook cannot fail the Write that already
+// succeeded. It reads as a sequence of guard checks, each setting
+// logOutcome before returning; resolveTarget, projectDisables, and
+// buildRegistry hold the checks' actual logic so each is independently
 // testable and this function stays a readable top-level flow.
 func run(stdin io.Reader) int {
 	start := time.Now()
@@ -297,7 +297,7 @@ func run(stdin io.Reader) int {
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "format-dispatch: read stdin: %v\n", err)
 		logOutcome = "error: read stdin failed"
-		return 1
+		return 0
 	}
 	if len(raw) > maxHookPayloadBytes {
 		fmt.Fprintf(os.Stderr, "format-dispatch: stdin exceeds %d bytes\n", maxHookPayloadBytes)
