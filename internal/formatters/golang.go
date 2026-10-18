@@ -218,7 +218,7 @@ func parseGolangciTOML(src []byte) goFormatOpts {
 		}
 		key = strings.TrimSpace(key)
 		val = strings.TrimSpace(val)
-		if key == "enable" && section == "formatters" && tomlListHas(val, "goimports") {
+		if key == "enable" && section == "formatters" && yamlListHas(val, "goimports") {
 			opts.goimports = true
 		}
 		if key == "group-params" && strings.Contains(section, "gofumpt") && val == "true" {
@@ -226,16 +226,6 @@ func parseGolangciTOML(src []byte) goFormatOpts {
 		}
 	}
 	return opts
-}
-
-func tomlListHas(val, item string) bool {
-	val = strings.Trim(val, "[]")
-	for part := range strings.SplitSeq(val, ",") {
-		if unquoteYAML(strings.TrimSpace(part)) == item {
-			return true
-		}
-	}
-	return false
 }
 
 type yamlFrame struct {
