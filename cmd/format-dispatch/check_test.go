@@ -827,11 +827,23 @@ func TestCheckWriteSkipsGeneratedFiles(t *testing.T) {
 }
 
 func TestParseCheckArgs(t *testing.T) {
-	paths, write := parseCheckArgs([]string{"a", "--write", "b"})
+	paths, write, err := parseCheckArgs([]string{"a", "--write", "b"})
+	qt.Assert(t, qt.IsNil(err))
 	qt.Check(t, qt.DeepEquals(paths, []string{"a", "b"}))
 	qt.Check(t, qt.IsTrue(write))
 
-	paths, write = parseCheckArgs([]string{"a"})
+	paths, write, err = parseCheckArgs([]string{"a"})
+	qt.Assert(t, qt.IsNil(err))
 	qt.Check(t, qt.DeepEquals(paths, []string{"a"}))
 	qt.Check(t, qt.IsFalse(write))
+}
+
+func TestCheckRejectsUnknownFlags(t *testing.T) {
+	dir := t.TempDir()
+	writeCheckFile(t, dir, "ok.json", formattedJSON)
+
+	var out, errOut bytes.Buffer
+	qt.Check(t, qt.Equals(runCheck([]string{dir, "--dry-run"}, &out, &errOut), 2))
+	qt.Check(t, qt.StringContains(errOut.String(), `unrecognized argument "--dry-run"`))
+	qt.Check(t, qt.Equals(out.String(), ""))
 }

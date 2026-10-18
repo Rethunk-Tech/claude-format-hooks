@@ -41,7 +41,11 @@ const checkTimeout = 15 * time.Minute
 // leave violations it declines to fix, and failing CI on them would gate
 // pushes on something no local write would ever repair.
 func runCheck(args []string, out, errOut io.Writer) int {
-	paths, write := parseCheckArgs(args)
+	paths, write, err := parseCheckArgs(args)
+	if err != nil {
+		_, _ = fmt.Fprintf(errOut, "format-dispatch --check: %v\n\n%s", err, usage)
+		return 2
+	}
 	if len(paths) == 0 {
 		_, _ = fmt.Fprintf(errOut, "format-dispatch --check: no paths given\n\n%s", usage)
 		return 2
@@ -119,16 +123,20 @@ func runCheck(args []string, out, errOut io.Writer) int {
 
 // parseCheckArgs splits --write out of the path list. It is accepted
 // anywhere among the paths rather than only first, because "--check .
-// --write" is what people type.
-func parseCheckArgs(args []string) (paths []string, write bool) {
+// --write" is what people type. Any other dash-prefix is a typo, not a
+// path: --install already refuses those instead of ignoring them.
+func parseCheckArgs(args []string) (paths []string, write bool, err error) {
 	for _, a := range args {
 		if a == "--write" {
 			write = true
 			continue
 		}
+		if strings.HasPrefix(a, "-") {
+			return nil, false, fmt.Errorf("unrecognized argument %q", a)
+		}
 		paths = append(paths, a)
 	}
-	return paths, write
+	return paths, write, nil
 }
 
 // checkJob is one file that survived classification: a known, enabled
