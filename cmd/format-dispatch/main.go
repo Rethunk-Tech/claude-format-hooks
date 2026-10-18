@@ -62,26 +62,6 @@ var errFormatterTimeout = fmt.Errorf("formatter timed out after %s", formatterTi
 // for indent settings.
 const projectConfigFile = ".claude-format-hooks.json"
 
-const usage = `format-dispatch is a Claude Code PostToolUse hook. Invoked with no
-arguments, it reads a hook payload from stdin and formats the file it names.
-
-Usage:
-  format-dispatch                    read a PostToolUse payload from stdin (normal hook invocation)
-  format-dispatch --install          wire this binary into ~/.claude/settings.json (PostToolUse) and ~/.cursor/hooks.json (afterFileEdit)
-  format-dispatch --uninstall        remove it from ~/.claude/settings.json and ~/.cursor/hooks.json
-  format-dispatch --install --dry-run    preview the Claude and Cursor hook diffs, without writing
-  format-dispatch --uninstall --dry-run  preview uninstall without writing
-  format-dispatch --upgrade          download and replace this platform's latest release binary, and refresh the bunx formatters
-  format-dispatch --upgrade --dry-run    preview the binary upgrade without writing
-  format-dispatch --check PATH...    report files a formatter would change, without changing them (exit 1 if any; exit 2 on usage or I/O error)
-  format-dispatch --check --write PATH...  format those files in place instead of reporting them
-  format-dispatch --check --json PATH...  same report as one JSON document on stdout
-  format-dispatch --doctor           report each formatter, its tools, extensions, and whether the hook is wired
-  format-dispatch --doctor --json    same report as one JSON document on stdout
-  format-dispatch --version          print version and build info
-  format-dispatch --help, -h         show this help
-`
-
 func main() {
 	if len(os.Args) > 1 {
 		os.Exit(dispatchArgs(os.Args[1:]))
@@ -124,6 +104,10 @@ func dispatchArgs(args []string) int {
 	case "--help", "-h":
 		fmt.Print(usage)
 		return 0
+	case "completion":
+		return runCompletion(args[1:])
+	case "man":
+		return runMan(args[1:])
 	default:
 		fmt.Fprint(os.Stderr, usage)
 		return 1
