@@ -127,6 +127,22 @@ func TestDispatchArgsVersion(t *testing.T) {
 	qt.Check(t, qt.StringContains(stdout, "format-dispatch"))
 }
 
+func TestDispatchArgsDoctorAndVersionRejectExtraArgs(t *testing.T) {
+	for _, flag := range []string{"--doctor", "--version"} {
+		for _, tc := range unrecognizedArgCases {
+			t.Run(flag+"/"+tc.name, func(t *testing.T) {
+				var code int
+				stderr := captureStderr(t, func() {
+					code = dispatchArgs(append([]string{flag}, tc.args...))
+				})
+				qt.Check(t, qt.Equals(code, 1))
+				qt.Check(t, qt.StringContains(stderr, tc.wantSubstr))
+				qt.Check(t, qt.StringContains(stderr, "format-dispatch "+flag+":"))
+			})
+		}
+	}
+}
+
 func TestDispatchArgsUnknownFlagPrintsUsageAndFails(t *testing.T) {
 	var code int
 	stderr := captureStderr(t, func() { code = dispatchArgs([]string{"--bogus"}) })

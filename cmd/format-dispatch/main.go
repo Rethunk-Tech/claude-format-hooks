@@ -97,8 +97,14 @@ func dispatchArgs(args []string) int {
 	case "--check":
 		return runCheck(args[1:], os.Stdout, os.Stderr)
 	case "--doctor":
+		if !parseNoExtra(args[1:], "--doctor") {
+			return 1
+		}
 		return runDoctor(os.Stdout, os.Stderr)
 	case "--version":
+		if !parseNoExtra(args[1:], "--version") {
+			return 1
+		}
 		fmt.Println(versionString())
 		return 0
 	case "--help", "-h":
@@ -213,6 +219,21 @@ func runInstallerAction(label string, dryRun bool, action func(installer.Options
 		return false
 	}
 	return true
+}
+
+// parseNoExtra rejects leftover arguments on flags that take none, the
+// same way parseDryRun rejects a typo of --dry-run instead of ignoring it.
+func parseNoExtra(args []string, label string) bool {
+	switch len(args) {
+	case 0:
+		return true
+	case 1:
+		fmt.Fprintf(os.Stderr, "format-dispatch %s: unrecognized argument %q\n\n%s", label, args[0], usage)
+		return false
+	default:
+		fmt.Fprintf(os.Stderr, "format-dispatch %s: unexpected arguments %q\n\n%s", label, args, usage)
+		return false
+	}
 }
 
 // parseDryRun reads a subcommand's only accepted argument. It reports the
