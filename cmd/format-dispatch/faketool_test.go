@@ -5,6 +5,7 @@ import (
 	"os"
 	"path/filepath"
 	"runtime"
+	"strings"
 	"testing"
 
 	"github.com/go-quicktest/qt"
@@ -21,6 +22,17 @@ func TestMain(m *testing.M) {
 			fmt.Printf("line %d\n", i)
 		}
 		os.Exit(1)
+	}
+	if os.Getenv(fakeToolEnv) == "marker" {
+		// Router stub: record which tool ran, named by the copied binary.
+		name := strings.TrimSuffix(filepath.Base(os.Args[0]), ".exe")
+		if name == "bunx" {
+			name = "prettier"
+		}
+		if err := os.WriteFile(os.Getenv("FORMATTER_MARKER"), []byte(name), 0o600); err != nil {
+			os.Exit(1)
+		}
+		os.Exit(0)
 	}
 	os.Exit(m.Run())
 }
