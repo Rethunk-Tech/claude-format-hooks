@@ -79,12 +79,42 @@ jobs:
         with:
           subject-path: format-dispatch-${{ matrix.goos }}-${{ matrix.goarch }}${{ matrix.ext }}
 
+      # Completions and the man page are generated from this binary's own
+      # command table, so they cannot drift from --help. Arch-independent:
+      # only one matrix leg stages the tarball, or the merged artifacts collide.
+      - name: Stage completions and the man page
+        if: matrix.goos == 'linux' && matrix.goarch == 'amd64'
+        run: |
+          bin="./format-dispatch-linux-amd64"
+          assets=$(mktemp -d)
+          "$bin" completion bash > "$assets/format-dispatch.bash"
+          "$bin" completion zsh > "$assets/_format-dispatch"
+          "$bin" completion fish > "$assets/format-dispatch.fish"
+          "$bin" completion powershell > "$assets/format-dispatch.ps1"
+          "$bin" man > "$assets/format-dispatch.1"
+          for f in format-dispatch.bash _format-dispatch format-dispatch.fish format-dispatch.ps1 format-dispatch.1; do
+            test -s "$assets/$f" || { echo "missing generated asset: $f"; exit 1; }
+          done
+          tar -czf format-dispatch-completions-man.tar.gz -C "$assets" \
+            format-dispatch.bash _format-dispatch format-dispatch.fish \
+            format-dispatch.ps1 format-dispatch.1
+          sha256sum format-dispatch-completions-man.tar.gz > format-dispatch-completions-man.tar.gz.sha256
+
       - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: format-dispatch-${{ matrix.goos }}-${{ matrix.goarch }}
           path: |
             format-dispatch-${{ matrix.goos }}-${{ matrix.goarch }}${{ matrix.ext }}
             format-dispatch-${{ matrix.goos }}-${{ matrix.goarch }}${{ matrix.ext }}.sha256
+
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        if: matrix.goos == 'linux' && matrix.goarch == 'amd64'
+        with:
+          name: format-dispatch-completions-man
+          path: |
+            format-dispatch-completions-man.tar.gz
+            format-dispatch-completions-man.tar.gz.sha256
+          if-no-files-found: error
 
   release:
     needs: build
@@ -99,6 +129,12 @@ jobs:
         with:
           path: dist
           merge-multiple: true
+
+      - name: SHA256SUMS
+        working-directory: dist
+        run: |
+          sha256sum -- * > ../SHA256SUMS
+          mv ../SHA256SUMS .
 
       # gh (preinstalled on GitHub-hosted runners) over a third-party
       # release action, consistent with this project's own bias toward
