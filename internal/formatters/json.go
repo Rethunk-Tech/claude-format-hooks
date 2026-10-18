@@ -89,8 +89,10 @@ func (f jsonFormatter) Format(_ context.Context, _, abs string) Result {
 	var buf bytes.Buffer
 	if err := json.Indent(&buf, src, "", indent); err != nil {
 		// Not valid strict JSON (e.g. actually JSONC, or malformed).
-		// Not our job to fix malformed JSON — skip silently.
-		return Result{Skipped: true}
+		// The hook surfaces Diagnostic; --check must fail rather than
+		// treat an unchanged scratch copy as already formatted or as a
+		// missing tool.
+		return Result{Diagnostic: err.Error()}
 	}
 
 	// json.Indent passes through any insignificant whitespace already

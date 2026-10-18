@@ -119,6 +119,31 @@ func TestWouldReformatComparesFormattedCopies(t *testing.T) {
 	}
 }
 
+func TestWouldReformatFailsOnFormatterDiagnostic(t *testing.T) {
+	dir := t.TempDir()
+	path := writeCheckFile(t, dir, "bad.json", "{\"a\": ")
+	registry := dispatch.NewRegistry(config.Default())
+
+	changed, skipped, err := wouldReformat(context.Background(), registry, dir, path, ".json", false)
+
+	qt.Check(t, qt.IsFalse(changed))
+	qt.Check(t, qt.IsFalse(skipped), qt.Commentf("a syntax decline is not a missing tool"))
+	if err == nil {
+		t.Fatal("wouldReformat must fail --check when Dispatch returns a diagnostic")
+	}
+}
+
+func TestCheckFailsOnInvalidJSON(t *testing.T) {
+	dir := t.TempDir()
+	writeCheckFile(t, dir, "bad.json", "{\"a\": ")
+
+	var out, errOut bytes.Buffer
+	qt.Check(t, qt.Equals(runCheck([]string{dir}, &out, &errOut), 2))
+	qt.Check(t, qt.Not(qt.StringContains(out.String(), "no tool")),
+		qt.Commentf("invalid JSON must not be tallied as a missing formatter"))
+	qt.Check(t, qt.Not(qt.Equals(errOut.String(), "")))
+}
+
 func TestWouldReformatReportsReadFileError(t *testing.T) {
 	dir := t.TempDir()
 	registry := dispatch.NewRegistry(config.Default())
@@ -392,9 +417,12 @@ func TestCheckProjectConfigMalformedWarnsAndContinues(t *testing.T) {
 	t.Setenv("CLAUDE_FORMAT_HOOKS_CONFIG", configPath)
 
 	var out, errOut bytes.Buffer
-	qt.Check(t, qt.Equals(runCheck([]string{projectRoot}, &out, &errOut), 1))
+	// The project config is itself a .json file. A syntax decline used to
+	// tally as a missing tool and let bad.json decide the exit; --check now
+	// fails that file the way the hook reports a formatter diagnostic.
+	qt.Check(t, qt.Equals(runCheck([]string{projectRoot}, &out, &errOut), 2))
 	qt.Check(t, qt.StringContains(errOut.String(), "project config:"))
-	qt.Check(t, qt.StringContains(out.String(), path))
+	qt.Check(t, qt.StringContains(errOut.String(), projectConfigFile))
 	qt.Check(t, qt.Equals(readFile(t, path), unformattedJSON))
 }
 
@@ -493,7 +521,7 @@ func TestCheckDispatchesNestedBiomeFromProjectRoot(t *testing.T) {
 
 	toolDir := t.TempDir()
 	marker := filepath.Join(t.TempDir(), "formatter-cwd")
-	script := "#!/bin/sh\nprintf '%s' \"$PWD\" > \"$FMTCHECK_MARKER\"\nfor arg in \"$@\"; do\n  case \"$arg\" in\n    *.ts) printf 'const value = { answer: 42 };\\n' > \"$arg\"; exit 0 ;;\n  esac\ndone\nexit 1\n"
+	script := "#!/bin/sh\nprintf '%s' \"$PWD\" > \"$FMTCHECK_MARKER\"\nfor arg in \"$@\"; do\n  case \"$arg\" in\n    *.ts) printf 'const value = { answer: 42 };\\n' > \"$arg\"; exit 0 ;;\n  esac\ndone\nexit 0\n"
 	for _, name := range []string{"biome", "bunx"} {
 		tool := filepath.Join(toolDir, name)
 		qt.Assert(t, qt.IsNil(os.WriteFile(tool, []byte(script), 0o755))) //nolint:gosec // test formatter fixture must be executable

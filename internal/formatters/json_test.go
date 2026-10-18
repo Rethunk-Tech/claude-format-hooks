@@ -40,8 +40,18 @@ func TestJSONFormatterIdempotent(t *testing.T) {
 
 func TestJSONFormatterReadErrorIsNotSkipped(t *testing.T) {
 	// A directory always fails os.ReadFile without being IsNotExist,
-	// distinguishing this from the "not valid JSON" Skipped path.
+	// distinguishing this from the "not valid JSON" diagnostic path.
 	assertDirectoryIsAReadError(t, NewJSON(config.Default()))
+}
+
+func TestJSONFormatterInvalidJSONIsDiagnostic(t *testing.T) {
+	dir, path := sourceFile(t, "t.json", `{"a": `)
+
+	res := NewJSON(config.Default()).Format(t.Context(), dir, path)
+
+	qt.Check(t, qt.IsFalse(res.Skipped), qt.Commentf("syntax decline must not look like a missing tool"))
+	qt.Check(t, qt.Not(qt.Equals(res.Diagnostic, "")))
+	qt.Check(t, qt.Equals(string(readSource(t, path)), `{"a": `))
 }
 
 func TestJSONFormatterPreservesKeyOrder(t *testing.T) {

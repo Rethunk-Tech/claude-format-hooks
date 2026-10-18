@@ -999,7 +999,6 @@ func TestRunWritesNoStdoutWhenNothingFailed(t *testing.T) {
 	}{
 		{name: "formatted successfully", file: "a.json", content: "{\"a\":1}\n"},
 		{name: "formatter tool absent", file: "a.lua", content: "local x = 1\n"},
-		{name: "malformed json is a skip", file: "b.json", content: "{\"a\": "},
 		{name: "unsupported extension", file: "a.xyz", content: "whatever\n"},
 	}
 	for _, tc := range cases {

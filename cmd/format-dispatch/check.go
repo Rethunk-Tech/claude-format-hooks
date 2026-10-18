@@ -349,6 +349,12 @@ func wouldReformat(ctx context.Context, registry *dispatch.Registry, projectRoot
 	if err := context.Cause(ctx); err != nil {
 		return false, false, err
 	}
+	if res.Err != nil {
+		return false, false, res.Err
+	}
+	if res.Diagnostic != "" {
+		return false, false, fmt.Errorf("%s", res.Diagnostic)
+	}
 	if res.Skipped {
 		return false, true, nil
 	}
