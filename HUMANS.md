@@ -19,6 +19,7 @@ cd claude-format-hooks
 ./install.sh              # build, wire Claude + Cursor hooks
 ./install.sh --dry-run    # preview hook diffs
 ./install.sh --upgrade    # latest release binary
+./install.sh --uninstall  # unwire Claude and Cursor hooks (no rebuild)
 ```
 
 Without Go: download the platform binary from
@@ -148,7 +149,7 @@ format-dispatch --check path/to/file
 ## Uninstall
 
 ```bash
-~/.claude/hooks/format-dispatch --uninstall [--dry-run]
+./install.sh --uninstall [--dry-run]
 rm ~/.claude/hooks/format-dispatch
 ```
 
