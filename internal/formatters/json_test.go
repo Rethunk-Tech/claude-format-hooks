@@ -71,6 +71,10 @@ func TestJSONRouterName(t *testing.T) {
 	qt.Check(t, qt.Equals(NewJSONRouter(config.Default()).Name(), "json"))
 }
 
+func TestJSONRouterTools(t *testing.T) {
+	qt.Check(t, qt.DeepEquals(NewJSONRouter(config.Default()).Tools(), []string{"biome", "bunx"}))
+}
+
 // Without a biome config the native formatter owns .json, so the file is
 // reformatted in-process with no external tool involved.
 func TestJSONRouterUsesNativeWithoutBiomeConfig(t *testing.T) {

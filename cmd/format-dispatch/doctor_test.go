@@ -38,6 +38,8 @@ func TestDoctorReportsToolPresence(t *testing.T) {
 	// Present and absent tools are distinguishable, which is the point.
 	qt.Check(t, qt.StringContains(got, "ok: rustfmt"))
 	qt.Check(t, qt.StringContains(got, "MISSING: buf"))
+	qt.Check(t, qt.StringContains(got, "biome"))
+	qt.Check(t, qt.StringContains(got, "native fallback"))
 	// Every extension a formatter owns is listed against it.
 	qt.Check(t, qt.StringContains(got, ".rs"))
 	qt.Check(t, qt.StringContains(got, ".lua"))

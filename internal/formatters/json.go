@@ -58,6 +58,10 @@ func NewJSONRouter(cfg config.Config) jsonRouter {
 
 func (jsonRouter) Name() string { return "json" }
 
+// Tools reports biome and bunx so --doctor does not label the router native.
+// Format still falls back to encoding/json.Indent when those are absent.
+func (jsonRouter) Tools() []string { return []string{"biome", "bunx"} }
+
 func (r jsonRouter) Format(ctx context.Context, projectRoot, abs string) Result {
 	// Biome exits 0 on a suffix it does not recognize (--no-errors-on-unmatched)
 	// and leaves the file as it was. These copies are still JSON.

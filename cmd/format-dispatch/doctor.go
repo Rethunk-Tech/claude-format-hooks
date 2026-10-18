@@ -49,7 +49,7 @@ func runDoctor(out, errOut io.Writer) int {
 	for _, name := range slices.Sorted(maps.Keys(byName)) {
 		e := byName[name]
 		slices.Sort(e.exts)
-		_, _ = fmt.Fprintf(w, "%s\t%s\t%s\n", name, toolStatus(e.tools), strings.Join(e.exts, " "))
+		_, _ = fmt.Fprintf(w, "%s\t%s\t%s\n", name, toolStatus(name, e.tools), strings.Join(e.exts, " "))
 	}
 	_ = w.Flush()
 
@@ -107,16 +107,21 @@ func wiringState(wired bool, err error) string {
 // of that type is silently skipped. It calls exec.LookPath rather than the
 // formatters package's caching wrapper on purpose -- a doctor that reports
 // a 30-second-old cached miss is reporting the cache, not the system.
-func toolStatus(tools []string) string {
+func toolStatus(name string, tools []string) string {
 	if len(tools) == 0 {
 		return "native"
 	}
+	status := "MISSING: " + strings.Join(tools, ", ")
 	for _, t := range tools {
 		if _, err := exec.LookPath(t); err == nil {
-			return "ok: " + t
+			status = "ok: " + t
+			break
 		}
 	}
-	return "MISSING: " + strings.Join(tools, ", ")
+	if name == "json" {
+		return status + " (native fallback)"
+	}
+	return status
 }
 
 // disabledExtensions is the difference between what some formatter
