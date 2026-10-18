@@ -31,8 +31,8 @@ func shebangExt(path string) (string, bool) {
 		return "", false
 	}
 
-	// python3.12 and similar version suffixes are the norm in shebangs, so
-	// match on prefix for the interpreters that carry one.
+	// python3.12 and php8.3 version suffixes are the norm in shebangs.
+	// php-fpm / php-cgi are not language interpreters.
 	base := filepath.Base(interpreter)
 	switch base {
 	case "bash", "sh", "zsh", "dash", "ksh":
@@ -50,6 +50,9 @@ func shebangExt(path string) (string, bool) {
 	default:
 		if strings.HasPrefix(base, "python") {
 			return ".py", true
+		}
+		if rest, ok := strings.CutPrefix(base, "php"); ok && len(rest) > 0 && rest[0] >= '0' && rest[0] <= '9' {
+			return ".php", true
 		}
 		return "", false
 	}
