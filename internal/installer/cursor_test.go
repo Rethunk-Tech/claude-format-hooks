@@ -2,6 +2,7 @@ package installer
 
 import (
 	"encoding/json"
+	"io"
 	"os"
 	"path/filepath"
 	"runtime"
@@ -109,6 +110,41 @@ func TestInstallAndUninstallWithCursorHooks(t *testing.T) {
 	qt.Assert(t, qt.IsNil(Uninstall(opts, false, &out)))
 	assertCursorHasOnlyOurHook(t, cursorPath, false)
 	qt.Check(t, qt.Equals(settingsHasHooks(t, readFile(t, settingsPath)), false))
+}
+
+func TestUninstallRestoresClaudeWhenCursorWriteFails(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("Windows does not enforce directory mode bits")
+	}
+
+	dir := t.TempDir()
+	settingsPath := filepath.Join(dir, "settings.json")
+	cursorDir := filepath.Join(dir, "cursor")
+	cursorPath := filepath.Join(cursorDir, "hooks.json")
+	qt.Assert(t, qt.IsNil(os.Mkdir(cursorDir, 0o700)))
+	qt.Assert(t, qt.IsNil(os.WriteFile(cursorPath, []byte(`{"version":1,"hooks":{"sessionStart":[]}}`), 0o600)))
+
+	opts := Options{BinPath: binPath, SettingsPath: settingsPath, CursorHooksPath: cursorPath}
+	qt.Assert(t, qt.IsNil(Install(opts, false, io.Discard)))
+	qt.Assert(t, qt.Equals(settingsHasHooks(t, readFile(t, settingsPath)), true))
+
+	qt.Assert(t, qt.IsNil(os.Chmod(cursorDir, 0o500))) //nolint:gosec // test must make the directory unwritable
+	t.Cleanup(func() {
+		if err := os.Chmod(cursorDir, 0o700); err != nil { //nolint:gosec // cleanup restores directory access
+			t.Errorf("restore directory permissions: %v", err)
+		}
+	})
+	probe := filepath.Join(cursorDir, "permission-probe")
+	if err := os.WriteFile(probe, []byte("probe"), 0o600); err == nil {
+		_ = os.Remove(probe)
+		t.Skip("directory remains writable after chmod")
+	}
+
+	var out strings.Builder
+	err := Uninstall(opts, false, &out)
+	qt.Assert(t, qt.IsNotNil(err))
+	qt.Check(t, qt.Equals(settingsHasHooks(t, readFile(t, settingsPath)), true),
+		qt.Commentf("Claude must stay wired when the Cursor uninstall write fails"))
 }
 
 func TestUninstallMissingCursorLeavesFileMissing(t *testing.T) {

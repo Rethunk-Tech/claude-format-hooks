@@ -337,6 +337,12 @@ func Uninstall(opts Options, dryRun bool, out io.Writer) error {
 		cursorOpts := opts
 		cursorOpts.SettingsPath = opts.CursorHooksPath
 		if err := applyChange(cursorOpts, cursorBefore, cursorAfter, dryRun, out, "Removed afterFileEdit hook from"); err != nil {
+			if !dryRun && !bytes.Equal(before, after) {
+				rollbackErr := applyChange(opts, after, before, false, io.Discard, "Restored PostToolUse hook in")
+				if rollbackErr != nil {
+					return fmt.Errorf("cursor hook write failed: %w; Claude restore failed: %w", err, rollbackErr)
+				}
+			}
 			return err
 		}
 	}
