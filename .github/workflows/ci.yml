@@ -28,21 +28,25 @@ jobs:
         shell: bash
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        if: ${{ !cancelled() }}
 
       # The lint job on ubuntu gets the default go.mod-only cache key. Sharing
       # it let whichever job finished first save the Linux build cache, and
       # lint usually wins, so this leg restored a cache with no -race build
       # in it. Hashing go.sum as well gives the test legs their own key.
       - uses: Rethunk-Tech/gh-actions/setup-go@bc5fa5b1004205c9c9399fc941d79d5ada53c59b # v1.16
+        if: ${{ !cancelled() }}
         with:
           cache-dependency-path: |
             go.mod
             go.sum
 
       - name: Go module verify
+        if: ${{ !cancelled() }}
         run: go mod download && go mod verify
 
       - name: gofmt
+        if: ${{ !cancelled() }}
         run: |
           fmt_out="$(gofmt -l .)"
           if [ -n "$fmt_out" ]; then
@@ -55,21 +59,24 @@ jobs:
       # same source and the full analyzer set only needs one OS. go test
       # still runs vet's high-confidence subset on every leg.
       - name: go vet
-        if: runner.os == 'Linux'
+        if: ${{ !cancelled() && runner.os == 'Linux' }}
         run: go vet ./...
 
       - name: Test
+        if: ${{ !cancelled() }}
         run: |
           go test -race -coverprofile=coverage.out -covermode=atomic ./...
           go tool cover -func=coverage.out
 
       - name: Coverage floor
+        if: ${{ !cancelled() }}
         run: |
           pct="$(go tool cover -func=coverage.out | tail -1 | grep -oE '[0-9]+\.[0-9]+')"
           echo "Total coverage: ${pct}%"
           awk -v pct="$pct" 'BEGIN { if (pct + 0 < 75) { print "::error::coverage " pct "% is below the 75% floor"; exit 1 } }'
 
       - name: Build
+        if: ${{ !cancelled() }}
         # No -trimpath: this binary is only dogfooded, and default build
         # flags let it reuse dependency compiles already in the build cache.
         run: go build -o format-dispatch ./cmd/format-dispatch
@@ -81,6 +88,7 @@ jobs:
       # job never installed. That is the same property that makes --check
       # usable in a consumer's CI without provisioning a toolchain.
       - name: Formatting check
+        if: ${{ !cancelled() }}
         run: ./format-dispatch --check .
 
   lint:
@@ -88,8 +96,20 @@ jobs:
     timeout-minutes: 30
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        if: ${{ !cancelled() }}
 
       - uses: Rethunk-Tech/gh-actions/setup-go@bc5fa5b1004205c9c9399fc941d79d5ada53c59b # v1.16
+        if: ${{ !cancelled() }}
         with:
           run-lint: "true"
           run-govulncheck: "true"
+
+      # gate --list also runs these; the test job restates Go checks so
+      # Windows still exercises the suite without a gate binary.
+      - name: actionlint
+        if: ${{ !cancelled() }}
+        run: go run github.com/rhysd/actionlint/cmd/actionlint@latest
+
+      - name: shellcheck
+        if: ${{ !cancelled() }}
+        run: shellcheck -x install.sh
