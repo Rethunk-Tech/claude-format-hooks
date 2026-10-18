@@ -9,6 +9,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- `./install.sh --uninstall` unwires Claude and Cursor hooks without a
+  rebuild. A missing binary prints that there is nothing to unwire and
+  exits 0. `--uninstall --dry-run` previews the binary's uninstall.
 - `.md.example` uses the Markdown formatter. markdownlint-cli2 fixes an
   explicit path in place. A bare `.example` file is left untouched.
 - `.py.example` uses the Python formatter. These copies are formatted via
@@ -37,6 +40,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- `./install.sh --dry-run extra` exits 2 with usage and does not compile.
 - `--check` fails when `Dispatch` returns `Err` or `Diagnostic`. An
   unchanged scratch copy is no longer treated as already formatted, and
   invalid JSON is a formatter failure rather than a missing tool.
@@ -68,6 +72,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- Generated-file skips also cover `*.min.ts`, `*.min.tsx`, `*.min.mts`,
+  and `*.min.cts`, matching the existing minified JS/CSS rule.
 - Operator and agent docs list every `NewRegistry` extension and the
   JSON biome handoff. Static analysis is documented as the ubuntu `lint`
   job, not as running on Windows.
