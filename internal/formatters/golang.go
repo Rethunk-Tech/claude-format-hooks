@@ -151,7 +151,7 @@ func golangciGoFormat(abs string) goFormatOpts {
 	dir := filepath.Dir(abs)
 	for {
 		for _, name := range golangciConfigNames {
-			body, err := os.ReadFile(filepath.Join(dir, name)) //nolint:gosec // dir is an ancestor of the source file being formatted
+			body, err := os.ReadFile(filepath.Clean(filepath.Join(dir, name)))
 			if err == nil {
 				return parseGolangciConfig(name, body)
 			}

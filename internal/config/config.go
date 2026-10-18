@@ -22,6 +22,7 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"path/filepath"
 	"slices"
 	"strconv"
 	"strings"
@@ -80,7 +81,7 @@ func Default() Config {
 // silent formatting hook into something that blocks every file write.
 func Load(path string) (Config, error) {
 	cfg := Default()
-	f, err := os.Open(path) //nolint:gosec // path is the caller-controlled config location (env override or fixed default), by design
+	f, err := os.Open(filepath.Clean(path))
 	if err != nil {
 		if os.IsNotExist(err) {
 			return cfg, nil
