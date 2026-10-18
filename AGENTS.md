@@ -74,7 +74,7 @@ still falls back to the native formatter.
 - Unsupported extension: instant no-op — no stat, exec, or config read.
   An extensionless file, or a hidden basename whose only suffix is the
   whole name (`.bashrc`), is first peeked at for a shebang naming a
-  shell, python, ruby, or node interpreter. `env -S` and other env flags
+  shell, python, ruby, node, php, or lua interpreter. `env -S` and other env flags
   are skipped so the real interpreter is seen.
 - Missing external tools cached briefly (`internal/diskcache`); self-heals within TTL.
 - Skips `node_modules/`, `.git/`, `vendor/`, `.venv/`, and peers; files outside `$CLAUDE_PROJECT_DIR`.

@@ -43,6 +43,10 @@ func shebangExt(path string) (string, bool) {
 		return ".js", true
 	case "deno":
 		return ".ts", true
+	case "php":
+		return ".php", true
+	case "lua", "luajit":
+		return ".lua", true
 	default:
 		if strings.HasPrefix(base, "python") {
 			return ".py", true
