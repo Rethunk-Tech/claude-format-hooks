@@ -14,13 +14,12 @@ about: Report incorrect or unexpected behavior
 
 ## Environment
 
-- claude-format-hooks version or commit:
-- Go version (`go version`):
+- version or commit:
+- `go version`:
 - OS:
-- File extension / formatter involved (if relevant):
+- extension / formatter:
 
-## Logs or screenshots
+## Logs
 
 ```text
-(paste relevant stderr diagnostic; redact file paths/contents if sensitive)
 ```
