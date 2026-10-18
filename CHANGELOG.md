@@ -9,6 +9,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- Homebrew (`brew install rethunk-tech/tap/format-dispatch`) and Scoop
+  (`scoop bucket add rethunk` then `scoop install format-dispatch`)
+  install paths in [README.md](README.md) and [HUMANS.md](HUMANS.md).
 - `./install.sh --uninstall` unwires Claude and Cursor hooks without a
   rebuild. A missing binary prints that there is nothing to unwire and
   exits 0. `--uninstall --dry-run` previews the binary's uninstall.

@@ -16,7 +16,20 @@ formats a file right after Write/Edit/MultiEdit/NotebookEdit writes it
 Single global Go binary (`format-dispatch`). Native JSON, shell, and Go;
 everything else shells out. No per-repo setup.
 
-## Quick start
+## Installation
+
+```bash
+brew install rethunk-tech/tap/format-dispatch
+```
+
+Windows:
+
+```powershell
+scoop bucket add rethunk https://github.com/Rethunk-Tech/scoop-bucket
+scoop install format-dispatch
+```
+
+From source:
 
 ```bash
 git clone git@github.com:Rethunk-Tech/claude-format-hooks.git
@@ -24,7 +37,7 @@ cd claude-format-hooks
 ./install.sh
 ```
 
-Install, config, uninstall: [HUMANS.md](HUMANS.md).
+Config and uninstall: [HUMANS.md](HUMANS.md).
 
 ## Highlights
 

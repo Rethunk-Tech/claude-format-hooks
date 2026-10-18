@@ -4,6 +4,17 @@ Operator setup. Developers: [AGENTS.md](AGENTS.md). Flags: `--help`.
 
 ## Install
 
+```bash
+brew install rethunk-tech/tap/format-dispatch
+```
+
+Windows:
+
+```powershell
+scoop bucket add rethunk https://github.com/Rethunk-Tech/scoop-bucket
+scoop install format-dispatch
+```
+
 Go ([go.mod](go.mod)). Reachable formatters: `--doctor`.
 
 ```bash
