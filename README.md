@@ -7,17 +7,14 @@
 [![CI](https://github.com/Rethunk-Tech/claude-format-hooks/actions/workflows/ci.yml/badge.svg)](https://github.com/Rethunk-Tech/claude-format-hooks/actions/workflows/ci.yml)
 
 A [Claude Code](https://claude.com/claude-code) `PostToolUse` hook that
-formats/lints a file right after Write/Edit/MultiEdit/NotebookEdit writes it
+formats a file right after Write/Edit/MultiEdit/NotebookEdit writes it
 
 </div>
 
 ---
 
-Single global Go binary (`format-dispatch`), no per-repo setup. Native
-in-process formatters for JSON, shell, and Go; everything else routes to
-biome, prettier, taplo, markdownlint-cli2, sqlfluff, ruff/black, rustfmt,
-`terraform fmt` (or `tofu fmt`), buf, clang-format, google-java-format, ktlint,
-swift-format/swiftformat, rubocop/standardrb, php-cs-fixer/pint, nixfmt, and stylua.
+Single global Go binary (`format-dispatch`). Native JSON, shell, and Go;
+everything else shells out. No per-repo setup.
 
 ## Quick start
 
@@ -27,16 +24,17 @@ cd claude-format-hooks
 ./install.sh
 ```
 
-Install, prerequisites, config, and uninstall: [HUMANS.md](HUMANS.md).
+Install, config, uninstall: [HUMANS.md](HUMANS.md).
 
 ## Highlights
 
-- **Native JSON, shell, Go** — in-process; JSON preserves key order.
-- **`--check` for CI** — reports files needing format (exit 1); usage/I/O errors exit 2. `--write` applies them.
-- **`--doctor`** — every formatter, its tools, extensions, and whether the hook is wired.
-- **Real tools for everything else** — honors project config. Prettier runs only where the project has a prettier config.
-- **Hook path silent on success, always exits 0** — failures reach both the operator and the model.
-- **One `./install.sh`** — wires Claude and Cursor hooks globally.
+- **`--check` / `--write`** — CI: exit 1 if formatting is needed, 2 on
+  usage/I/O error.
+- **`--doctor`** — formatters, tools, and whether the hook is wired.
+- **Prettier only with a project prettier config.** Other tools honor
+  theirs without requiring one to exist first.
+- **Hook path silent on success, always exits 0.** Failures reach the
+  operator and, on Claude payloads, the model.
 
 ## Documentation
 
