@@ -615,7 +615,9 @@ func TestWiredCursorReadsState(t *testing.T) {
 	qt.Assert(t, qt.IsNil(err))
 	qt.Check(t, qt.IsTrue(wired))
 
-	agentOnly := `{"version":1,"hooks":{"afterFileEdit":[{"command":"` + bin + `","timeout":5}]}}`
+	binJSON, err := json.Marshal(bin)
+	qt.Assert(t, qt.IsNil(err))
+	agentOnly := `{"version":1,"hooks":{"afterFileEdit":[{"command":` + string(binJSON) + `,"timeout":5}]}}`
 	qt.Assert(t, qt.IsNil(os.WriteFile(hooks, []byte(agentOnly), 0o600)))
 	wired, err = WiredCursor(hooks, bin)
 	qt.Assert(t, qt.IsNil(err))
