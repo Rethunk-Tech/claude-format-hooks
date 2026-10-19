@@ -53,9 +53,10 @@ func (sqlfluffFormatter) Format(ctx context.Context, projectRoot, abs string) Re
 
 	// --exclude-rules replaces the configured exclude_rules instead of
 	// extending it, so the effective list is read back from sqlfluff's own
-	// merged config (render is the cheapest command that prints it) and
-	// carried forward alongside the unsafe fixers.
-	render := exec.CommandContext(ctx, "sqlfluff", "render", "-vv", "--", abs) //nolint:gosec // external formatter by design; args are our own construction, never a shell
+	// merged config (render prints it) and carried forward alongside the
+	// unsafe fixers. -vv is omitted: a verbose config dump can include
+	// source and secrets, and this output is only parsed for exclude_rules.
+	render := exec.CommandContext(ctx, "sqlfluff", "render", "--", abs) //nolint:gosec // external formatter by design; args are our own construction, never a shell
 	render.Dir = projectRoot
 	// A failed render (no dialect, bad config) still yields RF03 below, and
 	// the fix call then reports the real error.
@@ -139,7 +140,7 @@ func sqlfluffOutcome(projectRoot string, ok bool, diag, raw string) Result {
 const sqlfluffUnsafeFixRules = "RF03"
 
 // sqlfluffExcludeRules returns the configured exclude_rules from `sqlfluff
-// render -vv` output plus sqlfluffUnsafeFixRules. The config dump precedes
+// render` output plus sqlfluffUnsafeFixRules. The config dump precedes
 // the rendered SQL, so only the first exclude_rules key is read; a
 // multi-line value prints its continuation lines unindented.
 func sqlfluffExcludeRules(renderOutput string) string {
