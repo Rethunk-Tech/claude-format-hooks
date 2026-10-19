@@ -7,6 +7,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.5.3] - 2026-10-18
+
+### Fixed
+
+- sqlfluff exclusions in `.sqlfluff` are honoured again: the config dump that carries `exclude_rules` is read at `-vv`.
+- `--check` skips a symlink whose target lies outside the tree it walks.
+- Hook diagnostics shown to the model leave out formatter dumps.
+- `--upgrade` requires a DSSE provenance payload, uses `gh` only for github.com, and fetches over https only.
+
 ## [0.5.2] - 2026-10-18
 
 ### Added
