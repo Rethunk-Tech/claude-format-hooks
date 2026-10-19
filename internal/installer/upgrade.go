@@ -135,11 +135,11 @@ func upgradeWithConfig(opts Options, dryRun bool, out io.Writer, cfg upgradeConf
 		return fmt.Errorf("latest release %q has an asset without a download URL", release.TagName)
 	}
 
-	binary, err := fetchHTTP(cfg.client, binaryAsset.BrowserDownloadURL)
+	binary, err := fetchHTTP(cfg.client, binaryAsset.BrowserDownloadURL, cfg.apiBaseURL)
 	if err != nil {
 		return fmt.Errorf("download %s: %w", assetName, err)
 	}
-	checksum, err := fetchHTTP(cfg.client, checksumAsset.BrowserDownloadURL)
+	checksum, err := fetchHTTP(cfg.client, checksumAsset.BrowserDownloadURL, cfg.apiBaseURL)
 	if err != nil {
 		return fmt.Errorf("download %s: %w", checksumName, err)
 	}
@@ -177,37 +177,42 @@ func upgradeWithConfig(opts Options, dryRun bool, out io.Writer, cfg upgradeConf
 // perform. gh, when installed and authenticated, verifies the DSSE
 // signature, the Fulcio chain and the Rekor inclusion proof with the signer
 // pinned to the release workflow; its verdict is therefore authoritative,
-// refusal included. Without gh this falls back to the inline binding below.
+// refusal included. Default GitHub upgrades require that verdict: the
+// inline binding only proves the attestation JSON names these bytes.
 //
-// Both run when gh is available: the inline check costs one already fetched
-// response and catches a malformed or missing attestation with a message
-// about this tool rather than about gh.
+// Both run when the API is GitHub: the inline check costs one already
+// fetched response and catches a malformed or missing attestation with a
+// message about this tool rather than about gh.
 func verifyProvenance(client *http.Client, baseURL string, binary []byte, out io.Writer) error {
 	if err := verifyReleaseProvenance(client, baseURL, binary); err != nil {
 		return err
 	}
+	return verifyGitHubReleaseWithGH(baseURL, binary, out)
+}
 
+// verifyGitHubReleaseWithGH is the gh half of verifyProvenance, split so
+// the "GitHub requires gh" decision can be tested without fetching
+// api.github.com.
+func verifyGitHubReleaseWithGH(baseURL string, binary []byte, out io.Writer) error {
 	// gh always talks to github.com. When the operator has pointed this at
 	// a mirror or a test server via CLAUDE_FORMAT_HOOKS_RELEASE_API, gh
 	// would be verifying a different origin's bytes than the ones just
-	// downloaded, and its refusal would say nothing about them.
+	// downloaded, and its refusal would say nothing about them. The inline
+	// DSSE payload binding is then the whole check.
 	if strings.TrimRight(baseURL, "/") != releaseAPIBaseURL {
 		return nil
 	}
 
 	path, cleanup, err := writeTempBinary(binary)
 	if err != nil {
-		// Staging is our own failure, not the release's. The inline binding
-		// already passed, so degrade to it rather than block the upgrade.
-		return nil
+		return fmt.Errorf("stage binary for gh attestation verify: %w", err)
 	}
 	defer cleanup()
 
 	available, ghErr := verifyWithGH(path, out)
 	if !available {
-		_, _ = fmt.Fprintf(out, "==> note: gh unavailable or unauthenticated; "+
-			"provenance checked against the attestation API only\n")
-		return nil
+		return fmt.Errorf("gh attestation verify is required for %s upgrades; install gh and run gh auth login",
+			releaseAPIBaseURL)
 	}
 	return ghErr
 }
@@ -245,7 +250,7 @@ func verifyReleaseProvenance(client *http.Client, baseURL string, binary []byte)
 	digest := sha256.Sum256(binary)
 	url := strings.TrimRight(baseURL, "/") + "/repos/" + releaseRepository +
 		"/attestations/sha256:" + hex.EncodeToString(digest[:]) + "?predicate_type=provenance"
-	body, err := fetchHTTP(client, url)
+	body, err := fetchHTTP(client, url, baseURL)
 	if err != nil {
 		return fmt.Errorf("fetch attestations: %w", err)
 	}
@@ -288,11 +293,7 @@ func verifyProvenanceBody(body, binary []byte) error {
 		return fmt.Errorf("no attestation binds these bytes to %s in %s",
 			releaseWorkflowPath, releaseRepository)
 	}
-	// The endpoint has returned bundle-less attestations before. Falling back
-	// to existence alone is exactly the posture this path had before the
-	// binding existed, and no weaker than the TLS anchor it already rests on
-	// -- whereas refusing would break every upgrade on an API shape change.
-	return nil
+	return fmt.Errorf("%s attestations have no DSSE payload", releaseRepository)
 }
 
 // decodeProvenance unwraps the base64 in-toto statement from a DSSE
@@ -334,7 +335,7 @@ func (s provenanceStatement) attests(wantDigest string) bool {
 func fetchLatestRelease(client *http.Client, baseURL string) (githubRelease, error) {
 	var release githubRelease
 	url := strings.TrimRight(baseURL, "/") + "/repos/" + releaseRepository + "/releases/latest"
-	body, err := fetchHTTP(client, url)
+	body, err := fetchHTTP(client, url, baseURL)
 	if err != nil {
 		return release, fmt.Errorf("fetch latest release: %w", err)
 	}
@@ -345,17 +346,58 @@ func fetchLatestRelease(client *http.Client, baseURL string) (githubRelease, err
 }
 
 func allowedFetchScheme(scheme string) error {
-	if scheme != "http" && scheme != "https" {
+	if scheme != "https" {
 		return fmt.Errorf("refusing URL scheme %q", scheme)
 	}
 	return nil
 }
 
-func fetchClient(client *http.Client) *http.Client {
+// githubFetchHosts are the hosts GitHub uses for the default release API
+// and the asset CDN it redirects to. A custom CLAUDE_FORMAT_HOOKS_RELEASE_API
+// does not inherit them: its downloads must stay on that API's own host.
+var githubFetchHosts = map[string]bool{
+	"api.github.com":                       true,
+	"github.com":                           true,
+	"objects.githubusercontent.com":        true,
+	"release-assets.githubusercontent.com": true,
+}
+
+func allowedFetchHost(host, apiBaseURL string) error {
+	host = strings.ToLower(host)
+	if host == "" {
+		return fmt.Errorf("refusing fetch host %q", host)
+	}
+	apiHost := ""
+	if parsed, err := url.Parse(apiBaseURL); err == nil {
+		apiHost = strings.ToLower(parsed.Hostname())
+	}
+	if apiHost != "" && host == apiHost {
+		return nil
+	}
+	if strings.TrimRight(apiBaseURL, "/") == releaseAPIBaseURL || apiHost == "api.github.com" {
+		if githubFetchHosts[host] {
+			return nil
+		}
+	}
+	return fmt.Errorf("refusing fetch host %q", host)
+}
+
+func allowedFetchURL(rawURL, apiBaseURL string) error {
+	parsed, err := url.Parse(rawURL)
+	if err != nil {
+		return err
+	}
+	if err := allowedFetchScheme(parsed.Scheme); err != nil {
+		return err
+	}
+	return allowedFetchHost(parsed.Hostname(), apiBaseURL)
+}
+
+func fetchClient(client *http.Client, apiBaseURL string) *http.Client {
 	c := *client
 	prev := c.CheckRedirect
 	c.CheckRedirect = func(req *http.Request, via []*http.Request) error {
-		if err := allowedFetchScheme(req.URL.Scheme); err != nil {
+		if err := allowedFetchURL(req.URL.String(), apiBaseURL); err != nil {
 			return err
 		}
 		if prev != nil {
@@ -369,12 +411,8 @@ func fetchClient(client *http.Client) *http.Client {
 	return &c
 }
 
-func fetchHTTP(client *http.Client, rawURL string) ([]byte, error) {
-	parsed, err := url.Parse(rawURL)
-	if err != nil {
-		return nil, err
-	}
-	if err := allowedFetchScheme(parsed.Scheme); err != nil {
+func fetchHTTP(client *http.Client, rawURL, apiBaseURL string) ([]byte, error) {
+	if err := allowedFetchURL(rawURL, apiBaseURL); err != nil {
 		return nil, err
 	}
 	req, err := http.NewRequestWithContext(context.Background(), http.MethodGet, rawURL, nil)
@@ -384,7 +422,7 @@ func fetchHTTP(client *http.Client, rawURL string) ([]byte, error) {
 	req.Header.Set("Accept", "application/vnd.github+json")
 	req.Header.Set("User-Agent", "format-dispatch")
 
-	resp, err := fetchClient(client).Do(req)
+	resp, err := fetchClient(client, apiBaseURL).Do(req)
 	if err != nil {
 		return nil, err
 	}

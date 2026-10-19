@@ -3,6 +3,7 @@ package main
 import (
 	"bytes"
 	"crypto/sha256"
+	"encoding/base64"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -369,8 +370,33 @@ func TestDispatchArgsUpgradeHappyPathViaReleaseAPI(t *testing.T) {
 
 	attestationPath := fmt.Sprintf("/repos/Rethunk-Tech/claude-format-hooks/attestations/sha256:%x", digest)
 
+	stmt, err := json.Marshal(map[string]any{
+		"subject": []any{map[string]any{"digest": map[string]string{"sha256": fmt.Sprintf("%x", digest)}}},
+		"predicate": map[string]any{
+			"buildDefinition": map[string]any{
+				"externalParameters": map[string]any{
+					"workflow": map[string]string{
+						"repository": "https://github.com/Rethunk-Tech/claude-format-hooks",
+						"path":       ".github/workflows/release.yml",
+					},
+				},
+			},
+		},
+	})
+	qt.Assert(t, qt.IsNil(err))
+	attestation, err := json.Marshal(map[string]any{
+		"attestations": []any{map[string]any{
+			"bundle": map[string]any{
+				"dsseEnvelope": map[string]string{
+					"payload": base64.StdEncoding.EncodeToString(stmt),
+				},
+			},
+		}},
+	})
+	qt.Assert(t, qt.IsNil(err))
+
 	var server *httptest.Server
-	server = httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	server = httptest.NewTLSServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		switch r.URL.Path {
 		case "/repos/Rethunk-Tech/claude-format-hooks/releases/latest":
 			_, _ = fmt.Fprintf(w, `{"tag_name":"v9.9.9","assets":[{"name":%q,"browser_download_url":%q},{"name":%q,"browser_download_url":%q}]}`,
@@ -380,15 +406,15 @@ func TestDispatchArgsUpgradeHappyPathViaReleaseAPI(t *testing.T) {
 		case "/checksum":
 			_, _ = w.Write(checksumFile)
 		case attestationPath:
-			// Null bundle with an offloaded bundle_url, matching both the live
-			// API and the installer package's own upgrade fixtures.
-			_, _ = fmt.Fprint(w,
-				`{"attestations":[{"repository_id":1,"bundle_url":"https://example.invalid/b.json.sn","bundle":null}]}`)
+			_, _ = w.Write(attestation)
 		default:
 			http.NotFound(w, r)
 		}
 	}))
 	defer server.Close()
+	prev := http.DefaultTransport
+	http.DefaultTransport = server.Client().Transport
+	t.Cleanup(func() { http.DefaultTransport = prev })
 
 	upgradeEnv(t, server.URL, dir, binDir)
 
@@ -1008,9 +1034,9 @@ func TestRunSurfacesDiagnosticsToTheModel(t *testing.T) {
 	var got hookOutput
 	qt.Assert(t, qt.IsNil(json.Unmarshal([]byte(lines[0]), &got)))
 	qt.Check(t, qt.Equals(got.HookSpecificOutput.HookEventName, "PostToolUse"))
-	qt.Check(t, qt.StringContains(got.HookSpecificOutput.AdditionalContext, "unexpected symbol"))
-	qt.Check(t, qt.StringContains(got.HookSpecificOutput.AdditionalContext, abs),
-		qt.Commentf("the model needs to know which file is broken"))
+	qt.Check(t, qt.Equals(got.HookSpecificOutput.AdditionalContext, modelFacingFailure("stylua", abs)))
+	qt.Check(t, qt.IsFalse(strings.Contains(got.HookSpecificOutput.AdditionalContext, "unexpected symbol")),
+		qt.Commentf("formatter dumps stay off the model transcript"))
 	// The operator still reads the same failure on stderr.
 	qt.Check(t, qt.StringContains(stderr, "unexpected symbol"))
 }

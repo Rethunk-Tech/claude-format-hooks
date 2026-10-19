@@ -142,7 +142,7 @@ func TestUpgradeUnattestedBinaryLeavesBinaryUntouched(t *testing.T) {
 // A repository that has never attested anything answers 404 rather than an
 // empty list, so both shapes have to refuse.
 func TestVerifyReleaseProvenanceRefusesUnattestedRepository(t *testing.T) {
-	server := httptest.NewServer(http.NotFoundHandler())
+	server := httptest.NewTLSServer(http.NotFoundHandler())
 	defer server.Close()
 
 	err := verifyReleaseProvenance(server.Client(), server.URL, []byte("release binary\n"))
@@ -179,6 +179,9 @@ func TestUpgradeUsesReleaseAPIEnvironmentOverride(t *testing.T) {
 	server, _ := upgradeTestServer(t, binary, binary)
 	defer server.Close()
 	t.Setenv("CLAUDE_FORMAT_HOOKS_RELEASE_API", server.URL)
+	prev := http.DefaultTransport
+	http.DefaultTransport = server.Client().Transport
+	t.Cleanup(func() { http.DefaultTransport = prev })
 
 	target := HookBinaryPath(t.TempDir())
 	if err := Upgrade(Options{BinPath: target}, false, nil); err != nil {
@@ -189,20 +192,34 @@ func TestUpgradeUsesReleaseAPIEnvironmentOverride(t *testing.T) {
 }
 
 func TestFetchHTTPRejectsNonHTTPURL(t *testing.T) {
-	_, err := fetchHTTP(http.DefaultClient, "file:///etc/passwd")
+	_, err := fetchHTTP(http.DefaultClient, "file:///etc/passwd", releaseAPIBaseURL)
 	if err == nil || !strings.Contains(err.Error(), "refusing") {
 		t.Fatalf("fetchHTTP error = %v, want refusing non-HTTP scheme", err)
 	}
 }
 
+func TestFetchHTTPRejectsHTTPURL(t *testing.T) {
+	_, err := fetchHTTP(http.DefaultClient, "http://api.github.com/repos/x", releaseAPIBaseURL)
+	if err == nil || !strings.Contains(err.Error(), "refusing URL scheme") {
+		t.Fatalf("fetchHTTP error = %v, want refusing http", err)
+	}
+}
+
+func TestFetchHTTPRejectsForeignHost(t *testing.T) {
+	_, err := fetchHTTP(http.DefaultClient, "https://evil.example/asset", releaseAPIBaseURL)
+	if err == nil || !strings.Contains(err.Error(), "refusing fetch host") {
+		t.Fatalf("fetchHTTP error = %v, want refusing foreign host", err)
+	}
+}
+
 func TestFetchHTTPRejectsNonHTTPRedirect(t *testing.T) {
-	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+	server := httptest.NewTLSServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 		w.Header().Set("Location", "file:///etc/passwd")
 		w.WriteHeader(http.StatusFound)
 	}))
 	defer server.Close()
 
-	_, err := fetchHTTP(server.Client(), server.URL)
+	_, err := fetchHTTP(server.Client(), server.URL, server.URL)
 	if err == nil || !strings.Contains(err.Error(), "refusing") {
 		t.Fatalf("fetchHTTP error = %v, want refusing file redirect", err)
 	}
@@ -227,34 +244,34 @@ func (errBodyTransport) RoundTrip(req *http.Request) (*http.Response, error) {
 
 func TestFetchHTTPReportsErrorBodyReadFailure(t *testing.T) {
 	client := &http.Client{Transport: errBodyTransport{}}
-	_, err := fetchHTTP(client, "http://upgrade.test/")
+	_, err := fetchHTTP(client, "https://api.github.com/", releaseAPIBaseURL)
 	if err == nil || !strings.Contains(err.Error(), "read body failed") {
 		t.Fatalf("fetchHTTP error = %v, want body read failure", err)
 	}
 }
 
 func TestFetchHTTPRejectsOversizedContentLength(t *testing.T) {
-	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+	server := httptest.NewTLSServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 		w.Header().Set("Content-Length", fmt.Sprintf("%d", maxUpgradeDownloadBytes+1))
 		_, _ = w.Write([]byte("body is not read"))
 	}))
 	defer server.Close()
 
-	_, err := fetchHTTP(server.Client(), server.URL)
+	_, err := fetchHTTP(server.Client(), server.URL, server.URL)
 	if err == nil || !strings.Contains(err.Error(), "exceeds maximum download size") {
 		t.Fatalf("fetchHTTP error = %v, want download size error", err)
 	}
 }
 
 func TestFetchHTTPReportsOversizedNon2xx(t *testing.T) {
-	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+	server := httptest.NewTLSServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 		w.Header().Set("Content-Length", fmt.Sprintf("%d", maxUpgradeDownloadBytes+1))
 		w.WriteHeader(http.StatusForbidden)
 		_, _ = w.Write([]byte("forbidden"))
 	}))
 	defer server.Close()
 
-	_, err := fetchHTTP(server.Client(), server.URL)
+	_, err := fetchHTTP(server.Client(), server.URL, server.URL)
 	if err == nil || !strings.Contains(err.Error(), "HTTP") {
 		t.Fatalf("fetchHTTP error = %v, want HTTP error", err)
 	}
@@ -267,13 +284,13 @@ func TestFetchHTTPCapsOversizedNon2xxBody(t *testing.T) {
 	const sentinel = "oversized-error-body-sentinel"
 	status := http.StatusBadGateway
 	body := append(bytes.Repeat([]byte("e"), maxUpgradeErrorBodyBytes), []byte(sentinel)...)
-	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+	server := httptest.NewTLSServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 		w.WriteHeader(status)
 		_, _ = w.Write(body)
 	}))
 	defer server.Close()
 
-	_, err := fetchHTTP(server.Client(), server.URL)
+	_, err := fetchHTTP(server.Client(), server.URL, server.URL)
 	if err == nil {
 		t.Fatal("fetchHTTP error = nil, want HTTP error")
 	}
@@ -307,13 +324,13 @@ func TestFetchHTTPReportsNon2xx(t *testing.T) {
 		{name: "not found", status: http.StatusNotFound, body: "missing release"},
 	} {
 		t.Run(tt.name, func(t *testing.T) {
-			server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+			server := httptest.NewTLSServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 				w.WriteHeader(tt.status)
 				_, _ = w.Write([]byte(tt.body))
 			}))
 			defer server.Close()
 
-			_, err := fetchHTTP(server.Client(), server.URL)
+			_, err := fetchHTTP(server.Client(), server.URL, server.URL)
 			if err == nil {
 				t.Fatal("fetchHTTP error = nil, want HTTP error")
 			}
@@ -442,7 +459,7 @@ func upgradeTestServerForTarget(t *testing.T, binary, checksumBinary []byte, goo
 	}
 
 	var server *httptest.Server
-	server = httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	server = httptest.NewTLSServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		switch r.URL.Path {
 		case "/repos/" + releaseRepository + "/releases/latest":
 			counts.release.Add(1)
@@ -460,11 +477,8 @@ func upgradeTestServerForTarget(t *testing.T, binary, checksumBinary []byte, goo
 				_, _ = fmt.Fprint(w, `{"attestations":[]}`)
 				return
 			}
-			// The live API answers with a null bundle and an offloaded
-			// bundle_url; the fixture keeps that shape so the verifier can
-			// never quietly grow a dependency on an inline bundle.
-			_, _ = fmt.Fprint(w,
-				`{"attestations":[{"repository_id":1,"bundle_url":"https://example.invalid/b.json.sn","bundle":null}]}`)
+			_, _ = w.Write(attestationBody(t, hex.EncodeToString(binaryDigest[:]),
+				"https://github.com/"+releaseRepository, releaseWorkflowPath))
 		default:
 			http.NotFound(w, r)
 		}

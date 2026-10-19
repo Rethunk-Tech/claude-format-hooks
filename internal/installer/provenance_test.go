@@ -95,6 +95,11 @@ func TestVerifyProvenanceBody(t *testing.T) {
 			wantErr: true,
 		},
 		{
+			name:    "bundle-less attestations",
+			body:    []byte(`{"attestations":[{"bundle":{}}]}`),
+			wantErr: true,
+		},
+		{
 			name:    "malformed response",
 			body:    []byte(`not json`),
 			wantErr: true,
@@ -112,13 +117,16 @@ func TestVerifyProvenanceBody(t *testing.T) {
 	}
 }
 
-// The endpoint has returned bundle-less attestations before. Falling back to
-// existence alone is the posture this path had before the binding existed
-// and is no weaker than the TLS anchor it already rests on, whereas
-// refusing would break every upgrade on an API shape change.
-func TestVerifyProvenanceAcceptsBundleLessAttestations(t *testing.T) {
-	err := verifyProvenanceBody([]byte(`{"attestations":[{"bundle":{}}]}`), []byte("bytes"))
-	qt.Check(t, qt.IsNil(err))
+func TestVerifyGitHubReleaseWithGHRequiresAuthenticatedGH(t *testing.T) {
+	t.Setenv("PATH", t.TempDir())
+	err := verifyGitHubReleaseWithGH(releaseAPIBaseURL, []byte("bytes"), io.Discard)
+	qt.Check(t, qt.IsNotNil(err))
+	qt.Check(t, qt.StringContains(err.Error(), "gh attestation verify is required"))
+}
+
+func TestVerifyGitHubReleaseWithGHSkipsNonGitHubAPI(t *testing.T) {
+	t.Setenv("PATH", t.TempDir())
+	qt.Check(t, qt.IsNil(verifyGitHubReleaseWithGH("https://example.test", []byte("bytes"), io.Discard)))
 }
 
 // A subject digest is compared case-insensitively: hex spelling is not part
@@ -214,7 +222,7 @@ func TestVerifyProvenanceSkipsGHForOverriddenAPI(t *testing.T) {
 	body := attestationBody(t, hex.EncodeToString(sum[:]),
 		"https://github.com/"+releaseRepository, releaseWorkflowPath)
 
-	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+	server := httptest.NewTLSServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 		_, _ = w.Write(body)
 	}))
 	defer server.Close()
