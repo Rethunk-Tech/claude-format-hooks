@@ -5,6 +5,7 @@ import (
 	"path/filepath"
 	"runtime"
 	"slices"
+	"strings"
 	"testing"
 
 	"github.com/go-quicktest/qt"
@@ -466,6 +467,17 @@ func TestAllKnownExtensionsIsConfigIndependent(t *testing.T) {
 	qt.Check(t, qt.IsTrue(slices.Contains(all, ".rs")))
 	qt.Check(t, qt.IsTrue(slices.IsSorted(all)))
 	qt.Check(t, qt.Not(qt.HasLen(all, 0)))
+}
+
+// Suffix matching takes the first hit, so longer suffixes must come first.
+func TestRegisteredSuffixesLongestFirst(t *testing.T) {
+	qt.Check(t, qt.IsTrue(slices.IsSortedFunc(registeredSuffixes, func(a, b string) int {
+		if len(a) != len(b) {
+			return len(b) - len(a)
+		}
+		return strings.Compare(a, b)
+	})))
+	qt.Check(t, qt.Equals(len(registeredSuffixes), len(knownExtensions)))
 }
 
 // The built-in skip list has needed three separate fixes for generated
