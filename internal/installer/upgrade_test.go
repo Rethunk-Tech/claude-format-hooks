@@ -225,6 +225,34 @@ func TestFetchHTTPRejectsNonHTTPRedirect(t *testing.T) {
 	}
 }
 
+// GitHub's asset CDN hosts are trusted only for the default API; a custom
+// release API keeps every download on its own host.
+func TestAllowedFetchHost(t *testing.T) {
+	for _, tc := range []struct {
+		host, api string
+		ok        bool
+	}{
+		{"objects.githubusercontent.com", releaseAPIBaseURL, true},
+		{"objects.githubusercontent.com", "https://releases.example", false},
+		{"releases.example", "https://releases.example", true},
+		{"", releaseAPIBaseURL, false},
+	} {
+		err := allowedFetchHost(tc.host, tc.api)
+		qt.Check(t, qt.Equals(err == nil, tc.ok), qt.Commentf("%s via %s: %v", tc.host, tc.api, err))
+	}
+}
+
+func TestFetchHTTPStopsARedirectLoop(t *testing.T) {
+	var server *httptest.Server
+	server = httptest.NewTLSServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		http.Redirect(w, r, server.URL, http.StatusFound)
+	}))
+	defer server.Close()
+
+	_, err := fetchHTTP(server.Client(), server.URL, server.URL)
+	qt.Assert(t, qt.ErrorMatches(err, `.*stopped after 10 redirects`))
+}
+
 type errBody struct{}
 
 func (errBody) Read([]byte) (int, error) { return 0, errors.New("read body failed") }

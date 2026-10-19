@@ -160,6 +160,7 @@ func TestUninstallRestoresClaudeWhenCursorWriteFails(t *testing.T) {
 	var out strings.Builder
 	err := Uninstall(opts, false, &out)
 	qt.Assert(t, qt.IsNotNil(err))
+	qt.Check(t, qt.Not(qt.ErrorMatches(err, `.*restore failed.*`)))
 	qt.Check(t, qt.Equals(settingsHasHooks(t, readFile(t, settingsPath)), true),
 		qt.Commentf("Claude must stay wired when the Cursor uninstall write fails"))
 }
@@ -207,6 +208,7 @@ func TestInstallRollsBackClaudeWhenCursorWriteFails(t *testing.T) {
 		CursorHooksPath: cursorPath,
 	}, false, &out)
 	qt.Assert(t, qt.IsNotNil(err))
+	qt.Check(t, qt.Not(qt.ErrorMatches(err, `.*rollback failed.*`)))
 	qt.Check(t, qt.Equals(settingsHasHooks(t, readFile(t, settingsPath)), false))
 }
 
