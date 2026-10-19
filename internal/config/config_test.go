@@ -64,6 +64,18 @@ func TestLoad(t *testing.T) {
 		qt.Check(t, qt.DeepEquals(cfg, Default()))
 	})
 
+	t.Run("file of exactly maxConfigBytes is accepted", func(t *testing.T) {
+		path := filepath.Join(t.TempDir(), "cfg.json")
+		head, tail := `{"json":{"indentSize":4},"pad":"`, `"}`
+		body := head + string(bytes.Repeat([]byte("x"), maxConfigBytes-len(head)-len(tail))) + tail
+		qt.Assert(t, qt.Equals(len(body), maxConfigBytes))
+		qt.Assert(t, qt.IsNil(os.WriteFile(path, []byte(body), 0o600)))
+
+		cfg, err := Load(path)
+		qt.Assert(t, qt.IsNil(err))
+		qt.Check(t, qt.Equals(cfg.JSON.IndentSize, 4))
+	})
+
 	t.Run("malformed file returns defaults and an error", func(t *testing.T) {
 		path := filepath.Join(t.TempDir(), "cfg.json")
 		qt.Assert(t, qt.IsNil(os.WriteFile(path, []byte(`{not valid json`), 0o600)))
@@ -127,6 +139,15 @@ func TestResolveIndentEditorConfigLayering(t *testing.T) {
 
 		spec := ResolveJSONIndent(Default(), filepath.Join(dir, "t.json"))
 		qt.Check(t, qt.Equals(spec, IndentSpec{Size: 4, UseTabs: false}))
+	})
+
+	t.Run("indent_style without indent_size keeps the fallback size", func(t *testing.T) {
+		isolateDiskCache(t)
+		dir := t.TempDir()
+		writeEditorConfig(t, dir, "root = true\n\n[*.json]\nindent_style = tab\n")
+
+		spec := ResolveJSONIndent(Default(), filepath.Join(dir, "t.json"))
+		qt.Check(t, qt.Equals(spec, IndentSpec{Size: 2, UseTabs: true}))
 	})
 
 	t.Run("missing editorconfig falls back to cfg default", func(t *testing.T) {
