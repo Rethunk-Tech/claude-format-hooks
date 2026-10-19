@@ -22,44 +22,7 @@ everything else shells out. No per-repo setup.
 brew install rethunk-tech/tap/format-dispatch
 ```
 
-Windows:
-
-```powershell
-scoop bucket add rethunk https://github.com/Rethunk-Tech/scoop-bucket
-scoop install format-dispatch
-```
-
-From source:
-
-```bash
-git clone git@github.com:Rethunk-Tech/claude-format-hooks.git
-cd claude-format-hooks
-./install.sh
-```
-
-Config and uninstall: [HUMANS.md](HUMANS.md).
-
-Each `v*` release attaches `format-dispatch-completions-man.tar.gz` (listed in
-`SHA256SUMS`). After extracting it:
-
-```bash
-install -Dm644 format-dispatch.bash ~/.local/share/bash-completion/completions/format-dispatch
-```
-
-```zsh
-install -Dm644 _format-dispatch ~/.local/share/zsh/site-functions/_format-dispatch
-```
-
-```fish
-install -Dm644 format-dispatch.fish ~/.config/fish/completions/format-dispatch.fish
-```
-
-```powershell
-$dest = Join-Path (Split-Path $PROFILE) 'Completions'
-New-Item -ItemType Directory -Force $dest | Out-Null
-Copy-Item format-dispatch.ps1 (Join-Path $dest 'format-dispatch.ps1')
-Add-Content $PROFILE ". '$(Join-Path $dest 'format-dispatch.ps1')'"
-```
+Scoop, building from source, completions, config and uninstall: [HUMANS.md](HUMANS.md#install).
 
 ## Highlights
 

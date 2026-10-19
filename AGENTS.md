@@ -35,7 +35,8 @@ Traps in `dispatch.NewRegistry`: `.json` uses biome only with a project
 biome config and a usable launcher (else native Indent); `.json.example`
 always native; `go.mod`/`go.work` only under those names; `gofumpt` else
 native `gofmt`, with `goimports` first when PATH has it and a parent
-`.golangci.yml` lists it; prettier only with a project prettier config;
+`.golangci.yml` lists it; prettier only with a project prettier config
+(`.prettierrc*`, `prettier.config.*` or package.json `prettier`);
 bare `.example` unregistered; JSONC stdin named `.jsonc`, Python stdin
 `.py`; sqlfluff `--stdin-filename`; taplo `--stdin-filepath`. External
 via `bunx` or `PATH`. Shell-out formatters implement `formatters.Prober`
@@ -55,8 +56,6 @@ PATH-binary-plus-in-place-flag: [`internal/formatters/system.go`](internal/forma
 - Skip `node_modules/`, `.git/`, `vendor/`, `.venv/`, peers; files
   outside `$CLAUDE_PROJECT_DIR`; generated names (`*.min.js`,
   `*.min.ts`, `*-lock.json`, peers). `skipDirs`/`skipFiles` extend both.
-- Prettier is the only formatter that requires project config
-  (`.prettierrc*`, `prettier.config.*`, or package.json `prettier`).
 
 ## Conventions
 
@@ -66,8 +65,5 @@ refactors. PRs: [CONTRIBUTING.md](CONTRIBUTING.md).
 
 ## Gate budget
 
-Measured 2026-10-09, load 5-30, 32 cores. Warm: 7.8 s wall / 16 s CPU
-(coverage uncached, load 21). Cold (fresh copy, throwaway Go build,
-module and lint caches, go1.27.2 toolchain download): 25 s wall /
-193 s CPU at load 26-33. Warm < 10 s; cold < 30 s wall. `.gate.toml`
-restates CI's race+coverage, `go mod verify`, and `--check` dogfood.
+Warm under 10 s, cold under 30 s wall. `.gate.toml` restates CI's
+race+coverage, `go mod verify`, and the `--check` dogfood.
