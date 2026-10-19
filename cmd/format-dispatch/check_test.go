@@ -679,6 +679,25 @@ func TestCollectCheckTargetsSkipsScratchFilesDuringWalk(t *testing.T) {
 	qt.Check(t, qt.DeepEquals(targets, []string{keep}))
 }
 
+func TestCollectCheckTargetsSkipsSymlinkToOutsideTree(t *testing.T) {
+	dir := t.TempDir()
+	outside := writeCheckFile(t, t.TempDir(), "secret.json", unformattedJSON)
+	link := filepath.Join(dir, "x.json")
+	if err := os.Symlink(outside, link); err != nil {
+		t.Skip(err)
+	}
+	t.Setenv("CLAUDE_PROJECT_DIR", "")
+	t.Chdir(dir)
+
+	targets, err := collectCheckTargets([]string{"."}, skipConfig{})
+	qt.Assert(t, qt.IsNil(err))
+	for _, got := range targets {
+		qt.Check(t, qt.Not(qt.Equals(got, link)))
+		resolved, _ := filepath.EvalSymlinks(got)
+		qt.Check(t, qt.Not(qt.Equals(resolved, outside)))
+	}
+}
+
 func TestCheckRejectsNoPaths(t *testing.T) {
 	var out, errOut bytes.Buffer
 	// 2, not 1: "you invoked me wrong" must be distinguishable from

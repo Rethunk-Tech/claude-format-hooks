@@ -536,7 +536,18 @@ func collectCheckTargets(paths []string, skip skipConfig) ([]string, error) {
 		if err != nil {
 			return
 		}
-		if projectRoot != "" && !within(abs, projectRoot) {
+		bound := projectRoot
+		if bound == "" {
+			if root != "" {
+				if absRoot, rootErr := filepath.Abs(root); rootErr == nil {
+					bound = absRoot
+				}
+			}
+			if bound == "" {
+				bound = workingRoot
+			}
+		}
+		if bound != "" && !within(abs, bound) {
 			return
 		}
 		if inSkipped(abs, projectRoot, workingRoot, root, skip) {
