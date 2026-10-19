@@ -68,7 +68,7 @@ func Get(dir, key string, maxAge time.Duration) (value string, ok bool) {
 	pruneOnce(dir, cacheNamespacePrefix(key), maxAge)
 
 	path := filepath.Join(dir, key)
-	raw, err := os.ReadFile(path) //nolint:gosec // dir/key are our own fixed cache location, never user input
+	raw, err := os.ReadFile(filepath.Clean(path))
 	if err != nil {
 		return "", false
 	}
@@ -150,7 +150,7 @@ func prune(dir, namespacePrefix string, maxAge time.Duration) {
 }
 
 func cacheEntryExpired(path string, maxAge time.Duration) bool {
-	raw, err := os.ReadFile(path) //nolint:gosec // path is our own fixed cache location, never user input
+	raw, err := os.ReadFile(filepath.Clean(path))
 	if err != nil {
 		return false
 	}

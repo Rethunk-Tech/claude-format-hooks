@@ -79,7 +79,7 @@ func sqlExampleCopy(abs string) bool {
 }
 
 func sqlfluffFixExample(ctx context.Context, projectRoot, abs, exclude string) Result {
-	src, err := os.ReadFile(abs) //nolint:gosec // abs is the file this formatter was invoked to format, by design
+	src, err := os.ReadFile(filepath.Clean(abs))
 	if err != nil {
 		return Result{Err: fmt.Errorf("read: %w", err)}
 	}

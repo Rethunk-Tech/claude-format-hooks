@@ -133,7 +133,7 @@ func hasPrettierConfig(projectRoot, abs string) bool {
 }
 
 func packageJSONHasPrettier(path string) bool {
-	raw, err := os.ReadFile(path) //nolint:gosec // path is built from the edited file's ancestors
+	raw, err := os.ReadFile(filepath.Clean(path))
 	if err != nil {
 		return false
 	}

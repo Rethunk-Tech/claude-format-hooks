@@ -222,7 +222,7 @@ func TestDispatchRoutesToFormatter(t *testing.T) {
 	result := r.Dispatch(t.Context(), dir, path, ".json")
 	qt.Assert(t, qt.IsNil(result.Err))
 
-	out, err := os.ReadFile(path) //nolint:gosec // test path is created under t.TempDir
+	out, err := os.ReadFile(filepath.Clean(path))
 	qt.Assert(t, qt.IsNil(err))
 	qt.Assert(t, qt.Equals(string(out), "{\n  \"b\": 1,\n  \"a\": 2\n}\n"))
 }
@@ -238,7 +238,7 @@ func TestDispatchFormatsExampleSuffixes(t *testing.T) {
 	result := r.Dispatch(t.Context(), dir, path, ext)
 	qt.Assert(t, qt.IsNil(result.Err))
 
-	out, err := os.ReadFile(path) //nolint:gosec // test path is created under t.TempDir
+	out, err := os.ReadFile(filepath.Clean(path))
 	qt.Assert(t, qt.IsNil(err))
 	qt.Assert(t, qt.Equals(string(out), "{\n  \"b\": 1,\n  \"a\": 2\n}\n"))
 
@@ -269,7 +269,7 @@ func TestDispatchFormatsExampleSuffixes(t *testing.T) {
 	qt.Check(t, qt.IsFalse(r.Supported(notesExt)))
 	notesResult := r.Dispatch(t.Context(), dir, notes, notesExt)
 	qt.Check(t, qt.IsTrue(notesResult.Skipped))
-	notesOut, err := os.ReadFile(notes) //nolint:gosec // test path is created under t.TempDir
+	notesOut, err := os.ReadFile(filepath.Clean(notes))
 	qt.Assert(t, qt.IsNil(err))
 	qt.Check(t, qt.Equals(string(notesOut), "keep\n"))
 
@@ -298,7 +298,7 @@ func TestDispatchFormatsExampleSuffixes(t *testing.T) {
 	tomlResult := r.Dispatch(t.Context(), dir, tomlPath, tomlExt)
 	qt.Assert(t, qt.IsNil(tomlResult.Err))
 	qt.Assert(t, qt.IsFalse(tomlResult.Skipped))
-	tomlOut, err := os.ReadFile(tomlPath) //nolint:gosec // test path is created under t.TempDir
+	tomlOut, err := os.ReadFile(filepath.Clean(tomlPath))
 	qt.Assert(t, qt.IsNil(err))
 	qt.Assert(t, qt.Equals(string(tomlOut), "a = 1\n"))
 
@@ -310,7 +310,7 @@ func TestDispatchFormatsExampleSuffixes(t *testing.T) {
 	jsoncResult := r.Dispatch(t.Context(), dir, jsoncPath, jsoncExt)
 	qt.Assert(t, qt.IsNil(jsoncResult.Err))
 	qt.Assert(t, qt.IsFalse(jsoncResult.Skipped))
-	jsoncOut, err := os.ReadFile(jsoncPath) //nolint:gosec // test path is created under t.TempDir
+	jsoncOut, err := os.ReadFile(filepath.Clean(jsoncPath))
 	qt.Assert(t, qt.IsNil(err))
 	qt.Assert(t, qt.Equals(string(jsoncOut), "{\n\t\"a\": 1 // c\n}\n"))
 
@@ -322,7 +322,7 @@ func TestDispatchFormatsExampleSuffixes(t *testing.T) {
 	sqlResult := r.Dispatch(t.Context(), dir, sqlPath, sqlExt)
 	qt.Assert(t, qt.IsNil(sqlResult.Err))
 	qt.Assert(t, qt.IsFalse(sqlResult.Skipped))
-	sqlOut, err := os.ReadFile(sqlPath) //nolint:gosec // test path is created under t.TempDir
+	sqlOut, err := os.ReadFile(filepath.Clean(sqlPath))
 	qt.Assert(t, qt.IsNil(err))
 	qt.Assert(t, qt.Equals(string(sqlOut), "SELECT 1\n"))
 
@@ -334,7 +334,7 @@ func TestDispatchFormatsExampleSuffixes(t *testing.T) {
 	mdResult := r.Dispatch(t.Context(), dir, mdPath, mdExt)
 	qt.Assert(t, qt.IsNil(mdResult.Err))
 	qt.Assert(t, qt.IsFalse(mdResult.Skipped))
-	mdOut, err := os.ReadFile(mdPath) //nolint:gosec // test path is created under t.TempDir
+	mdOut, err := os.ReadFile(filepath.Clean(mdPath))
 	qt.Assert(t, qt.IsNil(err))
 	qt.Assert(t, qt.Equals(string(mdOut), "# Title\n"))
 
@@ -346,7 +346,7 @@ func TestDispatchFormatsExampleSuffixes(t *testing.T) {
 	pyResult := r.Dispatch(t.Context(), dir, pyPath, pyExt)
 	qt.Assert(t, qt.IsNil(pyResult.Err))
 	qt.Assert(t, qt.IsFalse(pyResult.Skipped))
-	pyOut, err := os.ReadFile(pyPath) //nolint:gosec // test path is created under t.TempDir
+	pyOut, err := os.ReadFile(filepath.Clean(pyPath))
 	qt.Assert(t, qt.IsNil(err))
 	qt.Assert(t, qt.Equals(string(pyOut), "def f():\n    return 1\n"))
 }

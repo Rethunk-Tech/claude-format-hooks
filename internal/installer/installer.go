@@ -84,7 +84,7 @@ type jsonObject map[string]json.RawMessage
 // a raw blob. exists distinguishes an absent file from an empty one, which
 // is what tells WireCursor whether to add a version field.
 func readHooksDoc(path string) (before []byte, top jsonObject, exists bool, err error) {
-	before, err = os.ReadFile(path) //nolint:gosec // caller-controlled hooks location (env override or fixed default)
+	before, err = os.ReadFile(filepath.Clean(path))
 	if err != nil {
 		if !os.IsNotExist(err) {
 			return nil, nil, false, err

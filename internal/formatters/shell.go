@@ -5,6 +5,7 @@ import (
 	"context"
 	"fmt"
 	"os"
+	"path/filepath"
 
 	"mvdan.cc/sh/v3/syntax"
 
@@ -22,7 +23,7 @@ func NewShell(cfg config.Config) shellFormatter { return shellFormatter{cfg: cfg
 func (shellFormatter) Name() string { return "shfmt" }
 
 func (f shellFormatter) Format(_ context.Context, _, abs string) Result {
-	src, err := os.ReadFile(abs) //nolint:gosec // abs is the file this formatter was invoked to format, by design
+	src, err := os.ReadFile(filepath.Clean(abs))
 	if err != nil {
 		return Result{Err: fmt.Errorf("read: %w", err)}
 	}

@@ -203,7 +203,7 @@ func TestWriteTempBinaryRoundTrips(t *testing.T) {
 	want := []byte("released bytes")
 	path, cleanup, err := writeTempBinary(want)
 	qt.Assert(t, qt.IsNil(err))
-	got, err := os.ReadFile(path) //nolint:gosec // test path is created under t.TempDir
+	got, err := os.ReadFile(filepath.Clean(path))
 	qt.Assert(t, qt.IsNil(err))
 	qt.Check(t, qt.DeepEquals(got, want))
 

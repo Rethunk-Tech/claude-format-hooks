@@ -79,7 +79,7 @@ func truncate(out []byte, maxLines, maxChars int) string {
 // include) format stdin as the language anyway, so a copy they would
 // otherwise exclude still gets written.
 func runExternalStdin(ctx context.Context, dir, name string, args []string, abs string) Result {
-	src, err := os.ReadFile(abs) //nolint:gosec // abs is the file this formatter was invoked to format, by design
+	src, err := os.ReadFile(filepath.Clean(abs))
 	if err != nil {
 		return Result{Err: fmt.Errorf("read: %w", err)}
 	}

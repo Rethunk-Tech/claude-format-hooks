@@ -67,7 +67,7 @@ func fakeTool(t *testing.T, dir, name string) {
 	t.Helper()
 	self, err := os.Executable()
 	qt.Assert(t, qt.IsNil(err))
-	bin, err := os.ReadFile(self) //nolint:gosec // self is the current test executable
+	bin, err := os.ReadFile(filepath.Clean(self))
 	qt.Assert(t, qt.IsNil(err))
 	if runtime.GOOS == "windows" {
 		name += ".exe"

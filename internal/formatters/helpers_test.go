@@ -20,7 +20,7 @@ func sourceFile(t *testing.T, name, src string) (dir, path string) {
 
 func readSource(t *testing.T, path string) []byte {
 	t.Helper()
-	raw, err := os.ReadFile(path) //nolint:gosec // test path is created under t.TempDir
+	raw, err := os.ReadFile(filepath.Clean(path))
 	qt.Assert(t, qt.IsNil(err))
 	return raw
 }

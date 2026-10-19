@@ -357,7 +357,7 @@ func checkRootCandidates(paths []string) []string {
 // project .markdownlint-cli2.jsonc), so formatting a copy in a temp
 // directory elsewhere would silently apply the wrong rules.
 func wouldReformat(ctx context.Context, registry *dispatch.Registry, projectRoot, abs, ext string, write bool) (changed, skipped bool, err error) {
-	original, err := os.ReadFile(abs) //nolint:gosec // abs is a path the caller asked to check, by design
+	original, err := os.ReadFile(filepath.Clean(abs))
 	if err != nil {
 		return false, false, err
 	}
