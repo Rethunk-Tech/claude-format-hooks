@@ -10,6 +10,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Fixed
 
 - Markdown in a Biome project is formatted by Biome after markdownlint's fixes, so table padding matches the project's own check instead of markdownlint's compact style.
+- `install.sh --dry-run` previews with a throwaway build instead of replacing the installed binary.
 - Shell scripts take `switch_case_indent` from the project's `.editorconfig` as `shfmt` does (off when unset); `shell.switchCaseIndent` applies only where no `.editorconfig` covers the file.
 
 ## [0.5.3] - 2026-10-18

@@ -90,14 +90,22 @@ fi
 # --upgrade replaces the installed binary with a published release, so
 # building first would only discard the build. The build still runs when
 # there is nothing installed yet, since --upgrade is run by that binary.
+# A dry run writes nothing, so it previews with a throwaway build; the preview
+# still names BIN_PATH, which the installer reads from CLAUDE_HOOKS_BIN_DIR.
+RUN_PATH=$BIN_PATH
 if [ "$ACTION" = "--upgrade" ] && [ -x "$BIN_PATH" ]; then
   echo "==> Upgrading in place: $BIN_PATH"
 else
+  if [ "$ACTION" = "--dry-run" ] || [ -n "$DRY_RUN" ]; then
+    BUILD_DIR=$(mktemp -d "${TMPDIR:-/tmp}/format-dispatch.XXXXXX")
+    trap 'rm -rf "$BUILD_DIR"' EXIT
+    RUN_PATH="$BUILD_DIR/$BIN_NAME"
+  fi
   echo "==> Building format-dispatch..."
-  mkdir -p "$BIN_DIR"
-  (cd "$REPO_DIR" && go build -o "$BIN_PATH" ./cmd/format-dispatch)
-  chmod +x "$BIN_PATH"
-  echo "==> Built: $BIN_PATH"
+  mkdir -p "$(dirname "$RUN_PATH")"
+  (cd "$REPO_DIR" && go build -o "$RUN_PATH" ./cmd/format-dispatch)
+  chmod +x "$RUN_PATH"
+  echo "==> Built: $RUN_PATH"
 fi
 
 # Provisioning the bunx-dispatched formatters runs in `--install` below --
@@ -105,12 +113,12 @@ fi
 
 if [ "$ACTION" = "--upgrade" ]; then
   if [ "$DRY_RUN" = "--dry-run" ]; then
-    "$BIN_PATH" --upgrade --dry-run
+    "$RUN_PATH" --upgrade --dry-run
   else
     "$BIN_PATH" --upgrade
   fi
 elif [ "$ACTION" = "--dry-run" ]; then
-  "$BIN_PATH" --install --dry-run
+  "$RUN_PATH" --install --dry-run
 else
   "$BIN_PATH" --install
   echo "==> If Claude Code is already running, open /hooks once (or restart) to pick up the change."
