@@ -150,6 +150,17 @@ func TestResolveIndentEditorConfigLayering(t *testing.T) {
 		qt.Check(t, qt.Equals(spec, IndentSpec{Size: 2, UseTabs: true}))
 	})
 
+	t.Run("an editorconfig section decides shell case indent, off when unset as in shfmt", func(t *testing.T) {
+		isolateDiskCache(t)
+		dir := t.TempDir()
+		writeEditorConfig(t, dir, "root = true\n\n[*.sh]\nindent_style = space\n\n[on.sh]\nswitch_case_indent = true\n")
+
+		qt.Check(t, qt.IsFalse(ResolveShellIndent(Default(), filepath.Join(dir, "t.sh")).CaseIndent))
+		qt.Check(t, qt.IsTrue(ResolveShellIndent(Default(), filepath.Join(dir, "on.sh")).CaseIndent))
+		qt.Check(t, qt.IsTrue(ResolveShellIndent(Default(), filepath.Join(t.TempDir(), "t.sh")).CaseIndent),
+			qt.Commentf("without an editorconfig the user's switchCaseIndent stands"))
+	})
+
 	t.Run("missing editorconfig falls back to cfg default", func(t *testing.T) {
 		isolateDiskCache(t)
 		dir := t.TempDir()
@@ -204,7 +215,7 @@ func TestResolveIndentDegradesGracefullyWithNoCacheDirAvailable(t *testing.T) {
 }
 
 func TestEncodeDecodeIndentSpecRoundTrip(t *testing.T) {
-	cases := []IndentSpec{{Size: 2, UseTabs: false}, {Size: 4, UseTabs: true}, {Size: 8, UseTabs: false}}
+	cases := []IndentSpec{{Size: 2, UseTabs: false}, {Size: 4, UseTabs: true}, {Size: 8, UseTabs: false, CaseIndent: true}}
 	for _, spec := range cases {
 		got, ok := decodeIndentSpec(encodeIndentSpec(spec))
 		qt.Check(t, qt.IsTrue(ok))

@@ -42,7 +42,7 @@ func (f shellFormatter) Format(_ context.Context, _, abs string) Result {
 	}
 	printer := syntax.NewPrinter(
 		syntax.Indent(indentWidth),
-		syntax.SwitchCaseIndent(f.cfg.Shell.SwitchCaseIndent),
+		syntax.SwitchCaseIndent(spec.CaseIndent),
 	)
 	var buf bytes.Buffer
 	if err := printer.Print(&buf, file); err != nil {

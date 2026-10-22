@@ -31,7 +31,7 @@ func NewRegistry(cfg config.Config) *Registry {
 	gomod := formatters.NewGoMod()
 	gowork := formatters.NewGoWork()
 	biome := formatters.NewBiome()
-	markdown := formatters.NewMarkdown()
+	markdown := formatters.NewMarkdownRouter(cfg)
 	toml := formatters.NewTOML()
 	prettier := formatters.NewPrettier()
 	graphql := formatters.NewGraphQLRouter(cfg)

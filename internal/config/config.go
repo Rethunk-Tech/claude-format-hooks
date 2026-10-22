@@ -122,6 +122,8 @@ func (c Config) IsFormatterDisabled(name string) bool {
 type IndentSpec struct {
 	Size    int
 	UseTabs bool
+	// CaseIndent is shfmt's switch_case_indent; JSON ignores it.
+	CaseIndent bool
 }
 
 // ResolveJSONIndent applies the three-layer priority described above for
@@ -132,7 +134,11 @@ func ResolveJSONIndent(cfg Config, abs string) IndentSpec {
 
 // ResolveShellIndent applies the same priority for a shell script at abs.
 func ResolveShellIndent(cfg Config, abs string) IndentSpec {
-	return resolveIndent(abs, IndentSpec{Size: cfg.Shell.IndentSize, UseTabs: cfg.Shell.UseTabs})
+	return resolveIndent(abs, IndentSpec{
+		Size:       cfg.Shell.IndentSize,
+		UseTabs:    cfg.Shell.UseTabs,
+		CaseIndent: cfg.Shell.SwitchCaseIndent,
+	})
 }
 
 // editorconfigCacheTTL is how long a resolved IndentSpec is trusted
@@ -162,7 +168,7 @@ func resolveIndent(abs string, fallback IndentSpec) IndentSpec {
 		return resolveIndentUncached(abs, fallback)
 	}
 
-	key := diskcache.Key("editorconfig", abs, strconv.Itoa(fallback.Size), strconv.FormatBool(fallback.UseTabs))
+	key := diskcache.Key("editorconfig", abs, encodeIndentSpec(fallback))
 	if cached, hit := diskcache.Get(cacheDir, key, editorconfigCacheTTL); hit {
 		if spec, ok := decodeIndentSpec(cached); ok {
 			return spec
@@ -190,28 +196,28 @@ func resolveIndentUncached(abs string, fallback IndentSpec) IndentSpec {
 	if size := section.IndentSize(); size > 0 {
 		spec.Size = size
 	}
+	// shfmt itself reads switch_case_indent from the same section and treats
+	// it as off when unset, so a project's .editorconfig, not the user's
+	// preference, decides how its case branches sit.
+	spec.CaseIndent = section.Get("switch_case_indent") == "true"
 	return spec
 }
 
 // encodeIndentSpec/decodeIndentSpec serialize an IndentSpec to and from
-// the plain "size,tabs" string diskcache stores it as — no need for
-// JSON's overhead for a two-field value only this package ever reads.
+// the plain "size,tabs,caseIndent" string diskcache stores it as — no need
+// for JSON's overhead for a value only this package ever reads.
 func encodeIndentSpec(spec IndentSpec) string {
-	tabs := "0"
-	if spec.UseTabs {
-		tabs = "1"
-	}
-	return strconv.Itoa(spec.Size) + "," + tabs
+	return strconv.Itoa(spec.Size) + "," + strconv.FormatBool(spec.UseTabs) + "," + strconv.FormatBool(spec.CaseIndent)
 }
 
 func decodeIndentSpec(s string) (IndentSpec, bool) {
-	size, tabs, found := strings.Cut(s, ",")
-	if !found {
+	parts := strings.Split(s, ",")
+	if len(parts) != 3 {
 		return IndentSpec{}, false
 	}
-	n, err := strconv.Atoi(size)
+	n, err := strconv.Atoi(parts[0])
 	if err != nil {
 		return IndentSpec{}, false
 	}
-	return IndentSpec{Size: n, UseTabs: tabs == "1"}, true
+	return IndentSpec{Size: n, UseTabs: parts[1] == "true", CaseIndent: parts[2] == "true"}, true
 }
