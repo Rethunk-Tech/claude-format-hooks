@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.5.4] - 2026-10-22
+
 ### Fixed
 
 - Markdown in a Biome project is formatted by Biome after markdownlint's fixes, so table padding matches the project's own check instead of markdownlint's compact style.
