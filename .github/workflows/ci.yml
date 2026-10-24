@@ -106,3 +106,20 @@ jobs:
       - name: gate
         if: ${{ !cancelled() }}
         run: gate --tail 400
+
+  # One required check for branch protection to point at. Without it, a
+  # matrix leg that never ran reads as "not failing" rather than "not run".
+  final:
+    if: always()
+    needs: [test, lint]
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Fail if any check did not succeed
+        run: |
+          if [ "${{ needs.test.result }}" != "success" ] \
+            || [ "${{ needs.lint.result }}" != "success" ]; then
+            echo "test=${{ needs.test.result }} lint=${{ needs.lint.result }}"
+            exit 1
+          fi
+          echo "all checks passed"
