@@ -9,8 +9,10 @@ require (
 )
 
 require (
+	github.com/Rethunk-Tech/go-safefs v0.0.0-20261029191251-ae9667b83b09 // indirect
 	github.com/google/go-cmp v0.7.0 // indirect
 	github.com/kr/pretty v0.3.1 // indirect
 	github.com/kr/text v0.2.0 // indirect
 	github.com/rogpeppe/go-internal v1.16.0 // indirect
+	golang.org/x/sys v0.49.0 // indirect
 )

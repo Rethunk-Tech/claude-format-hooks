@@ -17,6 +17,8 @@ import (
 	"slices"
 	"strings"
 	"time"
+
+	"github.com/Rethunk-Tech/go-safefs"
 )
 
 const (
@@ -159,7 +161,7 @@ func upgradeWithConfig(opts Options, dryRun bool, out io.Writer, cfg upgradeConf
 	if err := os.MkdirAll(filepath.Dir(target), 0o750); err != nil {
 		return fmt.Errorf("create binary directory: %w", err)
 	}
-	if err := writeAtomic(target, binary, mode); err != nil {
+	if err := safefs.WriteFileAtomic(target, binary, mode); err != nil {
 		return fmt.Errorf("replace %s: %w", target, err)
 	}
 	_, _ = fmt.Fprintf(out, "==> upgraded %s to release %s\n", target, release.TagName)

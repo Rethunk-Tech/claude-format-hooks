@@ -12,6 +12,8 @@ import (
 	"os"
 	"path/filepath"
 	"slices"
+
+	"github.com/Rethunk-Tech/go-safefs"
 )
 
 const (
@@ -374,7 +376,7 @@ func applyChange(opts Options, before, after []byte, dryRun bool, out io.Writer,
 	backupPath := opts.SettingsPath + ".bak"
 	wroteBackup := false
 	if existing, err := os.ReadFile(opts.SettingsPath); err == nil {
-		if err := writeAtomic(backupPath, existing, 0o600); err != nil {
+		if err := safefs.WriteFileAtomic(backupPath, existing, 0o600); err != nil {
 			return fmt.Errorf("backup %s: %w", opts.SettingsPath, err)
 		}
 		wroteBackup = true
@@ -385,7 +387,7 @@ func applyChange(opts Options, before, after []byte, dryRun bool, out io.Writer,
 	if err := os.MkdirAll(filepath.Dir(opts.SettingsPath), 0o700); err != nil {
 		return err
 	}
-	if err := writeAtomic(opts.SettingsPath, after, 0o600); err != nil {
+	if err := safefs.WriteFileAtomic(opts.SettingsPath, after, 0o600); err != nil {
 		return err
 	}
 	if wroteBackup {
@@ -393,40 +395,5 @@ func applyChange(opts Options, before, after []byte, dryRun bool, out io.Writer,
 	} else {
 		_, _ = fmt.Fprintf(out, "==> %s %s\n", verb, opts.SettingsPath)
 	}
-	return nil
-}
-
-// writeAtomic writes data to a unique temp file in path's directory, then
-// renames it into place so concurrent writers cannot share a temp pathname
-// and a process killed mid-write cannot leave path truncated.
-func writeAtomic(path string, data []byte, perm os.FileMode) error {
-	dir := filepath.Dir(path)
-	tmp, err := os.CreateTemp(dir, filepath.Base(path)+".*.tmp")
-	if err != nil {
-		return err
-	}
-	tmpPath := tmp.Name()
-	removeTemp := true
-	defer func() {
-		if removeTemp {
-			_ = os.Remove(tmpPath)
-		}
-	}()
-
-	if _, err := tmp.Write(data); err != nil {
-		_ = tmp.Close()
-		return err
-	}
-	if err := tmp.Chmod(perm); err != nil {
-		_ = tmp.Close()
-		return err
-	}
-	if err := tmp.Close(); err != nil {
-		return err
-	}
-	if err := os.Rename(tmpPath, path); err != nil {
-		return err
-	}
-	removeTemp = false
 	return nil
 }
