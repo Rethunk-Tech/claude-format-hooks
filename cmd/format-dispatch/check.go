@@ -515,94 +515,110 @@ type skipConfig struct {
 // exclusion the hook uses. Sorting keeps output stable so a CI diff of two
 // runs is meaningful.
 func collectCheckTargets(paths []string, skip skipConfig) ([]string, error) {
-	seen := map[string]bool{}
-	projectRoot := projectRootEnv()
 	workingRoot, err := os.Getwd()
 	if err != nil {
 		workingRoot = ""
 	}
-
-	// InSkippedDir matches path SEGMENTS, so it must be given a path
-	// relative to the project or working directory -- handing it an absolute
-	// path would let an unrelated ancestor directory named "build" or
-	// "vendor" silently exclude the whole run.
-	add := func(root, p string) {
-		// copyBeside uses this prefix; ignoring it here keeps leftovers from
-		// an interrupted check out of the next target set.
-		if strings.HasPrefix(filepath.Base(p), ".fmtcheck-") {
-			return
-		}
-		abs, err := filepath.Abs(p)
-		if err != nil {
-			return
-		}
-		bound := projectRoot
-		if bound == "" {
-			if root != "" {
-				if absRoot, rootErr := filepath.Abs(root); rootErr == nil {
-					bound = absRoot
-				}
-			}
-			if bound == "" {
-				bound = workingRoot
-			}
-		}
-		if bound != "" && !within(abs, bound) {
-			return
-		}
-		if inSkipped(abs, projectRoot, workingRoot, root, skip) {
-			return
-		}
-		seen[abs] = true
-	}
-
+	t := &targetSet{seen: map[string]bool{}, projectRoot: projectRootEnv(), workingRoot: workingRoot, skip: skip}
 	for _, p := range paths {
 		info, err := os.Stat(p)
 		if err != nil {
 			return nil, err
 		}
 		if !info.IsDir() {
-			add(filepath.Dir(p), p)
+			t.add(filepath.Dir(p), p)
 			continue
 		}
-		absDir, err := filepath.Abs(p)
-		if err != nil {
+		if !t.dirKept(p) {
 			continue
 		}
-		if projectRoot != "" && !within(absDir, projectRoot) {
-			continue
-		}
-		if inSkipped(absDir, projectRoot, workingRoot, filepath.Dir(absDir), skip) {
-			continue
-		}
-		err = filepath.WalkDir(p, func(path string, d fs.DirEntry, err error) error {
-			if err != nil {
-				return err
-			}
-			rel, relErr := filepath.Rel(p, path)
-			if relErr != nil {
-				rel = path
-			}
-			if d.IsDir() {
-				// Prune rather than filter per-file: skipping a non-source
-				// tree at its root avoids walking node_modules at all.
-				if rel != "." && dispatch.InSkippedDir(rel, skip.dirs) {
-					return fs.SkipDir
-				}
-				return nil
-			}
-			add(p, path)
-			return nil
-		})
-		if err != nil {
+		if err := t.addDir(p); err != nil {
 			return nil, err
 		}
 	}
-
-	out := make([]string, 0, len(seen))
-	for p := range seen {
+	out := make([]string, 0, len(t.seen))
+	for p := range t.seen {
 		out = append(out, p)
 	}
 	sort.Strings(out)
 	return out, nil
+}
+
+// targetSet accumulates the files collectCheckTargets keeps.
+type targetSet struct {
+	seen        map[string]bool
+	projectRoot string
+	workingRoot string
+	skip        skipConfig
+}
+
+// add keeps p unless it is a leftover, outside the project, or in a skipped directory.
+//
+// InSkippedDir matches path SEGMENTS, so inSkipped must be given a path
+// relative to the project or working directory -- handing it an absolute
+// path would let an unrelated ancestor directory named "build" or
+// "vendor" silently exclude the whole run.
+func (t *targetSet) add(root, p string) {
+	// copyBeside uses this prefix; ignoring it here keeps leftovers from
+	// an interrupted check out of the next target set.
+	if strings.HasPrefix(filepath.Base(p), ".fmtcheck-") {
+		return
+	}
+	abs, err := filepath.Abs(p)
+	if err != nil {
+		return
+	}
+	bound := t.projectRoot
+	if bound == "" {
+		if root != "" {
+			if absRoot, rootErr := filepath.Abs(root); rootErr == nil {
+				bound = absRoot
+			}
+		}
+		if bound == "" {
+			bound = t.workingRoot
+		}
+	}
+	if bound != "" && !within(abs, bound) {
+		return
+	}
+	if inSkipped(abs, t.projectRoot, t.workingRoot, root, t.skip) {
+		return
+	}
+	t.seen[abs] = true
+}
+
+// dirKept reports whether directory p is inside the project and not itself skipped.
+func (t *targetSet) dirKept(p string) bool {
+	absDir, err := filepath.Abs(p)
+	if err != nil {
+		return false
+	}
+	if t.projectRoot != "" && !within(absDir, t.projectRoot) {
+		return false
+	}
+	return !inSkipped(absDir, t.projectRoot, t.workingRoot, filepath.Dir(absDir), t.skip)
+}
+
+// addDir walks directory p, pruning skipped directories, and adds every file under it.
+func (t *targetSet) addDir(p string) error {
+	return filepath.WalkDir(p, func(path string, d fs.DirEntry, err error) error {
+		if err != nil {
+			return err
+		}
+		rel, relErr := filepath.Rel(p, path)
+		if relErr != nil {
+			rel = path
+		}
+		if d.IsDir() {
+			// Prune rather than filter per-file: skipping a non-source
+			// tree at its root avoids walking node_modules at all.
+			if rel != "." && dispatch.InSkippedDir(rel, t.skip.dirs) {
+				return fs.SkipDir
+			}
+			return nil
+		}
+		t.add(p, path)
+		return nil
+	})
 }
