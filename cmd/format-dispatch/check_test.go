@@ -110,7 +110,7 @@ func TestWouldReformatComparesFormattedCopies(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			path := writeCheckFile(t, dir, tt.name+".json", tt.content)
 
-			changed, skipped, err := wouldReformat(context.Background(), registry, dir, path, ".json", false)
+			changed, skipped, err := wouldReformat(t.Context(), registry, dir, path, ".json", false)
 
 			qt.Assert(t, qt.IsNil(err))
 			qt.Check(t, qt.IsFalse(skipped), qt.Commentf("the native JSON formatter never skips"))
@@ -125,7 +125,7 @@ func TestWouldReformatFailsOnFormatterDiagnostic(t *testing.T) {
 	path := writeCheckFile(t, dir, "bad.json", "{\"a\": ")
 	registry := dispatch.NewRegistry(config.Default())
 
-	changed, skipped, err := wouldReformat(context.Background(), registry, dir, path, ".json", false)
+	changed, skipped, err := wouldReformat(t.Context(), registry, dir, path, ".json", false)
 
 	qt.Check(t, qt.IsFalse(changed))
 	qt.Check(t, qt.IsFalse(skipped), qt.Commentf("a syntax decline is not a missing tool"))
@@ -150,7 +150,7 @@ func TestWouldReformatReportsReadFileError(t *testing.T) {
 	registry := dispatch.NewRegistry(config.Default())
 	missing := filepath.Join(dir, "missing.json")
 
-	changed, _, err := wouldReformat(context.Background(), registry, dir, missing, ".json", false)
+	changed, _, err := wouldReformat(t.Context(), registry, dir, missing, ".json", false)
 
 	qt.Check(t, qt.Equals(changed, false))
 	if err == nil {
@@ -162,7 +162,7 @@ func TestWouldReformatReturnsContextCauseAfterDispatch(t *testing.T) {
 	dir := t.TempDir()
 	path := writeCheckFile(t, dir, "bad.json", unformattedJSON)
 	registry := dispatch.NewRegistry(config.Default())
-	ctx, cancel := context.WithCancelCause(context.Background())
+	ctx, cancel := context.WithCancelCause(t.Context())
 	cause := context.Canceled
 	cancel(cause)
 
@@ -192,7 +192,7 @@ func TestWouldReformatReportsFormattedCopyReadError(t *testing.T) {
 	t.Setenv("PATH", toolDir+string(os.PathListSeparator)+os.Getenv("PATH"))
 	registry := dispatch.NewRegistry(config.Default())
 
-	changed, _, err := wouldReformat(context.Background(), registry, projectRoot, path, ".ts", false)
+	changed, _, err := wouldReformat(t.Context(), registry, projectRoot, path, ".ts", false)
 
 	qt.Check(t, qt.Equals(changed, false))
 	if err == nil {
