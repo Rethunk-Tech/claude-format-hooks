@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.5.5] - 2026-11-08
+
+### Fixed
+
+- The installer writes settings, backups and the upgraded binary through an fsynced atomic writer, so an interrupted install no longer leaves a truncated file.
+
 ## [0.5.4] - 2026-10-22
 
 ### Fixed
@@ -657,7 +663,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 Initial release.
 
-[Unreleased]: https://github.com/Rethunk-Tech/claude-format-hooks/compare/v0.5.1...HEAD
+[Unreleased]: https://github.com/Rethunk-Tech/claude-format-hooks/compare/v0.5.5...HEAD
+[0.5.5]: https://github.com/Rethunk-Tech/claude-format-hooks/compare/v0.5.4...v0.5.5
 [0.5.1]: https://github.com/Rethunk-Tech/claude-format-hooks/compare/v0.5.0...v0.5.1
 [0.5.0]: https://github.com/Rethunk-Tech/claude-format-hooks/compare/v0.4.0...v0.5.0
 [0.4.0]: https://github.com/Rethunk-Tech/claude-format-hooks/compare/v0.3.0...v0.4.0
