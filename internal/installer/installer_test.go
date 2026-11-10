@@ -5,6 +5,7 @@ import (
 	"os"
 	"path/filepath"
 	"runtime"
+	"slices"
 	"strings"
 	"testing"
 
@@ -284,6 +285,72 @@ func TestUnwirePreservesOtherEntries(t *testing.T) {
 	qt.Check(t, qt.Equals(entries[0].Hooks[0].Command, "log.sh"))
 }
 
+// One matcher block may list several commands, so removing ours must leave the
+// block and its neighbours alone -- deleting the whole entry silently unhooks
+// whatever else was wired into it.
+func TestWireAndUnwireKeepSiblingCommandsInASharedMatcherBlock(t *testing.T) {
+	const shared = `{
+		"hooks": {
+			"PostToolUse": [
+				{"matcher": "Write", "hooks": [
+					{"type": "command", "command": "` + binPath + `"},
+					{"type": "command", "command": "my-linter --check"}
+				]}
+			]
+		}
+	}`
+
+	tests := []struct {
+		name     string
+		run      func(string) ([]byte, error)
+		wantOurs int // our command entries in the whole document
+	}{
+		{
+			name: "wire re-homes our command and keeps the linter in place",
+			run: func(path string) ([]byte, error) {
+				_, after, err := Wire(path, binPath)
+				return after, err
+			},
+			wantOurs: 1,
+		},
+		{
+			name: "unwire drops only our command",
+			run: func(path string) ([]byte, error) {
+				_, after, err := Unwire(path, binPath)
+				return after, err
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			path := settingsFile(t, shared)
+			after, err := tt.run(path)
+			qt.Assert(t, qt.IsNil(err))
+
+			entries := settingsPostToolUse(t, after)
+			qt.Check(t, qt.Equals(countOurCommands(entries, binPath), tt.wantOurs))
+			qt.Check(t, qt.IsTrue(slices.ContainsFunc(entries, func(e PostToolUseEntry) bool {
+				return e.Matcher == "Write" && slices.ContainsFunc(e.Hooks, func(h HookCommand) bool {
+					return h.Command == "my-linter --check"
+				})
+			})), qt.Commentf("the shared Write block and its other command must survive"))
+		})
+	}
+}
+
+func countOurCommands(entries []PostToolUseEntry, command string) int {
+	n := 0
+	for _, e := range entries {
+		for _, h := range e.Hooks {
+			if h.Command == command {
+				n++
+			}
+		}
+	}
+	return n
+}
+
 func TestUnwireNoOwnEntryIsIdempotent(t *testing.T) {
 	settingsPath := settingsFile(t, `{"theme":"dark"}`)
 
@@ -408,6 +475,28 @@ func TestInstallWritesSettings(t *testing.T) {
 	entries := settingsPostToolUse(t, readFile(t, settingsPath))
 	qt.Assert(t, qt.HasLen(entries, 1))
 	qt.Check(t, qt.Equals(entries[0].Hooks[0].Command, binPath))
+}
+
+// A truncated or `touch`ed settings file is a plausible on-disk state, and it
+// means "no settings yet", not "fail the install".
+func TestWireTreatsABlankSettingsFileAsEmptyObject(t *testing.T) {
+	tests := []struct {
+		name    string
+		content string
+	}{
+		{name: "zero bytes", content: ""},
+		{name: "whitespace only", content: " \n\t\n"},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			path := filepath.Join(t.TempDir(), "settings.json")
+			qt.Assert(t, qt.IsNil(os.WriteFile(path, []byte(tt.content), 0o600)))
+
+			_, after, err := Wire(path, binPath)
+			qt.Assert(t, qt.IsNil(err))
+			assertOnlyOurEntry(t, after, binPath)
+		})
+	}
 }
 
 func TestParseSettingsReportsMalformedTopLevelJSON(t *testing.T) {

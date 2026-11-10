@@ -97,6 +97,12 @@ func readHooksDoc(path string) (before []byte, top jsonObject, exists bool, err 
 	}
 
 	top = jsonObject{}
+	// A zero-byte or whitespace-only file is what a truncated or `touch`ed
+	// settings.json looks like, and it means "no settings yet" rather than
+	// a document to reject: nothing in it can be lost by treating it as {}.
+	if len(bytes.TrimSpace(before)) == 0 {
+		return before, top, exists, nil
+	}
 	if err := json.Unmarshal(before, &top); err != nil {
 		return nil, nil, false, fmt.Errorf("parse %s: %w", path, err)
 	}
@@ -210,7 +216,7 @@ func Wire(settingsPath, binPath string) (before, after []byte, err error) {
 		return nil, nil, err
 	}
 
-	kept := slices.DeleteFunc(entries, func(e PostToolUseEntry) bool { return hasBin(e, binPath) })
+	kept := withoutHooks(entries, binPath)
 	kept = append(kept, PostToolUseEntry{
 		Matcher: matcherAll,
 		Hooks: []HookCommand{{
@@ -241,7 +247,7 @@ func Unwire(settingsPath, binPath string) (before, after []byte, err error) {
 		return nil, nil, err
 	}
 
-	kept := slices.DeleteFunc(entries, func(e PostToolUseEntry) bool { return hasBin(e, binPath) })
+	kept := withoutHooks(entries, binPath)
 
 	after, err = renderHooks(top, hooks, postToolUseEvent, kept)
 	if err != nil {
@@ -261,6 +267,24 @@ func Wired(settingsPath, binPath string) (bool, error) {
 		return false, err
 	}
 	return slices.ContainsFunc(entries, func(e PostToolUseEntry) bool { return hasBin(e, binPath) }), nil
+}
+
+// withoutHooks returns entries with our own hook commands removed. Only the
+// command is dropped, never the matcher entry: one PostToolUse block may list
+// several commands, and deleting the block to remove ours silently unhooks
+// whatever else the operator wired into it.
+func withoutHooks(entries []PostToolUseEntry, binPath string) []PostToolUseEntry {
+	kept := make([]PostToolUseEntry, 0, len(entries))
+	for _, e := range entries {
+		hooks := slices.DeleteFunc(slices.Clone(e.Hooks), func(h HookCommand) bool {
+			return h.Command == binPath || isHookBinaryCommand(h.Command)
+		})
+		if len(hooks) > 0 {
+			e.Hooks = hooks
+			kept = append(kept, e)
+		}
+	}
+	return kept
 }
 
 // hasBin reports whether e has a hook command pointing at binPath.
