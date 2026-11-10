@@ -107,5 +107,5 @@ func cursorHookHasBin(raw json.RawMessage, binPath string) bool {
 	if err := json.Unmarshal(raw, &hook); err != nil {
 		return false
 	}
-	return hook.Command == binPath || isHookBinaryCommand(hook.Command)
+	return matchesHookCommand(HookCommand{Command: hook.Command}, binPath)
 }

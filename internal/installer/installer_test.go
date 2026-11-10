@@ -163,7 +163,10 @@ func TestWireIdempotentReinstall(t *testing.T) {
 
 func TestWireReplacesLegacyBareBasename(t *testing.T) {
 	settingsPath := settingsFile(t, settingsWithHook(binPath))
-	exeBinPath := filepath.Join(t.TempDir(), "format-dispatch.exe")
+	// Same install directory, the platform's other binary name: the upgrade
+	// from a bare `format-dispatch` to `format-dispatch.exe` replaces the
+	// entry rather than adding a second one.
+	exeBinPath := filepath.Join(filepath.Dir(binPath), "format-dispatch.exe")
 
 	_, after, err := Wire(settingsPath, exeBinPath)
 	qt.Assert(t, qt.IsNil(err))
@@ -175,12 +178,23 @@ func TestWireReplacesLegacyBareBasename(t *testing.T) {
 
 func TestUnwireExeRemovesLegacyBareBasename(t *testing.T) {
 	settingsPath := settingsFile(t, settingsWithHook(binPath))
-	exeBinPath := filepath.Join(t.TempDir(), "format-dispatch.exe")
+	exeBinPath := filepath.Join(filepath.Dir(binPath), "format-dispatch.exe")
 
 	_, after, err := Unwire(settingsPath, exeBinPath)
 	qt.Assert(t, qt.IsNil(err))
 
 	qt.Check(t, qt.Equals(settingsHasHooks(t, after), false))
+}
+
+// The bare basename older installs wrote carries no directory, so it is still
+// ours to replace wherever the binary now lives.
+func TestWireReplacesAHookWrittenAsABareBasename(t *testing.T) {
+	settingsPath := settingsFile(t, settingsWithHook("format-dispatch"))
+
+	_, after, err := Wire(settingsPath, binPath)
+	qt.Assert(t, qt.IsNil(err))
+
+	assertOnlyOurEntry(t, after, binPath)
 }
 
 func TestWirePreservesUnrelatedTopLevelKeys(t *testing.T) {
@@ -479,6 +493,22 @@ func TestInstallWritesSettings(t *testing.T) {
 
 // A truncated or `touch`ed settings file is a plausible on-disk state, and it
 // means "no settings yet", not "fail the install".
+// A second bin directory's install must not remove the first one's hook: only
+// an exact path match, or a bare basename (the shape legacy installs wrote),
+// is this installation.
+func TestWireKeepsAnotherBinDirectorysInstall(t *testing.T) {
+	otherBin := filepath.Join(t.TempDir(), "other-bin", "format-dispatch")
+	settingsPath := settingsFile(t, settingsWithHook(otherBin))
+
+	_, after, err := Wire(settingsPath, binPath)
+	qt.Assert(t, qt.IsNil(err))
+
+	entries := settingsPostToolUse(t, after)
+	qt.Check(t, qt.Equals(countOurCommands(entries, otherBin), 1),
+		qt.Commentf("the other installation's absolute path is not ours to remove"))
+	qt.Check(t, qt.Equals(countOurCommands(entries, binPath), 1))
+}
+
 func TestWireTreatsABlankSettingsFileAsEmptyObject(t *testing.T) {
 	tests := []struct {
 		name    string

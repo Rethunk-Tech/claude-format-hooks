@@ -277,7 +277,7 @@ func withoutHooks(entries []PostToolUseEntry, binPath string) []PostToolUseEntry
 	kept := make([]PostToolUseEntry, 0, len(entries))
 	for _, e := range entries {
 		hooks := slices.DeleteFunc(slices.Clone(e.Hooks), func(h HookCommand) bool {
-			return h.Command == binPath || isHookBinaryCommand(h.Command)
+			return matchesHookCommand(h, binPath)
 		})
 		if len(hooks) > 0 {
 			e.Hooks = hooks
@@ -287,11 +287,30 @@ func withoutHooks(entries []PostToolUseEntry, binPath string) []PostToolUseEntry
 	return kept
 }
 
-// hasBin reports whether e has a hook command pointing at binPath.
+// hasBin reports whether e runs this hook: binPath itself, or the bare
+// basename of an install that predates --install writing an absolute path.
 func hasBin(e PostToolUseEntry, binPath string) bool {
 	return slices.ContainsFunc(e.Hooks, func(h HookCommand) bool {
-		return h.Command == binPath || isHookBinaryCommand(h.Command)
+		return matchesHookCommand(h, binPath)
 	})
+}
+
+// matchesHookCommand reports whether h is this installation's hook. A
+// format-dispatch in a *different* directory is somebody else's installation
+// -- two operators share a machine and a settings.json more often than the
+// basename is unique -- so what counts is an exact path match, the same
+// directory under the platform's other binary name (an install that predates
+// the .exe suffix), or a command carrying no directory at all (the bare
+// basename legacy installs wrote).
+func matchesHookCommand(h HookCommand, binPath string) bool {
+	if h.Command == binPath {
+		return true
+	}
+	if !isHookBinaryCommand(h.Command) {
+		return false
+	}
+	dir := filepath.Dir(h.Command)
+	return dir == "." || dir == filepath.Dir(binPath)
 }
 
 func isHookBinaryCommand(command string) bool {
