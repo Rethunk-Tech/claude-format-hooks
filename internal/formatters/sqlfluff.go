@@ -7,7 +7,11 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"strconv"
 	"strings"
+	"time"
+
+	"github.com/Rethunk-Tech/claude-format-hooks/internal/diskcache"
 )
 
 // sqlfluffFormatter shells out to the system `sqlfluff` binary (Python
@@ -51,27 +55,96 @@ func (sqlfluffFormatter) Format(ctx context.Context, projectRoot, abs string) Re
 	}
 	userSQLFluffConfig()
 
-	// --exclude-rules replaces the configured exclude_rules instead of
-	// extending it, so the effective list is read back from sqlfluff's own
-	// merged config (render prints it only at -vv) and carried forward
-	// alongside the unsafe fixers. The dump is parsed here, never shown.
-	render := exec.CommandContext(ctx, "sqlfluff", "render", "-vv", "--", abs) //nolint:gosec // external formatter by design; args are our own construction, never a shell
-	render.Dir = projectRoot
-	// A failed render (no dialect, bad config) still yields RF03 below, and
-	// the fix call then reports the real error.
-	rendered, _ := render.CombinedOutput()
-	exclude := sqlfluffExcludeRules(string(rendered))
+	settings := cachedSQLFluffSettings(ctx, projectRoot, abs)
 	// sqlfluff's sql_file_exts stop at .sql, so a copy whose final suffix
 	// is .example is named on the command line and then skipped. Stdin is
 	// parsed as SQL; --stdin-filename keeps config lookup on the real file.
 	if sqlExampleCopy(abs) {
-		return sqlfluffFixExample(ctx, projectRoot, abs, exclude)
+		// The stdin path bypasses sqlfluff's own large_file_skip_byte_limit,
+		// so a big .sql.example spent the whole formatter budget and then
+		// reported a timeout on every single write of it. Skipping is what
+		// sqlfluff itself would have done with the file.
+		if info, err := os.Stat(filepath.Clean(abs)); err == nil && info.Size() > settings.largeFileSkipByteLimit {
+			return Result{Skipped: true}
+		}
+		return sqlfluffFixExample(ctx, projectRoot, abs, settings.excludeRules)
 	}
 	// No --force: it is the default as of sqlfluff 4, and passing it prints
 	// a deprecation warning that would itself become diagnostic noise.
 	ok, diag, raw := runExternalOutput(ctx, projectRoot, "sqlfluff",
-		[]string{"fix", "--exclude-rules", exclude, "--", abs})
+		[]string{"fix", "--exclude-rules", settings.excludeRules, "--", abs})
 	return sqlfluffOutcome(projectRoot, ok, diag, raw)
+}
+
+// sqlfluffSettings is the slice of sqlfluff's merged config this formatter
+// needs. Both values come from the same `render -vv` dump, so reading them
+// together costs one process instead of one per value.
+type sqlfluffSettings struct {
+	excludeRules string
+	// largeFileSkipByteLimit is sqlfluff's own limit for files it declines
+	// to lint at all, in bytes.
+	largeFileSkipByteLimit int64
+}
+
+// sqlfluffSettingsTTL is how long a project root's dump is trusted. The
+// exclude list and byte limit come from project config, which does not change
+// mid-session; a stale hit costs one extra render after expiry, never a wrong
+// format.
+const sqlfluffSettingsTTL = 30 * time.Second
+
+// sqlfluffDefaultLargeFileSkipByteLimit is sqlfluff's documented default,
+// used when the dump does not print the key.
+const sqlfluffDefaultLargeFileSkipByteLimit = 20000
+
+// cachedSQLFluffSettings reads the settings from disk, else from sqlfluff.
+// The dump costs ~275ms of process startup, which every .sql write used to
+// pay in full.
+func cachedSQLFluffSettings(ctx context.Context, projectRoot, abs string) sqlfluffSettings {
+	cacheDir, ok := diskcache.Dir()
+	var key string
+	if ok {
+		key = diskcache.Key("sqlfluff", projectRoot)
+		if cached, hit := diskcache.Get(cacheDir, key, sqlfluffSettingsTTL); hit {
+			if settings, parsed := parseSQLFluffSettings(cached); parsed {
+				return settings
+			}
+		}
+	}
+
+	settings := readSQLFluffSettings(ctx, projectRoot, abs)
+	if ok {
+		diskcache.Set(cacheDir, key, settings.excludeRules+"\n"+strconv.FormatInt(settings.largeFileSkipByteLimit, 10))
+	}
+	return settings
+}
+
+// readSQLFluffSettings dumps sqlfluff's merged config for the project. The
+// dump is parsed here, never shown.
+func readSQLFluffSettings(ctx context.Context, projectRoot, abs string) sqlfluffSettings {
+	render := exec.CommandContext(ctx, "sqlfluff", "render", "-vv", "--", abs) //nolint:gosec // external formatter by design; args are our own construction, never a shell
+	render.Dir = projectRoot
+	// A failed render (no dialect, bad config) still yields the defaults
+	// below, and the fix call then reports the real error.
+	rendered, _ := render.CombinedOutput()
+	dump := string(rendered)
+	return sqlfluffSettings{
+		excludeRules:           sqlfluffExcludeRules(dump),
+		largeFileSkipByteLimit: sqlfluffLargeFileSkipByteLimit(dump),
+	}
+}
+
+// parseSQLFluffSettings reads a cached settings value back, reporting ok=false
+// for an entry it cannot make sense of so the caller re-reads the config.
+func parseSQLFluffSettings(cached string) (sqlfluffSettings, bool) {
+	exclude, limit, found := strings.Cut(cached, "\n")
+	if !found {
+		return sqlfluffSettings{}, false
+	}
+	bytes, err := strconv.ParseInt(limit, 10, 64)
+	if err != nil || bytes <= 0 || exclude == "" {
+		return sqlfluffSettings{}, false
+	}
+	return sqlfluffSettings{excludeRules: exclude, largeFileSkipByteLimit: bytes}, true
 }
 
 func sqlExampleCopy(abs string) bool {
@@ -168,6 +241,24 @@ func sqlfluffExcludeRules(renderOutput string) string {
 
 func sqlfluffNoDialect(output string) bool {
 	return strings.Contains(strings.ToLower(output), "no dialect")
+}
+
+// sqlfluffLargeFileSkipByteLimit reads large_file_skip_byte_limit from the
+// config dump, falling back to sqlfluff's documented default. The key sits in
+// the [sqlfluff] section like exclude_rules, so the same first-match rule
+// applies: the dumped config precedes the rendered SQL.
+func sqlfluffLargeFileSkipByteLimit(renderOutput string) int64 {
+	for line := range strings.Lines(renderOutput) {
+		value, found := strings.CutPrefix(strings.TrimSpace(line), "large_file_skip_byte_limit:")
+		if !found || !strings.HasPrefix(line, " ") {
+			continue
+		}
+		if limit, err := strconv.ParseInt(strings.TrimSpace(value), 10, 64); err == nil && limit > 0 {
+			return limit
+		}
+		break
+	}
+	return sqlfluffDefaultLargeFileSkipByteLimit
 }
 
 func sqlfluffFailedToParse(output string) bool {

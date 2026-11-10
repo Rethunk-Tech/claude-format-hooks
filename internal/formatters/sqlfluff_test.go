@@ -4,6 +4,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"testing"
 
@@ -43,6 +44,72 @@ func TestSQLFluffTreatsUnparsableInputAsFailure(t *testing.T) {
 	// Nothing was fixed and the SQL is genuinely broken -- the one non-zero
 	// exit that is worth the operator's attention.
 	qt.Check(t, qt.IsTrue(sqlfluffFailedToParse(sqlfluffUnparsableOutput)))
+}
+
+// The config dump costs a process startup (~275ms measured) on every .sql
+// write, and the stdout path bypassed sqlfluff's own large-file limit -- a
+// 34KB .sql.example spent 71s in a 4s budget and reported a timeout forever.
+func TestSQLFluffCachesItsSettingsAndSkipsOversizedStdin(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("fake shell-script tools are POSIX-shell only")
+	}
+	resetSQLFluffConfigForTest()
+	isolateDiskCache(t)
+	t.Setenv("HOME", t.TempDir())
+
+	argvPath := filepath.Join(t.TempDir(), "argv")
+	t.Setenv("SQLFLUFF_ARGV", argvPath)
+	writeFakeTool(t, "sqlfluff", `printf '%s\n' "$@" >> "$SQLFLUFF_ARGV"
+if [ "$1" = render ]; then
+  printf '  exclude_rules: LT01\n  large_file_skip_byte_limit: 16\n'
+fi`)
+
+	dir := t.TempDir()
+	small := filepath.Join(dir, "small.sql.example")
+	qt.Assert(t, qt.IsNil(os.WriteFile(small, []byte("select 1;\n"), 0o600)))
+	res := NewSQLFluff().Format(t.Context(), dir, small)
+	assertFormatted(t, res)
+
+	// A second file in the same project must reuse the cached dump rather
+	// than paying for another render.
+	other := filepath.Join(dir, "other.sql")
+	qt.Assert(t, qt.IsNil(os.WriteFile(other, []byte("select 1;\n"), 0o600)))
+	assertFormatted(t, NewSQLFluff().Format(t.Context(), dir, other))
+	qt.Check(t, qt.Equals(strings.Count(string(readSource(t, argvPath)), "render\n"), 1),
+		qt.Commentf("the exclude_rules dump must be cached per project root, not re-read per file"))
+	qt.Check(t, qt.StringContains(string(readSource(t, argvPath)), "--exclude-rules\nLT01,RF03"),
+		qt.Commentf("the cached dump still carries the configured rules"))
+
+	// A file past sqlfluff's own large_file_skip_byte_limit is one sqlfluff
+	// would decline to lint; the stdin path has to decline it too instead of
+	// blowing the formatter budget and reporting a timeout on every write.
+	big := filepath.Join(dir, "big.sql.example")
+	bigSrc := strings.Repeat("select 1;\n", 4)
+	qt.Assert(t, qt.IsNil(os.WriteFile(big, []byte(bigSrc), 0o600)))
+	before := readSource(t, argvPath)
+	res = NewSQLFluff().Format(t.Context(), dir, big)
+	qt.Check(t, qt.IsTrue(res.Skipped), qt.Commentf("an oversized file is a skip, not a timeout"))
+	qt.Check(t, qt.Equals(res.Diagnostic, ""))
+	qt.Check(t, qt.DeepEquals(readSource(t, argvPath), before), qt.Commentf("no tool run for a file sqlfluff would skip"))
+	qt.Check(t, qt.Equals(string(readSource(t, big)), bigSrc))
+}
+
+func TestSQLFluffLargeFileSkipByteLimit(t *testing.T) {
+	tests := []struct {
+		name string
+		dump string
+		want int64
+	}{
+		{name: "configured value", dump: "  large_file_skip_byte_limit: 40000\n", want: 40000},
+		{name: "absent key uses sqlfluff's default", dump: "  exclude_rules: LT01\n", want: sqlfluffDefaultLargeFileSkipByteLimit},
+		{name: "top-level text is not config", dump: "large_file_skip_byte_limit: 1\n", want: sqlfluffDefaultLargeFileSkipByteLimit},
+		{name: "non-numeric value uses the default", dump: "  large_file_skip_byte_limit: none\n", want: sqlfluffDefaultLargeFileSkipByteLimit},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			qt.Check(t, qt.Equals(sqlfluffLargeFileSkipByteLimit(tt.dump), tt.want))
+		})
+	}
 }
 
 func TestSQLFluffParseFailureMatchesEitherMarkerAlone(t *testing.T) {
