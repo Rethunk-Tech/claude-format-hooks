@@ -829,6 +829,31 @@ func TestRunProjectConfigDisablesBiomeForGraphQLRouter(t *testing.T) {
 	}
 }
 
+func TestRunProjectConfigDisablesBiomeForMarkdownRouter(t *testing.T) {
+	// markdownRouter Names itself after markdownlint-cli2 and finishes with
+	// biome, so a project-level "biome" disable has to reach the router's own
+	// flag -- extension filtering alone cannot see the delegated formatter.
+	marker := fakeRouterTools(t)
+
+	projectRoot := t.TempDir()
+	configPath := filepath.Join(t.TempDir(), "claude-format-hooks.json")
+	writeFile(t, configPath, `{}`)
+	t.Setenv("CLAUDE_PROJECT_DIR", projectRoot)
+	t.Setenv("CLAUDE_FORMAT_HOOKS_CONFIG", configPath)
+	writeFile(t, filepath.Join(projectRoot, "biome.json"), "{}\n")
+	writeFile(t, filepath.Join(projectRoot, projectConfigFile), `{"disabledFormatters":["biome"]}`)
+
+	for _, ext := range []string{".md", ".mdx", ".mdc", ".md.example"} {
+		t.Run(ext, func(t *testing.T) {
+			abs := filepath.Join(projectRoot, "doc"+ext)
+			writeFile(t, abs, "# heading\n")
+			qt.Check(t, qt.Equals(run(strings.NewReader(payload(abs))), 0))
+			qt.Check(t, qt.Equals(readFile(t, marker), "prettier"),
+				qt.Commentf("project-disabled biome must leave %s to markdownlint-cli2", ext))
+		})
+	}
+}
+
 func TestRunUserConfigMalformedFallsBackAndWarns(t *testing.T) {
 	projectRoot := t.TempDir()
 	abs := filepath.Join(projectRoot, "f.json")

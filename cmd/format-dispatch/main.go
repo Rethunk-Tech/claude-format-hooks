@@ -526,17 +526,31 @@ func projectDisables(projectRoot, ext, formatterName string) (disabled bool, cfg
 }
 
 // projectRebuildsRouterRegistry is true when project config forces a
-// NewRegistry rebuild for the json and graphql/gql routers. The json router
-// Names itself "json" and the graphql router "prettier" while biome may run
-// underneath, so a project-level "biome" disable is invisible to extension
-// filtering alone.
+// NewRegistry rebuild for the routers whose Name hides a delegated formatter:
+// the json router Names itself "json" and the graphql router "prettier" while
+// biome may run underneath, and the markdown router Names itself
+// "markdownlint-cli2" while finishing with biome. A project-level "biome"
+// disable is invisible to extension filtering alone for all three.
 func projectRebuildsRouterRegistry(ext string, projectCfg config.Config) bool {
 	if !strings.EqualFold(ext, ".json") &&
 		!strings.EqualFold(ext, ".graphql") &&
-		!strings.EqualFold(ext, ".gql") {
+		!strings.EqualFold(ext, ".gql") &&
+		!markdownExtension(ext) {
 		return false
 	}
 	return projectCfg.IsFormatterDisabled("biome")
+}
+
+// markdownExtension reports whether ext is one markdownRouter owns, including
+// the .example copies.
+func markdownExtension(ext string) bool {
+	base := strings.TrimSuffix(strings.ToLower(ext), ".example")
+	switch base {
+	case ".md", ".mdx", ".markdown", ".mdc":
+		return true
+	default:
+		return false
+	}
 }
 
 // registryWithProjectConfig applies project formatter opt-outs that affect a
