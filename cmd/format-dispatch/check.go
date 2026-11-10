@@ -507,10 +507,7 @@ func restoreOnSignal() (stop func()) {
 	}()
 	return func() {
 		signal.Stop(sigs)
-		if done != nil {
-			close(done)
-			done = nil
-		}
+		close(done)
 	}
 }
 
