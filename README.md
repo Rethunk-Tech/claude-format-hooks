@@ -16,13 +16,13 @@ formats a file right after Write/Edit/MultiEdit/NotebookEdit writes it
 Single global Go binary (`format-dispatch`). Native JSON, shell, and Go;
 everything else shells out. No per-repo setup.
 
-## Installation
+## Quick start
 
 ```bash
 brew install rethunk-tech/tap/format-dispatch
 ```
 
-Scoop, building from source, completions, config and uninstall: [HUMANS.md](HUMANS.md#install).
+[HUMANS.md](HUMANS.md#install).
 
 ## Highlights
 
