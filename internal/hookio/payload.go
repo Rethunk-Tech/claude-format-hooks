@@ -1,12 +1,16 @@
 // Package hookio parses the Claude Code PostToolUse JSON envelope and the
 // Cursor afterFileEdit / afterTabFileEdit envelopes, which carry the path in
-// top-level file_path. The payload is tiny (a handful of string fields, well
-// under 1KB) — standard library encoding/json is already far faster than the
-// ~1-3ms process startup cost it's measured against, so there is no case for
-// a third-party JSON library here.
+// top-level file_path. The fields this package reads are tiny, but the
+// envelope is not: a Write's tool_input echoes the file's whole content, so
+// the payload is as large as the file being written.
 package hookio
 
-import "encoding/json"
+import (
+	"bytes"
+	"encoding/json"
+	"errors"
+	"io"
+)
 
 // Payload is the subset of Claude PostToolUse and Cursor afterFileEdit /
 // afterTabFileEdit JSON this package reads.
@@ -71,12 +75,33 @@ func (p Payload) resolve() (path string, claude bool) {
 	}
 }
 
-// Parse decodes raw stdin bytes into a Payload. An empty or malformed
+// Parse decodes raw hook payload bytes into a Payload. An empty or malformed
 // payload decodes to a Payload with an empty FilePath(), which callers
 // treat as "nothing to do" rather than an error — a hook must never fail
 // the tool call it's reacting to.
 func Parse(raw []byte) Payload {
-	var p Payload
-	_ = json.Unmarshal(raw, &p)
+	p, _ := Decode(bytes.NewReader(raw))
 	return p
+}
+
+// Decode streams a payload out of r. The envelope echoes the written file's
+// whole content, so the payload is as large as the file: decoding it from the
+// reader keeps memory off the file's size, where reading it all first made any
+// fixed limit on the envelope a limit on the file.
+//
+// A payload that is not JSON reports no payload, matching Parse; only a reader
+// that failed for some other reason is an error worth surfacing.
+func Decode(r io.Reader) (Payload, error) {
+	var p Payload
+	err := json.NewDecoder(r).Decode(&p)
+	if err == nil {
+		return p, nil
+	}
+	var syntax *json.SyntaxError
+	var typeErr *json.UnmarshalTypeError
+	if errors.Is(err, io.EOF) || errors.Is(err, io.ErrUnexpectedEOF) ||
+		errors.As(err, &syntax) || errors.As(err, &typeErr) {
+		return p, nil
+	}
+	return p, err
 }

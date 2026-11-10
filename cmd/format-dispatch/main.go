@@ -46,12 +46,6 @@ import (
 // the write of the diagnostic itself.
 const formatterTimeout = 4 * time.Second
 
-// maxHookPayloadBytes bounds the PostToolUse, afterFileEdit, and
-// afterTabFileEdit envelopes.
-// The payload is a handful of string fields; anything larger is not a
-// hook envelope and must not be slurped into memory.
-const maxHookPayloadBytes = 1 << 20
-
 // errFormatterTimeout is context.Cause(ctx) once formatterTimeout fires, so
 // a hung formatter's diagnostic says why instead of surfacing the generic
 // context.DeadlineExceeded.
@@ -328,19 +322,12 @@ func run(stdin io.Reader) int {
 	var logPath, logFormatter, logOutcome string
 	defer func() { logInvocation(logPath, logFormatter, logOutcome, time.Since(start)) }()
 
-	raw, err := io.ReadAll(io.LimitReader(stdin, maxHookPayloadBytes+1))
+	payload, err := hookio.Decode(stdin)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "format-dispatch: read stdin: %v\n", err)
 		logOutcome = "error: read stdin failed"
 		return 0
 	}
-	if len(raw) > maxHookPayloadBytes {
-		fmt.Fprintf(os.Stderr, "format-dispatch: stdin exceeds %d bytes\n", maxHookPayloadBytes)
-		logOutcome = "error: stdin too large"
-		return 0
-	}
-
-	payload := hookio.Parse(raw)
 	logPath = payload.FilePath()
 	path := logPath
 	if path == "" {

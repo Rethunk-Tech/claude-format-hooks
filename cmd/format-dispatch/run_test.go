@@ -508,13 +508,28 @@ func TestRunEmptyPayloadIsNoop(t *testing.T) {
 	qt.Check(t, qt.Equals(run(strings.NewReader(`{}`)), 0))
 }
 
-func TestRunOversizedStdinIsNoop(t *testing.T) {
+// The PostToolUse envelope echoes tool_input.content, so the payload for a
+// Write is as large as the file. A cap on the envelope is therefore a cap on
+// the file: a >1MB write must still be formatted, not dropped unparsed.
+func TestRunFormatsAWriteLargerThanAnyEnvelopeCap(t *testing.T) {
+	projectRoot := t.TempDir()
+	abs := filepath.Join(projectRoot, "big.json")
+	body := "{\"a\":1" + strings.Repeat(" ", 1<<20) + "}\n"
+	writeFile(t, abs, body)
+
+	echoed, err := json.Marshal(body)
+	qt.Assert(t, qt.IsNil(err))
+	encodedPath, err := json.Marshal(abs)
+	qt.Assert(t, qt.IsNil(err))
+	raw := `{"tool_input":{"file_path":` + string(encodedPath) + `,"content":` + string(echoed) + `}}`
+	qt.Assert(t, qt.IsTrue(len(raw) > 1<<20), qt.Commentf("the fixture must exceed the old envelope cap"))
+
+	t.Setenv("CLAUDE_PROJECT_DIR", projectRoot)
 	var code int
-	stderr := captureStderr(t, func() {
-		code = run(strings.NewReader(strings.Repeat("x", maxHookPayloadBytes+1)))
-	})
+	stderr := captureStderr(t, func() { code = run(strings.NewReader(raw)) })
 	qt.Check(t, qt.Equals(code, 0))
-	qt.Check(t, qt.StringContains(stderr, "exceeds"))
+	qt.Check(t, qt.Equals(stderr, ""), qt.Commentf("an oversized envelope is not a diagnostic"))
+	qt.Check(t, qt.Equals(readFile(t, abs), "{\n  \"a\": 1\n}\n"))
 }
 
 func TestRunUnsupportedExtensionIsNoop(t *testing.T) {
