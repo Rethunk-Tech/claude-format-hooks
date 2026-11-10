@@ -157,8 +157,8 @@ func TestCheckWorksInAReadOnlyTree(t *testing.T) {
 	good := writeCheckFile(t, dir, "ok.json", formattedJSON)
 	bad := writeCheckFile(t, dir, "bad.json", unformattedJSON)
 	plain := writeCheckFile(t, dir, "plain.txt", "text\n")
-	qt.Assert(t, qt.IsNil(os.Chmod(dir, 0o555)))
-	t.Cleanup(func() { _ = os.Chmod(dir, 0o755) })
+	qt.Assert(t, qt.IsNil(os.Chmod(dir, 0o555)))   //nolint:gosec // the test needs a directory that refuses new files
+	t.Cleanup(func() { _ = os.Chmod(dir, 0o755) }) //nolint:gosec // restoring write access so TempDir cleanup can run
 
 	var out, errOut bytes.Buffer
 	qt.Check(t, qt.Equals(runCheck([]string{dir}, &out, &errOut), 1),

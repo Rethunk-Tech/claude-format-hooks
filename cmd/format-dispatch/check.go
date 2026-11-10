@@ -93,27 +93,7 @@ func runCheck(args []string, out, errOut io.Writer) int {
 
 	// Tallied in job order, not completion order, so two runs over one tree
 	// produce identical output.
-	var wouldChange []string
-	failed := false
-	for i, o := range outcomes {
-		switch {
-		case o.err != nil:
-			// Every file's outcome is reported, not just the first failure:
-			// stopping here discarded the rest of the run's results and made a
-			// second check necessary to see them.
-			_, _ = fmt.Fprintf(errOut, "format-dispatch --check: %s: %v\n", jobs[i].abs, o.err)
-			failed = true
-		case o.disabled:
-			tally.disabled++
-		case o.skipped:
-			tally.noTool(o.formatter)
-		default:
-			tally.checked++
-			if o.changed {
-				wouldChange = append(wouldChange, jobs[i].abs)
-			}
-		}
-	}
+	wouldChange, failed := tally.record(jobs, outcomes, errOut)
 
 	if asJSON {
 		if wouldChange == nil {
@@ -285,6 +265,32 @@ func (t *checkTally) noTool(formatter string) {
 	if !slices.Contains(t.tools, formatter) {
 		t.tools = append(t.tools, formatter)
 	}
+}
+
+// record folds one run's outcomes into the tally and returns the files that
+// would change, in job order. failed reports any file the run could not check.
+//
+// Every failing file is reported rather than only the first: returning at the
+// first error discarded the rest of the run's results, so the operator needed
+// a second check just to see them.
+func (t *checkTally) record(jobs []checkJob, outcomes []checkOutcome, errOut io.Writer) (wouldChange []string, failed bool) {
+	for i, o := range outcomes {
+		switch {
+		case o.err != nil:
+			_, _ = fmt.Fprintf(errOut, "format-dispatch --check: %s: %v\n", jobs[i].abs, o.err)
+			failed = true
+		case o.disabled:
+			t.disabled++
+		case o.skipped:
+			t.noTool(o.formatter)
+		default:
+			t.checked++
+			if o.changed {
+				wouldChange = append(wouldChange, jobs[i].abs)
+			}
+		}
+	}
+	return wouldChange, failed
 }
 
 // summary reads as one line: what was checked, what needs work, and what

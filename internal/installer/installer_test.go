@@ -146,7 +146,7 @@ func TestWireMissingSettingsFile(t *testing.T) {
 	_, after, err := Wire(settingsPath, binPath)
 	qt.Assert(t, qt.IsNil(err))
 
-	assertOnlyOurEntry(t, after, binPath)
+	assertOnlyOurEntry(t, after)
 }
 
 func TestWireIdempotentReinstall(t *testing.T) {
@@ -158,7 +158,7 @@ func TestWireIdempotentReinstall(t *testing.T) {
 	qt.Assert(t, qt.IsNil(err))
 
 	qt.Check(t, qt.DeepEquals(second, first), qt.Commentf("a second wire must render the same document"))
-	assertOnlyOurEntry(t, second, binPath)
+	assertOnlyOurEntry(t, second)
 }
 
 func TestWireReplacesLegacyBareBasename(t *testing.T) {
@@ -194,7 +194,7 @@ func TestWireReplacesAHookWrittenAsABareBasename(t *testing.T) {
 	_, after, err := Wire(settingsPath, binPath)
 	qt.Assert(t, qt.IsNil(err))
 
-	assertOnlyOurEntry(t, after, binPath)
+	assertOnlyOurEntry(t, after)
 }
 
 func TestWirePreservesUnrelatedTopLevelKeys(t *testing.T) {
@@ -524,7 +524,7 @@ func TestWireTreatsABlankSettingsFileAsEmptyObject(t *testing.T) {
 
 			_, after, err := Wire(path, binPath)
 			qt.Assert(t, qt.IsNil(err))
-			assertOnlyOurEntry(t, after, binPath)
+			assertOnlyOurEntry(t, after)
 		})
 	}
 }

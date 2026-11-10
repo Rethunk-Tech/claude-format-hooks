@@ -108,13 +108,13 @@ func settingsWithHook(command string) string {
 }
 
 // assertOnlyOurEntry checks a rendered document holds exactly one
-// PostToolUse entry: ours, running command.
-func assertOnlyOurEntry(t *testing.T, raw []byte, command string) {
+// PostToolUse entry: ours, running binPath.
+func assertOnlyOurEntry(t *testing.T, raw []byte) {
 	t.Helper()
 	entries := settingsPostToolUse(t, raw)
 	qt.Assert(t, qt.HasLen(entries, 1))
 	qt.Check(t, qt.Equals(entries[0].Matcher, matcherAll))
-	qt.Check(t, qt.Equals(entries[0].Hooks[0].Command, command))
+	qt.Check(t, qt.Equals(entries[0].Hooks[0].Command, binPath))
 }
 
 // applyFixedChange runs applyChange over one before/after pair. The
