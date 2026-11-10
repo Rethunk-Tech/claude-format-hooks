@@ -28,7 +28,7 @@ func (pythonFormatter) Format(ctx context.Context, projectRoot, abs string) Resu
 	// a .py name in the same directory. Ruff takes the same invocation.
 	named := ""
 	if pyExampleCopy(abs) {
-		named = pyStdinFilePath(abs)
+		named = exampleStdinFilePath(abs)
 	}
 	if _, err := lookPath("ruff"); err == nil {
 		if named != "" {
@@ -67,8 +67,4 @@ func (pythonFormatter) FormatStdin(ctx context.Context, projectRoot, abs string,
 func pyExampleCopy(abs string) bool {
 	base := strings.ToLower(filepath.Base(abs))
 	return strings.HasSuffix(base, ".py.example") || strings.HasSuffix(base, ".pyi.example")
-}
-
-func pyStdinFilePath(abs string) string {
-	return exampleStdinFilePath(abs)
 }

@@ -104,8 +104,6 @@ type toolRunError struct {
 
 func (e *toolRunError) Error() string { return e.err.Error() }
 
-func (e *toolRunError) Unwrap() error { return e.err }
-
 // runToolStdout runs name in dir and returns stdout. stdin is connected only
 // when non-nil, so a tool that reads a path cannot consume the hook payload
 // waiting on the process's inherited stdin.

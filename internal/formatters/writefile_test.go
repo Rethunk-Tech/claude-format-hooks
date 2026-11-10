@@ -18,7 +18,7 @@ func TestWriteFormattedPreservesExistingMode(t *testing.T) {
 	path := filepath.Join(t.TempDir(), "f")
 	qt.Assert(t, qt.IsNil(os.WriteFile(path, []byte("old"), 0o755))) //nolint:gosec // test fixture must retain executable mode
 
-	qt.Assert(t, qt.IsNil(writeFormatted(path, []byte("old"), []byte("new"), 0o644)))
+	qt.Assert(t, qt.IsNil(WriteFormatted(path, []byte("old"), []byte("new"), 0o644)))
 
 	info, err := os.Stat(path)
 	qt.Assert(t, qt.IsNil(err))
@@ -28,7 +28,7 @@ func TestWriteFormattedPreservesExistingMode(t *testing.T) {
 func TestWriteFormattedFallsBackToDefaultModeWhenFileIsGone(t *testing.T) {
 	path := filepath.Join(t.TempDir(), "never-existed")
 
-	qt.Assert(t, qt.IsNil(writeFormatted(path, nil, []byte("new"), 0o644)))
+	qt.Assert(t, qt.IsNil(WriteFormatted(path, nil, []byte("new"), 0o644)))
 
 	info, err := os.Stat(path)
 	qt.Assert(t, qt.IsNil(err))
@@ -47,7 +47,7 @@ func TestWriteFormattedFollowsSymlinkToTarget(t *testing.T) {
 	qt.Assert(t, qt.IsNil(os.WriteFile(target, []byte("old"), 0o600)))
 	qt.Assert(t, qt.IsNil(os.Symlink(target, link)))
 
-	qt.Assert(t, qt.IsNil(writeFormatted(link, []byte("old"), []byte("new"), 0o644)))
+	qt.Assert(t, qt.IsNil(WriteFormatted(link, []byte("old"), []byte("new"), 0o644)))
 
 	got, err := os.ReadFile(filepath.Clean(target))
 	qt.Assert(t, qt.IsNil(err))
@@ -64,7 +64,7 @@ func TestWriteFormattedDanglingSymlinkNoOp(t *testing.T) {
 	link := filepath.Join(dir, "link")
 	qt.Assert(t, qt.IsNil(os.Symlink(target, link)))
 
-	qt.Assert(t, qt.IsNil(writeFormatted(link, []byte("old"), []byte("new"), 0o644)))
+	qt.Assert(t, qt.IsNil(WriteFormatted(link, []byte("old"), []byte("new"), 0o644)))
 
 	_, readErr := os.ReadFile(filepath.Clean(link))
 	qt.Check(t, qt.IsTrue(os.IsNotExist(readErr)), qt.Commentf("reading through a dangling symlink must fail"))
@@ -80,7 +80,7 @@ func TestWriteFormattedSkipsStaleSource(t *testing.T) {
 	path := filepath.Join(t.TempDir(), "f")
 	qt.Assert(t, qt.IsNil(os.WriteFile(path, []byte("newer"), 0o600)))
 
-	qt.Assert(t, qt.IsNil(writeFormatted(path, []byte("old"), []byte("formatted"), 0o644)))
+	qt.Assert(t, qt.IsNil(WriteFormatted(path, []byte("old"), []byte("formatted"), 0o644)))
 
 	got, err := os.ReadFile(filepath.Clean(path))
 	qt.Assert(t, qt.IsNil(err))
@@ -95,7 +95,7 @@ func TestWriteFormattedReturnsEvalSymlinksError(t *testing.T) {
 	blocker := filepath.Join(dir, "blocker")
 	qt.Assert(t, qt.IsNil(os.WriteFile(blocker, []byte("not a directory"), 0o600)))
 
-	err := writeFormatted(filepath.Join(blocker, "target"), []byte("old"), []byte("new"), 0o644)
+	err := WriteFormatted(filepath.Join(blocker, "target"), []byte("old"), []byte("new"), 0o644)
 
 	qt.Check(t, qt.IsNotNil(err))
 }
@@ -120,7 +120,7 @@ func TestWriteFormattedReturnsCreateTempError(t *testing.T) {
 		t.Skip("directory still writable after chmod 0555")
 	}
 
-	err := writeFormatted(path, []byte("old"), []byte("new"), 0o644)
+	err := WriteFormatted(path, []byte("old"), []byte("new"), 0o644)
 
 	qt.Check(t, qt.IsNotNil(err))
 }
@@ -130,7 +130,7 @@ func TestWriteFormattedReturnsReadFileErrorForDirectoryTarget(t *testing.T) {
 	target := filepath.Join(dir, "target")
 	qt.Assert(t, qt.IsNil(os.Mkdir(target, 0o750)))
 
-	err := writeFormatted(target, []byte("old"), []byte("new"), 0o644)
+	err := WriteFormatted(target, []byte("old"), []byte("new"), 0o644)
 
 	qt.Check(t, qt.IsNotNil(err))
 	assertDirEntryCount(t, dir, 1, "a failed read must remove the temporary file")
@@ -139,7 +139,7 @@ func TestWriteFormattedReturnsReadFileErrorForDirectoryTarget(t *testing.T) {
 func TestWriteFormattedIgnoresMissingTargetAfterFormatting(t *testing.T) {
 	path := filepath.Join(t.TempDir(), "missing")
 
-	qt.Assert(t, qt.IsNil(writeFormatted(path, []byte("old"), []byte("new"), 0o644)))
+	qt.Assert(t, qt.IsNil(WriteFormatted(path, []byte("old"), []byte("new"), 0o644)))
 
 	_, err := os.Stat(path)
 	qt.Check(t, qt.IsTrue(os.IsNotExist(err)))
@@ -150,7 +150,7 @@ func TestWriteFormattedReturnsRenameErrorForDirectoryTarget(t *testing.T) {
 	target := filepath.Join(dir, "target")
 	qt.Assert(t, qt.IsNil(os.Mkdir(target, 0o750)))
 
-	err := writeFormatted(target, nil, []byte("new"), 0o644)
+	err := WriteFormatted(target, nil, []byte("new"), 0o644)
 
 	qt.Check(t, qt.IsNotNil(err))
 	assertDirEntryCount(t, dir, 1, "a failed rename must remove the temporary file")

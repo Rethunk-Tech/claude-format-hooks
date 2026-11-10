@@ -60,7 +60,7 @@ func assertDirEntryCount(t *testing.T, dir string, want int, why string) {
 	qt.Check(t, qt.HasLen(entries, want), qt.Commentf("%s", why))
 }
 
-// assertStillSymlink checks writeFormatted wrote through a symlink rather
+// assertStillSymlink checks WriteFormatted wrote through a symlink rather
 // than replacing the link node itself.
 func assertStillSymlink(t *testing.T, link string) {
 	t.Helper()

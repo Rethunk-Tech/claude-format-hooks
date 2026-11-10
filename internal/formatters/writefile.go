@@ -7,11 +7,16 @@ import (
 	"path/filepath"
 )
 
-// writeFormatted writes out to abs, preserving abs's existing file mode
+// WriteFormatted writes out to abs, preserving abs's existing file mode
 // (e.g. an executable bit on a shell script) rather than resetting it —
 // falling back to defaultMode only when abs can't be stat'd (the file
-// somehow vanished between the read and the write).
-func writeFormatted(abs string, source, out []byte, defaultMode os.FileMode) error {
+// somehow vanished between the read and the write). A nil source writes
+// unconditionally; otherwise the write is skipped when the file no longer
+// holds source, so a formatter never clobbers a concurrent edit.
+//
+// Exported for --check --write, which must not re-implement mode preservation,
+// symlink handling and atomic replacement a second way.
+func WriteFormatted(abs string, source, out []byte, defaultMode os.FileMode) error {
 	target, err := filepath.EvalSymlinks(abs)
 	if err != nil {
 		if info, lstatErr := os.Lstat(abs); lstatErr == nil && info.Mode()&os.ModeSymlink != 0 {
@@ -72,7 +77,7 @@ func writeIfChanged(abs string, src, out []byte, perm os.FileMode) Result {
 	if bytes.Equal(out, src) {
 		return Result{}
 	}
-	if err := writeFormatted(abs, src, out, perm); err != nil {
+	if err := WriteFormatted(abs, src, out, perm); err != nil {
 		return Result{Err: fmt.Errorf("write: %w", err)}
 	}
 	return Result{}
