@@ -611,10 +611,13 @@ func configPath() string {
 func within(abs, root string) bool {
 	root = resolveSymlinks(filepath.Clean(root))
 	abs = resolveSymlinks(filepath.Clean(abs))
-	if abs == root {
-		return true
+	rel, err := filepath.Rel(root, abs)
+	if err != nil {
+		// Different volumes on Windows have no relative path, and so no
+		// containment either.
+		return false
 	}
-	return strings.HasPrefix(abs, root+string(filepath.Separator))
+	return rel == "." || (rel != ".." && !strings.HasPrefix(rel, ".."+string(filepath.Separator)))
 }
 
 // resolveSymlinks returns path with all symlinks resolved, or path
