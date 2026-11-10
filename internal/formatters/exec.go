@@ -99,6 +99,13 @@ func runExternalStdin(ctx context.Context, dir, name string, args []string, abs 
 		}
 		return Result{Diagnostic: truncate(stderr.Bytes(), 10, 500)}
 	}
+	// A tool that exits 0 having printed nothing formatted no document at
+	// all -- it declined the input rather than emptied it. Writing that empty
+	// stdout back would truncate a non-empty source file to zero bytes, which
+	// prettier does for real on a .yaml.example it parses as nothing.
+	if stdout.Len() == 0 && len(src) > 0 {
+		return Result{Skipped: true}
+	}
 	return writeIfChanged(abs, src, stdout.Bytes(), 0o644)
 }
 

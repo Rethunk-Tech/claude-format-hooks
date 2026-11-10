@@ -3,12 +3,31 @@ package formatters
 import (
 	"context"
 	"errors"
+	"path/filepath"
 	"strings"
 	"testing"
 	"unicode/utf8"
 
 	"github.com/go-quicktest/qt"
 )
+
+// A stdin tool that exits 0 without emitting the document declined the input.
+// Writing its empty stdout back truncated the source to zero bytes: a stub
+// taplo doing exactly that, and prettier for real on a .yaml.example.
+func TestRunExternalStdinTreatsEmptyStdoutAsASkip(t *testing.T) {
+	isolateDiskCache(t)
+	argvPath := filepath.Join(t.TempDir(), "argv")
+	t.Setenv("TAPLO_ARGV", argvPath)
+	writeFakeTool(t, "taplo", `printf '%s\n' "$@" > "$TAPLO_ARGV"`)
+
+	dir, abs := sourceFile(t, "config.toml.example", "a = 1\n")
+	res := runExternalStdin(t.Context(), dir, "taplo", []string{"format", "--stdin-filepath", abs, "-"}, abs)
+
+	qt.Check(t, qt.IsTrue(res.Skipped), qt.Commentf("silent success is a decline, not an empty document"))
+	qt.Check(t, qt.Equals(res.Diagnostic, ""))
+	qt.Check(t, qt.Equals(string(readSource(t, abs)), "a = 1\n"),
+		qt.Commentf("an empty stdout must never be written over the source"))
+}
 
 func TestTruncateLineLimit(t *testing.T) {
 	out := []byte("one\ntwo\nthree\nfour\nfive")
