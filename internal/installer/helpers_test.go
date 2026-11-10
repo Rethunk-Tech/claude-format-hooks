@@ -103,8 +103,13 @@ func hookFile(t *testing.T, name, content string) string {
 // settingsWithHook is a settings document whose only PostToolUse entry runs
 // command.
 func settingsWithHook(command string) string {
+	// Encoded, not spliced: a Windows path's backslashes are JSON escapes.
+	quoted, err := json.Marshal(command)
+	if err != nil {
+		panic(err)
+	}
 	return `{"hooks":{"PostToolUse":[{"matcher":"` + matcherAll +
-		`","hooks":[{"type":"command","command":"` + command + `"}]}]}}`
+		`","hooks":[{"type":"command","command":` + string(quoted) + `}]}]}}`
 }
 
 // assertOnlyOurEntry checks a rendered document holds exactly one
