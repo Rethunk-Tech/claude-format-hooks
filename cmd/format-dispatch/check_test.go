@@ -183,6 +183,116 @@ func TestCheckReportsEveryFailure(t *testing.T) {
 	qt.Check(t, qt.StringContains(errOut.String(), second))
 }
 
+// prettier, biome and taplo decide which files are theirs by path, so a
+// scratch copy named .fmtcheck-<hex>-<base> was judged by different rules than
+// the hook applies on the real file -- in both directions. A .prettierignore
+// naming the file made the hook leave it alone while --check reported "would
+// reformat", and a .prettierignore globbing dotfiles made --check call a file
+// clean that the hook reformats.
+func TestCheckAgreesWithTheHookOnPathScopedIgnoreRules(t *testing.T) {
+	if filepath.Separator == '\\' {
+		t.Skip("fake prettier script is POSIX-shell only")
+	}
+	const unformatted = "a:   1\n"
+	// Shell builtins only: the stub runs with a PATH holding just itself, so
+	// basename, ls and friends are not available inside it.
+	const script = `#!/bin/sh
+for arg in "$@"; do
+  case "$arg" in
+    ?*.yaml) file="${arg##*/}" ;;
+  esac
+done
+if [ -n "$file" ] && [ -f .prettierignore ]; then
+  while IFS= read -r pattern; do
+    case "$file" in $pattern) exit 0 ;; esac
+  done < .prettierignore
+fi
+for arg in "$@"; do
+  case "$arg" in
+    *.yaml) printf 'a: 1\n' > "$arg" ;;
+  esac
+done
+exit 0`
+
+	tests := []struct {
+		name     string
+		ignore   string
+		fileName string
+		wantExit int
+		want     string
+	}{
+		{
+			name:     "a file prettier is told to ignore is not reformatted",
+			ignore:   "f.yaml\n",
+			fileName: "f.yaml",
+			wantExit: 0,
+			want:     unformatted,
+		},
+		{
+			name:     "a dotfile glob does not hide the file from the check",
+			ignore:   ".*\n",
+			fileName: "f.yaml",
+			wantExit: 1,
+			want:     unformatted,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			projectRoot := t.TempDir()
+			path := writeCheckFile(t, projectRoot, tt.fileName, unformatted)
+			writeCheckFile(t, projectRoot, ".prettierrc", "{}\n")
+			writeCheckFile(t, projectRoot, ".prettierignore", tt.ignore)
+
+			configPath := filepath.Join(t.TempDir(), "claude-format-hooks.json")
+			writeFile(t, configPath, `{}`)
+			toolDir := t.TempDir()
+			prettier := filepath.Join(toolDir, "prettier")
+			qt.Assert(t, qt.IsNil(os.WriteFile(prettier, []byte(script), 0o755))) //nolint:gosec // test formatter fixture must be executable
+			t.Setenv("PATH", toolDir)
+			t.Setenv("CLAUDE_FORMAT_HOOKS_CACHE", filepath.Join(t.TempDir(), "cache"))
+			t.Setenv("CLAUDE_PROJECT_DIR", projectRoot)
+			t.Setenv("CLAUDE_FORMAT_HOOKS_CONFIG", configPath)
+
+			var out, errOut strings.Builder
+			qt.Check(t, qt.Equals(runCheck([]string{path}, &out, &errOut), tt.wantExit),
+				qt.Commentf("out=%q err=%q", out.String(), errOut.String()))
+			qt.Check(t, qt.Equals(readFile(t, path), tt.want),
+				qt.Commentf("a check must never leave a reformatted file behind"))
+		})
+	}
+}
+
+// The restore is not only for the success path: a formatter that rewrites the
+// file and then exits non-zero still has to be undone, or a failed check
+// leaves the tree reformatted.
+func TestWouldReformatRestoresAfterAFormatterFailure(t *testing.T) {
+	if filepath.Separator == '\\' {
+		t.Skip("fake prettier script is POSIX-shell only")
+	}
+	projectRoot := t.TempDir()
+	path := writeCheckFile(t, projectRoot, "f.yaml", "a:   1\n")
+	writeCheckFile(t, projectRoot, ".prettierrc", "{}\n")
+	configPath := filepath.Join(t.TempDir(), "claude-format-hooks.json")
+	writeFile(t, configPath, `{}`)
+	toolDir := t.TempDir()
+	// Rewrites first, then reports a failure: unfixable leftovers look like
+	// this to several of the real tools.
+	script := "#!/bin/sh\nfor arg in \"$@\"; do\n  case \"$arg\" in\n    *.yaml) printf 'a: 1\\n' > \"$arg\" ;;\n  esac\ndone\necho 'unexpected failure' >&2\nexit 1\n"
+	qt.Assert(t, qt.IsNil(os.WriteFile(filepath.Join(toolDir, "prettier"), []byte(script), 0o755))) //nolint:gosec // test formatter fixture must be executable
+	t.Setenv("PATH", toolDir)
+	t.Setenv("CLAUDE_FORMAT_HOOKS_CACHE", filepath.Join(t.TempDir(), "cache"))
+	t.Setenv("CLAUDE_PROJECT_DIR", projectRoot)
+	t.Setenv("CLAUDE_FORMAT_HOOKS_CONFIG", configPath)
+	registry := dispatch.NewRegistry(config.Default())
+
+	_, _, err := wouldReformat(t.Context(), registry, projectRoot, path, ".yaml", false)
+
+	qt.Check(t, qt.IsNotNil(err))
+	qt.Check(t, qt.Equals(readFile(t, path), "a:   1\n"),
+		qt.Commentf("a failed check must put the original bytes back"))
+}
+
 func TestWouldReformatReportsReadFileError(t *testing.T) {
 	dir := t.TempDir()
 	registry := dispatch.NewRegistry(config.Default())

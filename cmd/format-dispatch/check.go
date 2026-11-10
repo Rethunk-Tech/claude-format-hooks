@@ -9,17 +9,21 @@ import (
 	"fmt"
 	"io"
 	"io/fs"
+	"maps"
 	"os"
+	"os/signal"
 	"path/filepath"
 	"runtime"
 	"slices"
 	"sort"
 	"strings"
 	"sync"
+	"syscall"
 	"time"
 
 	"github.com/Rethunk-Tech/claude-format-hooks/internal/config"
 	"github.com/Rethunk-Tech/claude-format-hooks/internal/dispatch"
+	"github.com/Rethunk-Tech/claude-format-hooks/internal/formatters"
 )
 
 // checkTimeout bounds a whole --check run. This is CI-shaped work over many
@@ -60,6 +64,12 @@ func runCheck(args []string, out, errOut io.Writer) int {
 
 	ctx, cancel := context.WithTimeout(context.Background(), checkTimeout)
 	defer cancel()
+
+	// A check changes nothing, but it formats each file in place to find out.
+	// An interrupt between that write and the restore would leave the tree
+	// reformatted, so the pending originals are put back before exiting.
+	stopRestoring := restoreOnSignal()
+	defer stopRestoring()
 
 	rootCandidates := checkRootCandidates(args)
 	files, err := collectCheckTargets(args, checkSkipConfig(rootCandidates))
@@ -360,40 +370,58 @@ func checkRootCandidates(paths []string) []string {
 	return candidates
 }
 
-// wouldReformat answers the question by actually formatting a copy and
+// wouldReformat answers the question by actually formatting the file and
 // comparing bytes, rather than by asking each tool for a check/dry-run
 // flag. Those flags differ per tool, several report lint findings a fixer
 // would not have touched, and two of the formatters are native with no CLI
-// at all -- so a uniform copy-and-compare is both simpler and exactly
+// at all -- so a uniform format-and-compare is both simpler and exactly
 // consistent with what the hook does on a real write.
 //
-// The copy is made in the file's OWN directory: every one of these tools
-// resolves its config by walking up from the file (biome.json, .sqlfluff, a
-// project .markdownlint-cli2.jsonc), so formatting a copy in a temp
-// directory elsewhere would silently apply the wrong rules. Where that
-// directory is not writable -- an archive mount, a 0555 checkout -- the
-// formatter is asked to format the same bytes on stdin under the real path
-// instead, which keeps path-scoped config resolution and needs no write.
+// The file formatted is the real one, and the saved copy is only the undo
+// record. prettier, biome and taplo all decide which file a path is -- from
+// .prettierignore, its own include rules, path-scoped overrides -- so a
+// scratch name beside it is judged by different rules than the hook applies,
+// in both directions: an ignored file came back "would reformat" and a
+// dotfile-ignored one came back clean. Formatting the real path leaves a
+// check changing nothing on its own, which is why it is restored unless
+// --write asked for the change.
+//
+// The copy is written in the file's OWN directory, which also proves that
+// directory is writable. Where it is not -- an archive mount, a 0555
+// checkout -- the formatter is asked to format the same bytes on stdin under
+// the real path instead, which keeps path-scoped config resolution and needs
+// no write of its own.
 func wouldReformat(ctx context.Context, registry *dispatch.Registry, projectRoot, abs, ext string, write bool) (changed, skipped bool, err error) {
 	original, err := os.ReadFile(filepath.Clean(abs))
 	if err != nil {
 		return false, false, err
 	}
 
-	scratch, cleanup, err := copyBeside(abs, original)
-	if err != nil {
+	// The copy is the undo record and the writability probe in one: if it
+	// cannot be written beside the file, nothing there can be, and the file
+	// has to be judged on stdin instead.
+	_, cleanup, copyErr := copyBeside(abs, original)
+	if copyErr != nil {
 		return wouldReformatStdin(ctx, registry, projectRoot, abs, ext, original, write)
 	}
 	defer cleanup()
 
-	// A formatter that skips (tool not installed) leaves the copy untouched,
-	// which would compare equal and read as "already formatted". It is
-	// reported as a skip instead: an absent tool must not fail a build for
-	// files it could never have formatted, but it must not claim to have
-	// checked them either.
+	// A check changes nothing, so every way out of here -- a formatter
+	// failure, a panic, an interrupt -- has to put the file back.
+	if !write {
+		pendingRestores.add(abs, original)
+		defer pendingRestores.remove(abs)
+		defer func() {
+			if restoreErr := restoreOriginal(abs, original); restoreErr != nil && err == nil {
+				changed = false
+				err = fmt.Errorf("restore: %w", restoreErr)
+			}
+		}()
+	}
+
 	// Dispatch from the check's project root so config discovery matches the
 	// hook, even when the file being checked is nested below that root.
-	res := registry.Dispatch(ctx, projectRoot, scratch, ext)
+	res := registry.Dispatch(ctx, projectRoot, abs, ext)
 	if err := context.Cause(ctx); err != nil {
 		return false, false, err
 	}
@@ -403,27 +431,87 @@ func wouldReformat(ctx context.Context, registry *dispatch.Registry, projectRoot
 	if res.Diagnostic != "" {
 		return false, false, fmt.Errorf("%s", res.Diagnostic)
 	}
+	// A formatter that skips (tool not installed) leaves the file untouched,
+	// which would compare equal and read as "already formatted". It is
+	// reported as a skip instead: an absent tool must not fail a build for
+	// files it could never have formatted, but it must not claim to have
+	// checked them either.
 	if res.Skipped {
 		return false, true, nil
 	}
 
-	formatted, err := os.ReadFile(scratch) //nolint:gosec // scratch is the temp copy this function just created
+	formatted, err := os.ReadFile(filepath.Clean(abs))
 	if err != nil {
 		return false, false, err
 	}
-	if bytes.Equal(original, formatted) {
-		return false, false, nil
+	// --write keeps what the formatter produced; otherwise the deferred
+	// restore above is already putting the original bytes back.
+	return !bytes.Equal(original, formatted), false, nil
+}
+
+// restoreSet is the files --check is formatting in place right now, by
+// absolute path, with the bytes to put back. A check must never leave a
+// reformatted file behind, and the process can be killed between the
+// formatter's write and the caller's restore, so the undo record has to be
+// visible outside the goroutine doing the work.
+type restoreSet struct {
+	mu    sync.Mutex
+	files map[string][]byte
+}
+
+var pendingRestores = restoreSet{files: map[string][]byte{}}
+
+func (s *restoreSet) add(abs string, original []byte) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.files[abs] = original
+}
+
+func (s *restoreSet) remove(abs string) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	delete(s.files, abs)
+}
+
+// restoreAll puts every in-flight file back, for the signal handler.
+func (s *restoreSet) restoreAll() {
+	s.mu.Lock()
+	pending := maps.Clone(s.files)
+	s.mu.Unlock()
+	for abs, original := range pending {
+		_ = restoreOriginal(abs, original)
 	}
-	if write {
-		// The scratch copy already holds exactly what the hook would have
-		// produced, config resolution and all, so applying it is a byte
-		// copy rather than a second formatter run that could resolve
-		// differently.
-		if err := replaceContents(abs, formatted); err != nil {
-			return true, false, err
+}
+
+// restoreOriginal writes original back over abs. A nil source forces the
+// write: the file's current content is the formatter's, and it is being
+// discarded on purpose.
+func restoreOriginal(abs string, original []byte) error {
+	return formatters.WriteFormatted(abs, nil, original, 0o644)
+}
+
+// restoreOnSignal puts every in-flight file back when the operator interrupts
+// a check, then exits non-zero: the run did not answer its question, and it
+// must not leave the tree changed. The returned function stops watching.
+func restoreOnSignal() (stop func()) {
+	sigs := make(chan os.Signal, 1)
+	signal.Notify(sigs, os.Interrupt, syscall.SIGTERM)
+	done := make(chan struct{})
+	go func() {
+		select {
+		case <-sigs:
+			pendingRestores.restoreAll()
+			os.Exit(2)
+		case <-done:
+		}
+	}()
+	return func() {
+		signal.Stop(sigs)
+		if done != nil {
+			close(done)
+			done = nil
 		}
 	}
-	return true, false, nil
 }
 
 // wouldReformatStdin is wouldReformat for a file whose directory cannot hold a
@@ -459,37 +547,11 @@ func wouldReformatStdin(ctx context.Context, registry *dispatch.Registry, projec
 	return true, false, nil
 }
 
-// replaceContents overwrites abs with out, preserving its mode and writing
-// through a temp file in the same directory so an interrupted --write
-// leaves the original intact rather than a half-written source file.
+// replaceContents overwrites abs with out through the same atomic,
+// mode-preserving, symlink-following write the hook's formatters use, so
+// --write cannot drift from them.
 func replaceContents(abs string, out []byte) error {
-	mode := os.FileMode(0o644)
-	if info, err := os.Stat(abs); err == nil {
-		mode = info.Mode()
-	}
-	target, err := filepath.EvalSymlinks(abs)
-	if err != nil {
-		target = abs
-	}
-
-	tmp, err := os.CreateTemp(filepath.Dir(target), "."+filepath.Base(target)+"-write-*")
-	if err != nil {
-		return err
-	}
-	tmpName := tmp.Name()
-	defer func() { _ = os.Remove(tmpName) }()
-
-	if _, err := tmp.Write(out); err != nil {
-		_ = tmp.Close()
-		return err
-	}
-	if err := tmp.Close(); err != nil {
-		return err
-	}
-	if err := os.Chmod(tmpName, mode); err != nil {
-		return err
-	}
-	return os.Rename(tmpName, target)
+	return formatters.WriteFormatted(abs, nil, out, 0o644)
 }
 
 // copyBeside writes content to a uniquely-named sibling of abs, preserving
