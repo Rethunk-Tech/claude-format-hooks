@@ -21,15 +21,27 @@ import (
 	"time"
 )
 
-// prunedNamespaces records the namespaces this process has already swept.
-// prune costs an os.ReadDir of the whole cache directory, and that directory
-// grows one entry per file formatted, so sweeping on every Get made a read
-// scale with the session's history: on a six-entry $PATH, a cached miss
-// measured 206us against a 2.8us bare exec.LookPath once ~2000 entries had
-// accumulated. A longer $PATH narrows the gap (19us bare at forty entries),
-// so the penalty is the sweep, not the lookup. One sweep per namespace per
-// process keeps the collection without putting it on the read path.
+// prunedNamespaces records the namespaces this process has already swept, so
+// a run that reads the same namespace many times sweeps it once.
+//
+// A process marker alone is not enough: format-dispatch is a fresh process
+// per file write, so "once per process" is still once per hook invocation --
+// every one of them an os.ReadDir plus a read of every entry in the
+// namespace. Measured with 5000 fresh entries and nothing prunable, that was
+// 70-80ms per invocation against 173us on an empty cache, and a normal
+// monorepo session (one entry per file formatted) reaches those numbers. The
+// sweep interval below makes the cost amortized instead.
 var prunedNamespaces sync.Map
+
+// pruneInterval is how often any process may sweep a namespace. Expired
+// entries linger up to this much longer than their TTL, which costs disk
+// space but never a wrong answer: Get re-checks the timestamp of the entry it
+// reads and treats a stale one as a miss whether or not a sweep ran.
+const pruneInterval = 5 * time.Minute
+
+// pruneStampName records when the cache directory was last swept. Dotted so
+// it cannot collide with an entry: every namespace prefix is a bare word.
+const pruneStampName = ".prune-stamp"
 
 // Dir resolves the directory cache entries are stored under:
 // $CLAUDE_FORMAT_HOOKS_CACHE if set, else the OS's own cache directory
@@ -107,9 +119,9 @@ func cacheNamespacePrefix(key string) string {
 	return key[:i+1]
 }
 
-// pruneOnce sweeps a namespace the first time this process reads from it.
-// format-dispatch is a fresh process per file write, so "once per process"
-// is still frequent enough to collect expired entries.
+// pruneOnce sweeps a namespace at most once per process and once per
+// pruneInterval across processes. A cache miss must not pay for a full sweep
+// of a directory that has grown one entry per formatted file.
 func pruneOnce(dir, namespacePrefix string, maxAge time.Duration) {
 	if namespacePrefix == "" {
 		return
@@ -117,7 +129,51 @@ func pruneOnce(dir, namespacePrefix string, maxAge time.Duration) {
 	if _, swept := prunedNamespaces.LoadOrStore(dir+"\x00"+namespacePrefix, struct{}{}); swept {
 		return
 	}
+	if !pruneDue(dir) {
+		return
+	}
 	prune(dir, namespacePrefix, maxAge)
+	writePruneStamp(dir)
+}
+
+// pruneDue reports whether the cache directory's last sweep is older than
+// pruneInterval, or unknown. A missing or unreadable stamp counts as due so a
+// cache that never records a sweep still collects expired entries.
+func pruneDue(dir string) bool {
+	raw, err := os.ReadFile(filepath.Clean(filepath.Join(dir, pruneStampName)))
+	if err != nil {
+		return true
+	}
+	stamped, err := strconv.ParseInt(string(bytes.TrimSpace(raw)), 10, 64)
+	if err != nil {
+		return true
+	}
+	return time.Since(time.Unix(stamped, 0)) >= pruneInterval
+}
+
+// writePruneStamp records now as the last sweep time, best effort and through
+// a rename so a concurrent reader never sees a half-written timestamp.
+func writePruneStamp(dir string) {
+	if err := os.MkdirAll(dir, 0o700); err != nil {
+		return
+	}
+	tmp, err := os.CreateTemp(dir, "."+pruneStampName+"-*")
+	if err != nil {
+		return
+	}
+	tmpName := tmp.Name()
+	if _, err := tmp.WriteString(strconv.FormatInt(time.Now().Unix(), 10)); err != nil {
+		_ = tmp.Close()
+		_ = os.Remove(tmpName)
+		return
+	}
+	if err := tmp.Close(); err != nil {
+		_ = os.Remove(tmpName)
+		return
+	}
+	if err := os.Rename(tmpName, filepath.Join(dir, pruneStampName)); err != nil {
+		_ = os.Remove(tmpName)
+	}
 }
 
 // prune removes expired entries under namespacePrefix. Cache cleanup is best

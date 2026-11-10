@@ -90,8 +90,48 @@ func TestGetExpiresAfterMaxAge(t *testing.T) {
 	qt.Check(t, qt.IsTrue(os.IsNotExist(err)), qt.Commentf("expired entries should be removed after they are observed"))
 }
 
+// A hook invocation is a fresh process, so "once per process" was really
+// "once per file write": with a few thousand entries in the namespace every
+// write paid a full directory read. A recorded sweep must suppress the next
+// one across processes.
+func TestGetSkipsTheSweepUntilTheIntervalElapses(t *testing.T) {
+	dir := t.TempDir()
+	resetPruneStateForTest()
+	stale := strconv.FormatInt(time.Now().Add(-time.Hour).Unix(), 10) + "\nvalue"
+	stalePath := filepath.Join(dir, Key("interval", "stale"))
+	qt.Assert(t, qt.IsNil(os.WriteFile(stalePath, []byte(stale), 0o600)))
+
+	// A sweep moments ago belongs to a previous invocation.
+	qt.Assert(t, qt.IsNil(os.WriteFile(filepath.Join(dir, pruneStampName),
+		[]byte(strconv.FormatInt(time.Now().Unix(), 10)), 0o600)))
+
+	_, ok := Get(dir, Key("interval", "fresh"), time.Minute)
+	qt.Check(t, qt.IsFalse(ok))
+	_, err := os.Stat(stalePath)
+	qt.Check(t, qt.IsNil(err), qt.Commentf("an entry inside the sweep interval must not be collected"))
+
+	// Once the interval has elapsed the next reader collects it.
+	qt.Assert(t, qt.IsNil(os.WriteFile(filepath.Join(dir, pruneStampName),
+		[]byte(strconv.FormatInt(time.Now().Add(-2*pruneInterval).Unix(), 10)), 0o600)))
+	resetPruneStateForTest()
+
+	_, _ = Get(dir, Key("interval", "fresh"), time.Minute)
+	_, err = os.Stat(stalePath)
+	qt.Check(t, qt.IsTrue(os.IsNotExist(err)), qt.Commentf("a sweep past the interval must collect the expired entry"))
+}
+
+// resetPruneStateForTest clears the per-process sweep memo, standing in for
+// the fresh process every hook invocation is.
+func resetPruneStateForTest() {
+	prunedNamespaces.Range(func(k, _ any) bool {
+		prunedNamespaces.Delete(k)
+		return true
+	})
+}
+
 func TestGetPrunesExpiredEntriesInTheSameNamespace(t *testing.T) {
 	dir := t.TempDir()
+	resetPruneStateForTest()
 	freshKey := Key("ns", "fresh")
 	staleKey := Key("ns", "stale")
 	otherKey := Key("other", "stale")
@@ -112,6 +152,7 @@ func TestGetPrunesExpiredEntriesInTheSameNamespace(t *testing.T) {
 
 func TestGetSweepsANamespaceOnlyOncePerProcess(t *testing.T) {
 	dir := t.TempDir()
+	resetPruneStateForTest()
 	freshKey := Key("sweeponce", "fresh")
 	stale := strconv.FormatInt(time.Now().Add(-time.Hour).Unix(), 10) + "\nvalue"
 
@@ -133,6 +174,7 @@ func TestGetSweepsANamespaceOnlyOncePerProcess(t *testing.T) {
 
 func TestGetPrunesHyphenatedBinaryNamesAsOneNamespace(t *testing.T) {
 	dir := t.TempDir()
+	resetPruneStateForTest()
 	freshKey := "missing-current-binary"
 	staleKey := "missing-old-binary"
 	otherKey := "other-old-binary"
