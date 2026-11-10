@@ -153,6 +153,41 @@ func TestDoctorJSONReportsFormattersToolsAndWiring(t *testing.T) {
 	qt.Check(t, qt.IsTrue(sawRustfmt))
 }
 
+func TestDoctorNamesEveryFormatterToolDeterministically(t *testing.T) {
+	// "prettier" is the name of both the prettier formatter and the GraphQL
+	// router, whose Tools() differ and includes biome. Picking whichever
+	// registry.All() yielded first made the column vary run to run: with only
+	// biome on PATH it alternated between "ok: biome" and "MISSING: ...".
+	t.Setenv("CLAUDE_FORMAT_HOOKS_CONFIG", filepath.Join(t.TempDir(), "absent.json"))
+	fakePath(t, "biome")
+
+	var want string
+	var code int
+	var got struct {
+		Formatters []struct {
+			Name string `json:"name"`
+			Tool string `json:"tool"`
+		} `json:"formatters"`
+	}
+	for range 20 {
+		out := captureStdout(t, func() { code = dispatchArgs([]string{"--doctor", "--json"}) })
+		qt.Assert(t, qt.Equals(code, 0))
+		qt.Assert(t, qt.IsNil(json.Unmarshal([]byte(out), &got)))
+		var tool string
+		for _, f := range got.Formatters {
+			if f.Name == "prettier" {
+				tool = f.Tool
+			}
+		}
+		if want == "" {
+			want = tool
+		}
+		qt.Check(t, qt.Equals(tool, want), qt.Commentf("--doctor's tool column must not depend on map order"))
+	}
+	qt.Check(t, qt.Equals(want, "ok: biome"),
+		qt.Commentf("either delegate being present means the formatter runs"))
+}
+
 // wiringLineSays reports whether the --doctor line naming path ends in
 // state, independent of how tabwriter padded the columns.
 func wiringLineSays(output, path, state string) bool {

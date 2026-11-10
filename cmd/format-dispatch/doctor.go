@@ -37,10 +37,10 @@ func runDoctor(out, errOut io.Writer, asJSON bool) int {
 		e := byName[f.Name()]
 		if e == nil {
 			e = &entry{}
-			if p, ok := f.(formatters.Prober); ok {
-				e.tools = p.Tools()
-			}
 			byName[f.Name()] = e
+		}
+		if p, ok := f.(formatters.Prober); ok {
+			e.tools = unionTools(e.tools, p.Tools())
 		}
 		e.exts = append(e.exts, ext)
 	}
@@ -88,6 +88,23 @@ func runDoctor(out, errOut io.Writer, asJSON bool) int {
 	}
 	writeWiring(out, wiring)
 	return 0
+}
+
+// unionTools merges two candidate-binary lists into one deterministic list.
+// Several formatters share a name -- "prettier" is both prettier itself and
+// the GraphQL router, which may delegate to biome -- and registry.All() is a
+// map, so taking Tools() from whichever instance happened to come first made
+// --doctor's tool column change between runs. Sorted so the column is stable;
+// any of the listed binaries makes the formatter run.
+func unionTools(have, more []string) []string {
+	merged := slices.Clone(have)
+	for _, t := range more {
+		if !slices.Contains(merged, t) {
+			merged = append(merged, t)
+		}
+	}
+	slices.Sort(merged)
+	return merged
 }
 
 type doctorWiring struct {
