@@ -80,6 +80,29 @@ func (biomeFormatter) Format(ctx context.Context, projectRoot, abs string) Resul
 	)
 }
 
+// FormatStdin formats src as abs through biome's stdin mode. Biome resolves
+// its config from the working directory and the --stdin-file-path name, so
+// the invocation runs from the same config directory Format uses.
+func (biomeFormatter) FormatStdin(ctx context.Context, projectRoot, abs string, src []byte) ([]byte, Result, bool) {
+	cfgDir := cachedFindUpward(filepath.Dir(abs), projectRoot, biomeConfigNames...)
+	if cfgDir == "" {
+		cfgDir = projectRoot
+	}
+	named := abs
+	if biomeExampleCopy(abs) {
+		named = exampleStdinFilePath(abs)
+	}
+	args := []string{"format", "--no-errors-on-unmatched", "--stdin-file-path", named}
+	command, argv := "bunx", append([]string{"@biomejs/biome"}, args...)
+	if path, err := lookPath("biome"); err == nil {
+		command, argv = path, args
+	} else if _, err := lookPath("bunx"); err != nil {
+		return nil, Result{Skipped: true}, true
+	}
+	out, res := runExternalStdinBytes(ctx, cfgDir, command, argv, src)
+	return out, res, true
+}
+
 var biomeExampleLangs = []string{
 	".ts", ".tsx", ".js", ".jsx", ".mjs", ".cjs", ".mts", ".cts",
 	".css", ".jsonc", ".graphql", ".gql",

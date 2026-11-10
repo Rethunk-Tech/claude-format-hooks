@@ -49,6 +49,21 @@ func (pythonFormatter) Format(ctx context.Context, projectRoot, abs string) Resu
 	return Result{Skipped: true}
 }
 
+// FormatStdin formats src as abs. Ruff and black both accept a whole file on
+// stdin regardless of the name's suffix, so --check needs no writable
+// directory beside the file for this formatter.
+func (pythonFormatter) FormatStdin(ctx context.Context, projectRoot, abs string, src []byte) ([]byte, Result, bool) {
+	if _, err := lookPath("ruff"); err == nil {
+		out, res := runExternalStdinBytes(ctx, projectRoot, "ruff", []string{"format", "--stdin-filename", abs, "-"}, src)
+		return out, res, true
+	}
+	if _, err := lookPath("black"); err == nil {
+		out, res := runExternalStdinBytes(ctx, projectRoot, "black", []string{"--quiet", "--stdin-filename", abs, "-"}, src)
+		return out, res, true
+	}
+	return nil, Result{Skipped: true}, true
+}
+
 func pyExampleCopy(abs string) bool {
 	base := strings.ToLower(filepath.Base(abs))
 	return strings.HasSuffix(base, ".py.example") || strings.HasSuffix(base, ".pyi.example")

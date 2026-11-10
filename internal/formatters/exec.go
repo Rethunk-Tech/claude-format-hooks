@@ -84,6 +84,18 @@ func runExternalStdin(ctx context.Context, dir, name string, args []string, abs 
 		return Result{Err: fmt.Errorf("read: %w", err)}
 	}
 
+	out, res := runExternalStdinBytes(ctx, dir, name, args, src)
+	if res != (Result{}) {
+		return res
+	}
+	return writeIfChanged(abs, src, out, 0o644)
+}
+
+// runExternalStdinBytes is runExternalStdin without a file: it feeds src on
+// stdin and returns what the tool printed. Callers holding the document in
+// memory -- --check on a tree with no writable directory for a scratch copy --
+// compare those bytes without writing anything.
+func runExternalStdinBytes(ctx context.Context, dir, name string, args []string, src []byte) ([]byte, Result) {
 	cmd := exec.CommandContext(ctx, name, args...) //nolint:gosec // running an external formatter by design; args are our own construction, never a shell
 	cmd.Dir = dir
 	cmd.Stdin = bytes.NewReader(src)
@@ -92,21 +104,21 @@ func runExternalStdin(ctx context.Context, dir, name string, args []string, abs 
 	cmd.Stderr = &stderr
 	if err := cmd.Run(); err != nil {
 		if ctx.Err() != nil {
-			return Result{Diagnostic: context.Cause(ctx).Error()}
+			return nil, Result{Diagnostic: context.Cause(ctx).Error()}
 		}
 		if stderr.Len() == 0 {
-			return Result{Diagnostic: err.Error()}
+			return nil, Result{Diagnostic: err.Error()}
 		}
-		return Result{Diagnostic: truncate(stderr.Bytes(), 10, 500)}
+		return nil, Result{Diagnostic: truncate(stderr.Bytes(), 10, 500)}
 	}
 	// A tool that exits 0 having printed nothing formatted no document at
 	// all -- it declined the input rather than emptied it. Writing that empty
 	// stdout back would truncate a non-empty source file to zero bytes, which
 	// prettier does for real on a .yaml.example it parses as nothing.
 	if stdout.Len() == 0 && len(src) > 0 {
-		return Result{Skipped: true}
+		return nil, Result{Skipped: true}
 	}
-	return writeIfChanged(abs, src, stdout.Bytes(), 0o644)
+	return stdout.Bytes(), Result{}
 }
 
 // runExternalResult runs an external formatter and shapes the outcome as a

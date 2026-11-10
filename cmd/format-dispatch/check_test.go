@@ -145,6 +145,44 @@ func TestCheckFailsOnInvalidJSON(t *testing.T) {
 	qt.Check(t, qt.Not(qt.Equals(errOut.String(), "")))
 }
 
+// A read-only checkout (archive mount, chmod 555) offers nowhere to put the
+// scratch copy. --check must still answer for files whose formatter has a
+// stdin mode, and must report every file it cannot check rather than stopping
+// at the first one.
+func TestCheckWorksInAReadOnlyTree(t *testing.T) {
+	if filepath.Separator == '\\' || os.Geteuid() == 0 {
+		t.Skip("POSIX directory modes and a non-root user are required")
+	}
+	dir := t.TempDir()
+	good := writeCheckFile(t, dir, "ok.json", formattedJSON)
+	bad := writeCheckFile(t, dir, "bad.json", unformattedJSON)
+	plain := writeCheckFile(t, dir, "plain.txt", "text\n")
+	qt.Assert(t, qt.IsNil(os.Chmod(dir, 0o555)))
+	t.Cleanup(func() { _ = os.Chmod(dir, 0o755) })
+
+	var out, errOut bytes.Buffer
+	qt.Check(t, qt.Equals(runCheck([]string{dir}, &out, &errOut), 1),
+		qt.Commentf("a JSON file can be judged on stdin, so it is checked, not failed"))
+	qt.Check(t, qt.StringContains(out.String(), bad))
+	qt.Check(t, qt.Not(qt.StringContains(out.String(), good)))
+	qt.Check(t, qt.Equals(errOut.String(), ""))
+	qt.Check(t, qt.Equals(readFile(t, plain), "text\n"))
+}
+
+// Every failing outcome is reported. Returning at the first one discarded the
+// rest of the run's results, so the operator needed a second check to see
+// them.
+func TestCheckReportsEveryFailure(t *testing.T) {
+	dir := t.TempDir()
+	first := writeCheckFile(t, dir, "a.json", "{\"a\": ")
+	second := writeCheckFile(t, dir, "b.json", "{\"b\": ")
+
+	var out, errOut strings.Builder
+	qt.Check(t, qt.Equals(runCheck([]string{dir}, &out, &errOut), 2))
+	qt.Check(t, qt.StringContains(errOut.String(), first))
+	qt.Check(t, qt.StringContains(errOut.String(), second))
+}
+
 func TestWouldReformatReportsReadFileError(t *testing.T) {
 	dir := t.TempDir()
 	registry := dispatch.NewRegistry(config.Default())

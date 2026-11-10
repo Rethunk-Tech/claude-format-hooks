@@ -37,3 +37,17 @@ type Formatter interface {
 type Prober interface {
 	Tools() []string
 }
+
+// StdinFormatter is a Formatter that can also format a document handed to it
+// in memory, without a writable path beside the file. --check needs a scratch
+// copy in the file's own directory so path-scoped config resolves the way the
+// hook's does, and a read-only checkout offers nowhere to put one; abs stays
+// the real path either way, so config lookup and path-scoped rules are
+// unchanged. It is optional for the same reason Prober is: a formatter with
+// no stdin mode (markdownlint-cli2) cannot answer the question this way, and
+// the caller reports that rather than pretending.
+type StdinFormatter interface {
+	// FormatStdin returns the formatted document, or a Result explaining why
+	// it produced none. ok is false when this formatter has no stdin mode.
+	FormatStdin(ctx context.Context, projectRoot, abs string, src []byte) (out []byte, res Result, ok bool)
+}

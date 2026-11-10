@@ -399,6 +399,21 @@ func (r *Registry) Dispatch(ctx context.Context, projectRoot, abs, ext string) f
 	return f.Format(ctx, projectRoot, abs)
 }
 
+// FormatStdin formats src as if it were the contents of abs, without writing
+// anything. ok is false when the formatter for ext has no stdin mode, so a
+// caller that cannot write a scratch copy reports that instead of guessing.
+func (r *Registry) FormatStdin(ctx context.Context, projectRoot, abs, ext string, src []byte) (out []byte, res formatters.Result, ok bool) {
+	f := r.byExt[strings.ToLower(ext)]
+	if f == nil {
+		return nil, formatters.Result{Skipped: true}, true
+	}
+	sf, ok := f.(formatters.StdinFormatter)
+	if !ok {
+		return nil, formatters.Result{}, false
+	}
+	return sf.FormatStdin(ctx, projectRoot, abs, src)
+}
+
 // Name returns the formatter name registered for ext, or "" if unsupported.
 // Used only for diagnostic messages.
 func (r *Registry) Name(ext string) string {

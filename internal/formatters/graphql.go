@@ -42,3 +42,12 @@ func (r graphqlRouter) Format(ctx context.Context, projectRoot, abs string) Resu
 	}
 	return r.prettier.Format(ctx, projectRoot, abs)
 }
+
+// FormatStdin answers --check's question without a scratch copy, choosing the
+// same delegate Format would for abs.
+func (r graphqlRouter) FormatStdin(ctx context.Context, projectRoot, abs string, src []byte) ([]byte, Result, bool) {
+	if biomeUsable(projectRoot, abs, r.biomeDisabled) {
+		return formatStdinVia(ctx, r.biome, projectRoot, abs, src)
+	}
+	return formatStdinVia(ctx, r.prettier, projectRoot, abs, src)
+}

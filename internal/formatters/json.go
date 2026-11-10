@@ -76,6 +76,26 @@ func (r jsonRouter) Format(ctx context.Context, projectRoot, abs string) Result 
 	return r.native.Format(ctx, projectRoot, abs)
 }
 
+// FormatStdin answers --check's question without a scratch copy, following the
+// same delegate Format would pick for abs.
+// formatStdinVia adapts a delegate held as a plain Formatter to the
+// StdinFormatter a caller needs, reporting ok=false when it has no stdin mode.
+func formatStdinVia(ctx context.Context, f Formatter, projectRoot, abs string, src []byte) ([]byte, Result, bool) {
+	sf, ok := f.(StdinFormatter)
+	if !ok {
+		return nil, Result{}, false
+	}
+	return sf.FormatStdin(ctx, projectRoot, abs, src)
+}
+
+func (r jsonRouter) FormatStdin(ctx context.Context, projectRoot, abs string, src []byte) ([]byte, Result, bool) {
+	isExample := strings.HasSuffix(strings.ToLower(filepath.Base(abs)), ".json.example")
+	if !isExample && biomeUsable(projectRoot, abs, r.biomeDisabled) {
+		return formatStdinVia(ctx, r.biome, projectRoot, abs, src)
+	}
+	return formatStdinVia(ctx, r.native, projectRoot, abs, src)
+}
+
 func (jsonFormatter) Name() string { return "json" }
 
 func (f jsonFormatter) Format(_ context.Context, _, abs string) Result {
@@ -83,7 +103,23 @@ func (f jsonFormatter) Format(_ context.Context, _, abs string) Result {
 	if err != nil {
 		return Result{Err: fmt.Errorf("read: %w", err)}
 	}
+	out, res := f.format(src, abs)
+	if res != (Result{}) {
+		return res
+	}
+	return writeIfChanged(abs, src, out, 0o644)
+}
 
+// FormatStdin formats src as JSON for abs. Only the indent resolution needs
+// the path, so this answers --check's question without a scratch copy beside
+// the file.
+func (f jsonFormatter) FormatStdin(_ context.Context, _, abs string, src []byte) ([]byte, Result, bool) {
+	out, res := f.format(src, abs)
+	return out, res, true
+}
+
+// format is the in-process formatting both Format and FormatStdin apply.
+func (f jsonFormatter) format(src []byte, abs string) ([]byte, Result) {
 	spec := config.ResolveJSONIndent(f.cfg, abs)
 	indent := "\t"
 	if !spec.UseTabs {
@@ -96,7 +132,7 @@ func (f jsonFormatter) Format(_ context.Context, _, abs string) Result {
 		// The hook surfaces Diagnostic; --check must fail rather than
 		// treat an unchanged scratch copy as already formatted or as a
 		// missing tool.
-		return Result{Diagnostic: err.Error()}
+		return nil, Result{Diagnostic: err.Error()}
 	}
 
 	// json.Indent passes through any insignificant whitespace already
@@ -104,8 +140,7 @@ func (f jsonFormatter) Format(_ context.Context, _, abs string) Result {
 	// it). Trim before appending exactly one newline, or a file that
 	// already ends in "}\n" would gain an extra blank line every single
 	// time it's formatted — a non-idempotent, ever-growing bug.
-	out := append(bytes.TrimRight(buf.Bytes(), "\n\t \r"), '\n')
-	return writeIfChanged(abs, src, out, 0o644)
+	return append(bytes.TrimRight(buf.Bytes(), "\n\t \r"), '\n'), Result{}
 }
 
 // maxIndentWidth caps spaces taken from untrusted config / .editorconfig.

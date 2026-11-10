@@ -94,11 +94,15 @@ func runCheck(args []string, out, errOut io.Writer) int {
 	// Tallied in job order, not completion order, so two runs over one tree
 	// produce identical output.
 	var wouldChange []string
+	failed := false
 	for i, o := range outcomes {
 		switch {
 		case o.err != nil:
+			// Every file's outcome is reported, not just the first failure:
+			// stopping here discarded the rest of the run's results and made a
+			// second check necessary to see them.
 			_, _ = fmt.Fprintf(errOut, "format-dispatch --check: %s: %v\n", jobs[i].abs, o.err)
-			return 2
+			failed = true
 		case o.disabled:
 			tally.disabled++
 		case o.skipped:
@@ -130,6 +134,11 @@ func runCheck(args []string, out, errOut io.Writer) int {
 			_, _ = fmt.Fprintf(out, "%s: %s\n", verb, path)
 		}
 		_, _ = fmt.Fprintf(out, "format-dispatch --check: %s\n", tally.summary(len(wouldChange), write))
+	}
+	// A file the run could not check is the strongest failure: it means the
+	// gate did not answer its question, so it outranks "needs formatting".
+	if failed {
+		return 2
 	}
 	// --write fixed what it found, so there is nothing left to fail over.
 	// Without it the whole point is a non-zero exit CI can gate on.
@@ -355,7 +364,10 @@ func checkRootCandidates(paths []string) []string {
 // The copy is made in the file's OWN directory: every one of these tools
 // resolves its config by walking up from the file (biome.json, .sqlfluff, a
 // project .markdownlint-cli2.jsonc), so formatting a copy in a temp
-// directory elsewhere would silently apply the wrong rules.
+// directory elsewhere would silently apply the wrong rules. Where that
+// directory is not writable -- an archive mount, a 0555 checkout -- the
+// formatter is asked to format the same bytes on stdin under the real path
+// instead, which keeps path-scoped config resolution and needs no write.
 func wouldReformat(ctx context.Context, registry *dispatch.Registry, projectRoot, abs, ext string, write bool) (changed, skipped bool, err error) {
 	original, err := os.ReadFile(filepath.Clean(abs))
 	if err != nil {
@@ -364,7 +376,7 @@ func wouldReformat(ctx context.Context, registry *dispatch.Registry, projectRoot
 
 	scratch, cleanup, err := copyBeside(abs, original)
 	if err != nil {
-		return false, false, err
+		return wouldReformatStdin(ctx, registry, projectRoot, abs, ext, original, write)
 	}
 	defer cleanup()
 
@@ -401,6 +413,39 @@ func wouldReformat(ctx context.Context, registry *dispatch.Registry, projectRoot
 		// produced, config resolution and all, so applying it is a byte
 		// copy rather than a second formatter run that could resolve
 		// differently.
+		if err := replaceContents(abs, formatted); err != nil {
+			return true, false, err
+		}
+	}
+	return true, false, nil
+}
+
+// wouldReformatStdin is wouldReformat for a file whose directory cannot hold a
+// scratch copy. It formats the bytes in memory through the formatter's stdin
+// mode, under the real path so config lookup and path-scoped rules resolve the
+// way the hook's do. A formatter with no stdin mode cannot answer the question
+// at all, and says so rather than reporting the file clean.
+func wouldReformatStdin(ctx context.Context, registry *dispatch.Registry, projectRoot, abs, ext string, original []byte, write bool) (changed, skipped bool, err error) {
+	formatted, res, ok := registry.FormatStdin(ctx, projectRoot, abs, ext, original)
+	if !ok {
+		return false, false, fmt.Errorf("no writable directory beside it and %s has no stdin mode", registry.Name(ext))
+	}
+	if err := context.Cause(ctx); err != nil {
+		return false, false, err
+	}
+	if res.Err != nil {
+		return false, false, res.Err
+	}
+	if res.Diagnostic != "" {
+		return false, false, fmt.Errorf("%s", res.Diagnostic)
+	}
+	if res.Skipped {
+		return false, true, nil
+	}
+	if bytes.Equal(original, formatted) {
+		return false, false, nil
+	}
+	if write {
 		if err := replaceContents(abs, formatted); err != nil {
 			return true, false, err
 		}

@@ -19,6 +19,10 @@ type bunxFormatter struct {
 	name     string
 	pathArgs func(abs string) []string
 	bunxArgs func(abs string) []string
+	// stdinArgs builds the invocation for formatting a document on stdin, or
+	// is nil when the tool has no stdin mode (markdownlint-cli2 fixes paths
+	// only). --check's read-only fallback depends on it.
+	stdinArgs func(abs string) []string
 	// skipIf reclassifies a failure diagnostic as a skip. Set only where a
 	// tool's failure can mean "this file isn't mine" rather than "this file
 	// is broken".
@@ -57,8 +61,9 @@ func NewMarkdown() bunxFormatter {
 // NewTOML returns the bunxFormatter for .toml and .toml.example, via taplo.
 func NewTOML() bunxFormatter {
 	return bunxFormatter{
-		name:     "taplo",
-		pathArgs: tomlFormatArgs,
+		name:      "taplo",
+		pathArgs:  tomlFormatArgs,
+		stdinArgs: tomlStdinArgs,
 		bunxArgs: func(abs string) []string {
 			return append([]string{"@taplo/cli"}, tomlFormatArgs(abs)...)
 		},
@@ -73,9 +78,15 @@ func NewTOML() bunxFormatter {
 // format rules pointed at the real file.
 func tomlFormatArgs(abs string) []string {
 	if tomlExampleCopy(abs) {
-		return []string{"format", "--stdin-filepath", abs, "-"}
+		return tomlStdinArgs(abs)
 	}
 	return []string{"format", "--", abs}
+}
+
+// tomlStdinArgs is taplo's stdin invocation, which formats the document under
+// abs's name whatever its suffix.
+func tomlStdinArgs(abs string) []string {
+	return []string{"format", "--stdin-filepath", abs, "-"}
 }
 
 func tomlExampleCopy(abs string) bool {
@@ -104,7 +115,24 @@ func NewPrettier() bunxFormatter {
 		},
 		configured:    hasPrettierConfig,
 		stdinFromFile: prettierPluginExampleCopy,
+		stdinArgs:     prettierStdinArgs,
 	}
+}
+
+// prettierStdinArgs is prettier's stdin invocation: it reads the document from
+// stdin and names it with --stdin-filepath, which is also what scopes prettier's
+// own .prettierignore and overrides to the real file. A parser is added where
+// the suffix alone would not pick one.
+func prettierStdinArgs(abs string) []string {
+	args := []string{"--stdin-filepath", abs}
+	base := strings.ToLower(filepath.Base(abs))
+	for _, p := range prettierExampleParsers {
+		if strings.HasSuffix(base, p.suffix) {
+			args = append(args, "--parser", p.parser)
+			break
+		}
+	}
+	return args
 }
 
 var prettierConfigNames = []string{
@@ -203,6 +231,29 @@ func (b bunxFormatter) Format(ctx context.Context, projectRoot, abs string) Resu
 		return Result{Skipped: true}
 	}
 	return res
+}
+
+// FormatStdin formats src as abs through the tool's stdin mode. A formatter
+// with no stdin mode reports ok=false, so --check can say it has no way to
+// check that file without a writable directory rather than call it formatted.
+func (b bunxFormatter) FormatStdin(ctx context.Context, projectRoot, abs string, src []byte) ([]byte, Result, bool) {
+	if b.stdinArgs == nil {
+		return nil, Result{}, false
+	}
+	if b.configured != nil && !b.configured(projectRoot, abs) {
+		return nil, Result{Skipped: true}, true
+	}
+	command, args := "bunx", append([]string{b.name}, b.stdinArgs(abs)...)
+	if path, err := lookPath(b.name); err == nil {
+		command, args = path, b.stdinArgs(abs)
+	} else if _, err := lookPath("bunx"); err != nil {
+		return nil, Result{Skipped: true}, true
+	}
+	out, res := runExternalStdinBytes(ctx, projectRoot, command, args, src)
+	if b.skipIf != nil && res.Diagnostic != "" && b.skipIf(res.Diagnostic) {
+		return nil, Result{Skipped: true}, true
+	}
+	return out, res, true
 }
 
 func runPathOrBunx(ctx context.Context, cwd, pathName string, pathArgs, bunxArgs []string, stdinPath string) Result {

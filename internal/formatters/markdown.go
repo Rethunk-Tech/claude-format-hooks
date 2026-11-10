@@ -38,3 +38,10 @@ func (r markdownRouter) Format(ctx context.Context, projectRoot, abs string) Res
 	}
 	return r.biome.Format(ctx, projectRoot, abs)
 }
+
+// FormatStdin reports ok=false: markdownlint-cli2 fixes a path it is given and
+// has no stdin mode, so --check cannot answer its question for a Markdown file
+// without a writable directory next to it.
+func (markdownRouter) FormatStdin(context.Context, string, string, []byte) ([]byte, Result, bool) {
+	return nil, Result{}, false
+}
