@@ -65,6 +65,22 @@ func runIsolated(m *testing.M) int {
 // extensions and a shell script cannot execute.
 func fakeTool(t *testing.T, dir, name string) {
 	t.Helper()
+	if runtime.GOOS != "windows" {
+		// Elsewhere a script stands in: the copied -race binary takes most of a
+		// second to start. Builtins only, since tests narrow PATH to dir.
+		recorded := name
+		if name == "bunx" {
+			recorded = "prettier"
+		}
+		script := `#!/bin/sh
+case "$` + fakeToolEnv + `" in
+fail) i=1; while [ "$i" -le 20 ]; do echo "line $i"; i=$((i + 1)); done; exit 1 ;;
+marker) printf '%s' '` + recorded + `' >"${0%/*}/formatter-marker" ;;
+esac
+`
+		qt.Assert(t, qt.IsNil(os.WriteFile(filepath.Join(dir, name), []byte(script), 0o755))) //nolint:gosec // the stub must be executable
+		return
+	}
 	self, err := os.Executable()
 	qt.Assert(t, qt.IsNil(err))
 	bin, err := os.ReadFile(filepath.Clean(self))
