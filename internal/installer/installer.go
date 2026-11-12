@@ -47,8 +47,35 @@ type HookCommand struct {
 
 // PostToolUseEntry is one matcher block under hooks.PostToolUse.
 type PostToolUseEntry struct {
-	Matcher string        `json:"matcher"`
-	Hooks   []HookCommand `json:"hooks"`
+	Matcher string        `json:"matcher,omitempty"`
+	Hooks   []HookCommand `json:"hooks,omitempty"`
+	raw     json.RawMessage
+}
+
+func (e *PostToolUseEntry) UnmarshalJSON(data []byte) error {
+	type plain struct {
+		Matcher string        `json:"matcher,omitempty"`
+		Hooks   []HookCommand `json:"hooks,omitempty"`
+	}
+	var v plain
+	if err := json.Unmarshal(data, &v); err != nil {
+		return err
+	}
+	e.Matcher = v.Matcher
+	e.Hooks = v.Hooks
+	e.raw = bytes.Clone(data)
+	return nil
+}
+
+func (e PostToolUseEntry) MarshalJSON() ([]byte, error) {
+	if e.raw != nil {
+		return e.raw, nil
+	}
+	type plain struct {
+		Matcher string        `json:"matcher,omitempty"`
+		Hooks   []HookCommand `json:"hooks,omitempty"`
+	}
+	return json.Marshal(plain{Matcher: e.Matcher, Hooks: e.Hooks})
 }
 
 // Options controls where Install/Uninstall read and write.
@@ -105,6 +132,9 @@ func readHooksDoc(path string) (before []byte, top jsonObject, exists bool, err 
 	}
 	if err := json.Unmarshal(before, &top); err != nil {
 		return nil, nil, false, fmt.Errorf("parse %s: %w", path, err)
+	}
+	if top == nil {
+		return nil, nil, false, fmt.Errorf("parse %s: JSON is not an object", path)
 	}
 	return before, top, exists, nil
 }
@@ -279,10 +309,14 @@ func withoutHooks(entries []PostToolUseEntry, binPath string) []PostToolUseEntry
 		hooks := slices.DeleteFunc(slices.Clone(e.Hooks), func(h HookCommand) bool {
 			return matchesHookCommand(h, binPath)
 		})
-		if len(hooks) > 0 {
-			e.Hooks = hooks
-			kept = append(kept, e)
+		if len(hooks) == 0 && len(e.Hooks) > 0 {
+			continue
 		}
+		if len(hooks) != len(e.Hooks) {
+			e.Hooks = hooks
+			e.raw = nil
+		}
+		kept = append(kept, e)
 	}
 	return kept
 }

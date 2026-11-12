@@ -63,6 +63,9 @@ func shebangExt(path string) (string, bool) {
 // program; treating the first token after env as the interpreter misses
 // every `#!/usr/bin/env -S python3 -u` script.
 func shebangInterpreter(line string) string {
+	if !strings.HasPrefix(line, "#!") {
+		return ""
+	}
 	fields := strings.Fields(line[2:])
 	if len(fields) == 0 {
 		return ""

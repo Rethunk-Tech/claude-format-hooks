@@ -70,3 +70,30 @@ func TestResolveExtensionPrefersLongestRegisteredSuffix(t *testing.T) {
 		qt.Check(t, qt.Equals(ResolveExtension(tc.path), tc.want), qt.Commentf("path=%q", tc.path))
 	}
 }
+
+func FuzzResolveExtension(f *testing.F) {
+	f.Add("foo.go")
+	f.Add("foo.json")
+	f.Add("foo.json.example")
+	f.Add("go.mod")
+	f.Add("go.work")
+	f.Add(".bashrc")
+	f.Add("Makefile")
+	f.Add("foo.tar.gz")
+	f.Add("file.min.js")
+	f.Add("package-lock.json")
+	f.Add("")
+	f.Add("foo.")
+	f.Add(".")
+	f.Add("..")
+	f.Add("a.b.c.d")
+	f.Fuzz(func(t *testing.T, path string) {
+		got := ResolveExtension(path)
+		if got == "" {
+			return
+		}
+		if got[0] != '.' {
+			t.Fatalf("ResolveExtension(%q) = %q; want empty or '.' prefix", path, got)
+		}
+	})
+}

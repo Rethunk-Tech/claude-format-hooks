@@ -84,3 +84,49 @@ func TestResolveDispatchExt(t *testing.T) {
 	writeFile(t, zsh, "echo hi\n")
 	qt.Check(t, qt.Equals(resolveDispatchExt(zsh), ".zsh"))
 }
+
+func FuzzShebangInterpreter(f *testing.F) {
+	for _, line := range []string{
+		"#!/usr/bin/env bash",
+		"#!/usr/bin/env bash\r",
+		"#!/bin/sh",
+		"#!/bin/bash",
+		"#!/usr/bin/env python",
+		"#!/usr/bin/python3.12",
+		"#!/usr/bin/env -S python3 -u",
+		"#!/usr/bin/env -S bash -euo pipefail",
+		"#!/usr/bin/env --split-string=python3",
+		"#!/usr/bin/env -i python3",
+		"#!/usr/bin/env -u FOO python3",
+		"#!/usr/bin/env FOO=bar python3",
+		"#!/usr/bin/env -S",
+		"#!",
+		"#!/usr/bin/env",
+		"#!/usr/bin/env - python3",
+		"#!/usr/bin/env -u=FOO python3",
+		"#!/usr/bin/env --chdir=/tmp python3",
+		"#!/usr/bin/env -u",
+		"#!/usr/bin/env ruby",
+		"#!/usr/bin/env php",
+		"#!/usr/bin/env php8.3",
+		"#!/usr/bin/env php-fpm",
+		"#!/usr/bin/env lua",
+		"#!/usr/bin/env node",
+		"#!/usr/bin/env bun",
+		"#!/usr/bin/env deno",
+		"echo hello",
+		"",
+		"!",
+	} {
+		f.Add(line)
+	}
+	f.Fuzz(func(t *testing.T, line string) {
+		got := shebangInterpreter(line)
+		if shebangInterpreter(line+" \t") != got {
+			t.Fatalf("trailing whitespace changed result: %q -> %q", line, got)
+		}
+		if shebangInterpreter(line+"\r\n") != got {
+			t.Fatalf("CRLF changed result: %q -> %q", line, got)
+		}
+	})
+}
