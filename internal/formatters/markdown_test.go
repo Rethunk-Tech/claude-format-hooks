@@ -38,6 +38,17 @@ func TestMarkdownRouterLeavesBiomeOutsideABiomeProject(t *testing.T) {
 	qt.Check(t, qt.Equals(markdownRuns(t, config.Default(), false), "markdownlint\n"))
 }
 
+func TestMarkdownRouterKeepsMarkdownlintDiagnostic(t *testing.T) {
+	isolateDiskCache(t)
+	writeFakeTools(t, map[string]string{
+		"markdownlint-cli2": `echo 'MD013/line-length' >&2; exit 1`,
+		"biome":             `exit 0`,
+	})
+	dir, path := biomeProject(t, "README.md", "# Title\n")
+	res := NewMarkdownRouter(config.Default()).Format(t.Context(), dir, path)
+	assertDiagnostic(t, res)
+}
+
 func TestMarkdownRouterHonoursABiomeDisable(t *testing.T) {
 	cfg := config.Default()
 	cfg.DisabledFormatters = []string{"biome"}

@@ -33,7 +33,7 @@ func (r markdownRouter) Tools() []string { return r.lint.Tools() }
 
 func (r markdownRouter) Format(ctx context.Context, projectRoot, abs string) Result {
 	res := r.lint.Format(ctx, projectRoot, abs)
-	if res.Err != nil || !biomeUsable(projectRoot, abs, r.biomeDisabled) {
+	if res.Err != nil || res.Diagnostic != "" || !biomeUsable(projectRoot, abs, r.biomeDisabled) {
 		return res
 	}
 	return r.biome.Format(ctx, projectRoot, abs)
