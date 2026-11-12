@@ -185,6 +185,19 @@ echo "$@" > `+argsLog)
 	qt.Check(t, qt.StringContains(string(got), "fix --exclude-rules PG01,LT05,RF03 --"))
 }
 
+func TestSQLFluffExampleKeepsFileWhenStdoutEmpty(t *testing.T) {
+	isolateDiskCache(t)
+	t.Setenv("HOME", t.TempDir())
+	dir, abs := sourceFile(t, "query.sql.example", "SELECT 1;\n")
+	writeFakeTool(t, "sqlfluff", `if [ "$1" = render ]; then exit 0; fi
+exit 0
+`)
+
+	res := NewSQLFluff().Format(t.Context(), dir, abs)
+	qt.Check(t, qt.IsTrue(res.Skipped))
+	qt.Check(t, qt.Equals(string(readSource(t, abs)), "SELECT 1;\n"))
+}
+
 func TestSQLFluffExampleUsesStdin(t *testing.T) {
 	isolateDiskCache(t)
 	t.Setenv("HOME", t.TempDir())

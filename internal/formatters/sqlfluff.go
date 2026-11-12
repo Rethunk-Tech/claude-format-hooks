@@ -164,6 +164,11 @@ func sqlfluffFixExample(ctx context.Context, projectRoot, abs, exclude string) R
 	cmd.Stderr = &stderr
 	err = cmd.Run()
 	if err == nil {
+		// sqlfluff prints nothing on a no-op success; writing that would
+		// wipe a .sql.example the in-place path never touches.
+		if stdout.Len() == 0 && len(src) != 0 {
+			return Result{Skipped: true}
+		}
 		return writeIfChanged(abs, src, stdout.Bytes(), 0o644)
 	}
 	if ctx.Err() != nil {
