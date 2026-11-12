@@ -29,6 +29,8 @@ jobs:
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
         if: ${{ !cancelled() }}
+        with:
+          persist-credentials: false
 
       # The lint job on ubuntu gets the default go.mod-only cache key. Sharing
       # it let whichever job finished first save the Linux build cache, and
@@ -87,6 +89,8 @@ jobs:
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
         if: ${{ !cancelled() }}
+        with:
+          persist-credentials: false
 
       - uses: Rethunk-Tech/gh-actions/setup-go@00f86ab1d379ecfb8d7d5b5cfa6e21a2722ac159 # v1.25
         if: ${{ !cancelled() }}
