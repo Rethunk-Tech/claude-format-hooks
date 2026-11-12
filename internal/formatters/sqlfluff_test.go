@@ -62,7 +62,9 @@ func TestSQLFluffCachesItsSettingsAndSkipsOversizedStdin(t *testing.T) {
 	writeFakeTool(t, "sqlfluff", `printf '%s\n' "$@" >> "$SQLFLUFF_ARGV"
 if [ "$1" = render ]; then
   printf '  exclude_rules: LT01\n  large_file_skip_byte_limit: 16\n'
-fi`)
+  exit 0
+fi
+cat`)
 
 	dir := t.TempDir()
 	small := filepath.Join(dir, "small.sql.example")
@@ -76,7 +78,7 @@ fi`)
 	qt.Assert(t, qt.IsNil(os.WriteFile(other, []byte("select 1;\n"), 0o600)))
 	assertFormatted(t, NewSQLFluff().Format(t.Context(), dir, other))
 	qt.Check(t, qt.Equals(strings.Count(string(readSource(t, argvPath)), "render\n"), 1),
-		qt.Commentf("the exclude_rules dump must be cached per project root, not re-read per file"))
+		qt.Commentf("the exclude_rules dump must be cached per directory, not re-read per file"))
 	qt.Check(t, qt.StringContains(string(readSource(t, argvPath)), "--exclude-rules\nLT01,RF03"),
 		qt.Commentf("the cached dump still carries the configured rules"))
 
@@ -92,6 +94,35 @@ fi`)
 	qt.Check(t, qt.Equals(res.Diagnostic, ""))
 	qt.Check(t, qt.DeepEquals(readSource(t, argvPath), before), qt.Commentf("no tool run for a file sqlfluff would skip"))
 	qt.Check(t, qt.Equals(string(readSource(t, big)), bigSrc))
+}
+
+func TestSQLFluffSettingsCacheIsPerDirectory(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("fake shell-script tools are POSIX-shell only")
+	}
+	resetSQLFluffConfigForTest()
+	isolateDiskCache(t)
+	t.Setenv("HOME", t.TempDir())
+
+	writeFakeTool(t, "sqlfluff", `if [ "$1" = render ]; then
+  case "$4" in
+  */svc/*) printf '  exclude_rules: LT02\n  large_file_skip_byte_limit: 20000\n' ;;
+  *) printf '  exclude_rules: LT01\n  large_file_skip_byte_limit: 20000\n' ;;
+  esac
+fi`)
+
+	dir := t.TempDir()
+	a := filepath.Join(dir, "a.sql")
+	svc := filepath.Join(dir, "svc")
+	qt.Assert(t, qt.IsNil(os.Mkdir(svc, 0o700)))
+	b := filepath.Join(svc, "b.sql")
+	qt.Assert(t, qt.IsNil(os.WriteFile(a, []byte("select 1;\n"), 0o600)))
+	qt.Assert(t, qt.IsNil(os.WriteFile(b, []byte("select 1;\n"), 0o600)))
+
+	root := cachedSQLFluffSettings(t.Context(), dir, a)
+	nested := cachedSQLFluffSettings(t.Context(), dir, b)
+	qt.Check(t, qt.Equals(root.excludeRules, "LT01,RF03"))
+	qt.Check(t, qt.Equals(nested.excludeRules, "LT02,RF03"))
 }
 
 func TestSQLFluffLargeFileSkipByteLimit(t *testing.T) {

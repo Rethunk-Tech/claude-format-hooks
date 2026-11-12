@@ -86,10 +86,9 @@ type sqlfluffSettings struct {
 	largeFileSkipByteLimit int64
 }
 
-// sqlfluffSettingsTTL is how long a project root's dump is trusted. The
-// exclude list and byte limit come from project config, which does not change
-// mid-session; a stale hit costs one extra render after expiry, never a wrong
-// format.
+// sqlfluffSettingsTTL is how long a directory's dump is trusted. Nested
+// .sqlfluff files differ by directory; a stale hit costs one extra render
+// after expiry, never a wrong format.
 const sqlfluffSettingsTTL = 30 * time.Second
 
 // sqlfluffDefaultLargeFileSkipByteLimit is sqlfluff's documented default,
@@ -103,7 +102,7 @@ func cachedSQLFluffSettings(ctx context.Context, projectRoot, abs string) sqlflu
 	cacheDir, ok := diskcache.Dir()
 	var key string
 	if ok {
-		key = diskcache.Key("sqlfluff", projectRoot)
+		key = diskcache.Key("sqlfluff", projectRoot, filepath.Dir(abs))
 		if cached, hit := diskcache.Get(cacheDir, key, sqlfluffSettingsTTL); hit {
 			if settings, parsed := parseSQLFluffSettings(cached); parsed {
 				return settings
