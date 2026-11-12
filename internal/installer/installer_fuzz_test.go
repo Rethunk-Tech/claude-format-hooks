@@ -30,7 +30,7 @@ func FuzzWireUnwire(f *testing.F) {
 	f.Fuzz(func(t *testing.T, raw []byte) {
 		dir := t.TempDir()
 		path := filepath.Join(dir, "settings.json")
-		if err := os.WriteFile(path, raw, 0o644); err != nil {
+		if err := os.WriteFile(path, raw, 0o600); err != nil {
 			t.Fatal(err)
 		}
 		bin := "/format-dispatch-fuzz-bin"
@@ -39,7 +39,7 @@ func FuzzWireUnwire(f *testing.F) {
 		}
 
 		_, wired, err := Wire(path, bin)
-		got, readErr := os.ReadFile(path)
+		got, readErr := os.ReadFile(filepath.Clean(path))
 		if readErr != nil {
 			t.Fatal(readErr)
 		}
@@ -59,7 +59,7 @@ func FuzzWireUnwire(f *testing.F) {
 			}
 			return
 		}
-		if err := os.WriteFile(path, wired, 0o644); err != nil {
+		if err := os.WriteFile(path, wired, 0o600); err != nil {
 			t.Fatal(err)
 		}
 		_, unwired, err := Unwire(path, bin)
