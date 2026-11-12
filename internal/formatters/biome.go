@@ -106,6 +106,7 @@ func (biomeFormatter) FormatStdin(ctx context.Context, projectRoot, abs string, 
 var biomeExampleLangs = []string{
 	".ts", ".tsx", ".js", ".jsx", ".mjs", ".cjs", ".mts", ".cts",
 	".css", ".jsonc", ".graphql", ".gql",
+	".md", ".mdx", ".markdown", ".mdc",
 }
 
 func biomeExampleCopy(abs string) bool {

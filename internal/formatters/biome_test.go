@@ -8,6 +8,11 @@ import (
 	"github.com/go-quicktest/qt"
 )
 
+func TestBiomeExampleCopyIncludesMarkdown(t *testing.T) {
+	qt.Check(t, qt.IsTrue(biomeExampleCopy("README.md.example")))
+	qt.Check(t, qt.Equals(exampleStdinFilePath("README.md.example"), "README.md"))
+}
+
 func TestBiomeUsesFormatSubcommand(t *testing.T) {
 	isolateDiskCache(t)
 	dir := t.TempDir()
