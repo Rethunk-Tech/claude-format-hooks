@@ -141,6 +141,16 @@ func TestResolveIndentEditorConfigLayering(t *testing.T) {
 		qt.Check(t, qt.Equals(spec, IndentSpec{Size: 4, UseTabs: false}))
 	})
 
+	t.Run("example copy matches the real suffix under the same editorconfig", func(t *testing.T) {
+		isolateDiskCache(t)
+		dir := t.TempDir()
+		writeEditorConfig(t, dir, "root = true\n\n[*.json]\nindent_style = space\nindent_size = 4\n")
+
+		jsonSpec := ResolveJSONIndent(Default(), filepath.Join(dir, "t.json"))
+		exampleSpec := ResolveJSONIndent(Default(), filepath.Join(dir, "t.json.example"))
+		qt.Check(t, qt.Equals(exampleSpec, jsonSpec))
+	})
+
 	t.Run("indent_style without indent_size keeps the fallback size", func(t *testing.T) {
 		isolateDiskCache(t)
 		dir := t.TempDir()

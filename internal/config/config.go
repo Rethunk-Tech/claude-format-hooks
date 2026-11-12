@@ -181,7 +181,8 @@ func resolveIndent(abs string, fallback IndentSpec) IndentSpec {
 }
 
 func resolveIndentUncached(abs string, fallback IndentSpec) IndentSpec {
-	section, err := editorconfig.Find(abs, nil)
+	// [*.json] / [*.sh] do not match a trailing .example, so look up the real suffix.
+	section, err := editorconfig.Find(examplePath(abs), nil)
 	if err != nil {
 		return fallback
 	}
@@ -201,6 +202,16 @@ func resolveIndentUncached(abs string, fallback IndentSpec) IndentSpec {
 	// preference, decides how its case branches sit.
 	spec.CaseIndent = section.Get("switch_case_indent") == "true"
 	return spec
+}
+
+// examplePath is the path EditorConfig globs should see: the real name
+// with a trailing .example removed.
+func examplePath(abs string) string {
+	base := filepath.Base(abs)
+	if !strings.HasSuffix(strings.ToLower(base), ".example") {
+		return abs
+	}
+	return filepath.Join(filepath.Dir(abs), base[:len(base)-len(".example")])
 }
 
 // encodeIndentSpec/decodeIndentSpec serialize an IndentSpec to and from
