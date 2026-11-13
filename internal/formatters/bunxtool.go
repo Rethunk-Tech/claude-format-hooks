@@ -149,8 +149,8 @@ var prettierConfigNames = []string{
 // in repos that format with something else (biome), so a repo that never
 // configured prettier does not get it.
 func hasPrettierConfig(projectRoot, abs string) bool {
-	root := filepath.Clean(projectRoot)
-	for dir := filepath.Dir(abs); ; dir = filepath.Dir(dir) {
+	root := resolvedClean(projectRoot)
+	for dir := resolvedClean(filepath.Dir(abs)); ; dir = filepath.Dir(dir) {
 		if findUpward(dir, dir, prettierConfigNames...) != "" || packageJSONHasPrettier(filepath.Join(dir, "package.json")) {
 			return true
 		}

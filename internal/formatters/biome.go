@@ -150,10 +150,21 @@ func cachedFindUpward(dir, root string, names ...string) string {
 	return found
 }
 
+// resolvedClean makes root and dir comparable when one was spelled through a
+// symlink: otherwise the walk never meets root and climbs into parent repos.
+func resolvedClean(p string) string {
+	p = filepath.Clean(p)
+	if r, err := filepath.EvalSymlinks(p); err == nil {
+		return r
+	}
+	return p
+}
+
 // findUpward walks from dir up to (and including) root looking for any of
 // names. Returns the containing directory, or "" if none is found.
 func findUpward(dir, root string, names ...string) string {
-	root = filepath.Clean(root)
+	root = resolvedClean(root)
+	dir = resolvedClean(dir)
 	for {
 		if slices.ContainsFunc(names, func(n string) bool {
 			_, err := os.Stat(filepath.Join(dir, n))

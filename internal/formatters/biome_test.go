@@ -82,3 +82,16 @@ exit 0`)
 
 	assertArgv(t, argvPath, "@biomejs/biome\nformat\n--write\n--no-errors-on-unmatched\n--\n"+abs+"\n")
 }
+
+// A project root spelled through a symlink must still bound the walk, or a
+// biome.json in a parent directory of the real path configures the wrong repo.
+func TestFindUpwardStopsAtSymlinkedRoot(t *testing.T) {
+	base := t.TempDir()
+	qt.Assert(t, qt.IsNil(os.WriteFile(filepath.Join(base, "biome.json"), []byte("{}"), 0o600)))
+	proj := filepath.Join(base, "proj", "pkg")
+	qt.Assert(t, qt.IsNil(os.MkdirAll(proj, 0o750)))
+	link := filepath.Join(t.TempDir(), "link")
+	qt.Assert(t, qt.IsNil(os.Symlink(filepath.Join(base, "proj"), link)))
+
+	qt.Check(t, qt.Equals(findUpward(proj, link, biomeConfigNames...), ""))
+}
