@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strings"
 
 	"mvdan.cc/sh/v3/syntax"
 
@@ -28,7 +29,7 @@ func (f shellFormatter) Format(_ context.Context, _, abs string) Result {
 		return Result{Err: fmt.Errorf("read: %w", err)}
 	}
 
-	parser := syntax.NewParser(syntax.Variant(syntax.LangBash), syntax.KeepComments(true))
+	parser := syntax.NewParser(syntax.Variant(dialect(abs, src)), syntax.KeepComments(true))
 	file, err := parser.Parse(bytes.NewReader(src), abs)
 	if err != nil {
 		// Not valid shell syntax — not our job to fix a broken script.
@@ -51,4 +52,30 @@ func (f shellFormatter) Format(_ context.Context, _, abs string) Result {
 
 	out := buf.Bytes()
 	return writeIfChanged(abs, src, out, 0o755)
+}
+
+// dialect picks the parser language from the extension, else the shebang;
+// everything else stays bash.
+func dialect(abs string, src []byte) syntax.LangVariant {
+	if strings.HasSuffix(abs, ".zsh") || strings.HasSuffix(abs, ".zsh.example") {
+		return syntax.LangZsh
+	}
+	if strings.HasSuffix(abs, ".ksh") || strings.HasSuffix(abs, ".ksh.example") {
+		return syntax.LangMirBSDKorn
+	}
+	line, _, _ := bytes.Cut(src, []byte("\n"))
+	if bytes.HasPrefix(line, []byte("#!")) {
+		f := strings.Fields(string(line[2:]))
+		if len(f) == 0 {
+			return syntax.LangBash
+		}
+		interp := filepath.Base(f[len(f)-1]) // "#!/usr/bin/env zsh" names the shell last.
+		switch interp {
+		case "zsh":
+			return syntax.LangZsh
+		case "ksh", "mksh":
+			return syntax.LangMirBSDKorn
+		}
+	}
+	return syntax.LangBash
 }

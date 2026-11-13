@@ -99,3 +99,26 @@ func TestShellFormatterSkipsInvalidSyntax(t *testing.T) {
 	qt.Check(t, qt.IsTrue(result.Skipped))
 	qt.Check(t, qt.IsNil(result.Err))
 }
+
+func TestShellFormatterPicksDialect(t *testing.T) {
+	cases := []struct {
+		name, file, src, want string
+	}{
+		{"zsh extension", "t.zsh", "if true; then\necho ${(U)x}\nfi\n", "if true; then\n  echo ${(U)x}\nfi\n"},
+		{"zsh shebang", "t", "#!/usr/bin/env zsh\nif true; then\necho ${(U)x}\nfi\n", "#!/usr/bin/env zsh\nif true; then\n  echo ${(U)x}\nfi\n"},
+		{"ksh extension", "t.ksh", "#!/bin/ksh\nif true; then\necho hi\nfi\n", "#!/bin/ksh\nif true; then\n  echo hi\nfi\n"},
+		{"mksh shebang", "t", "#!/bin/mksh\nif true; then\necho hi\nfi\n", "#!/bin/mksh\nif true; then\n  echo hi\nfi\n"},
+		{"bash unchanged", "t.sh", "if [[ -n $1 ]]; then\necho hi\nfi\n", "if [[ -n $1 ]]; then\n  echo hi\nfi\n"},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			_, path := sourceFile(t, tc.file, tc.src)
+			res := NewShell(config.Default()).Format(t.Context(), "", path)
+			qt.Assert(t, qt.IsNil(res.Err))
+			qt.Check(t, qt.IsFalse(res.Skipped))
+			got, err := os.ReadFile(path)
+			qt.Assert(t, qt.IsNil(err))
+			qt.Check(t, qt.Equals(string(got), tc.want))
+		})
+	}
+}
