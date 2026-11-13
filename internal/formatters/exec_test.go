@@ -6,6 +6,7 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+	"time"
 	"unicode/utf8"
 
 	"github.com/go-quicktest/qt"
@@ -58,4 +59,23 @@ func TestRunExternalReportsContextCause(t *testing.T) {
 	ok, diag := runExternal(ctx, t.TempDir(), "does-not-matter", nil)
 	qt.Check(t, qt.IsFalse(ok))
 	qt.Check(t, qt.Equals(diag, cause.Error()), qt.Commentf("want the context's cause, not a generic process-killed error"))
+}
+
+// A formatter launcher (bunx) leaves a child holding the output pipe when the
+// timeout kills it; without WaitDelay the hook waits for that child to exit.
+func TestRunExternalReturnsWhenOrphanHoldsPipe(t *testing.T) {
+	isolateDiskCache(t)
+	writeFakeTool(t, "slowtool", `/bin/sleep 20 & wait`)
+	ctx, cancel := context.WithTimeout(t.Context(), 200*time.Millisecond)
+	defer cancel()
+
+	start := time.Now()
+	ok, _ := runExternal(ctx, t.TempDir(), "slowtool", nil)
+	qt.Check(t, qt.IsFalse(ok))
+	qt.Check(t, qt.IsTrue(time.Since(start) < 5*time.Second), qt.Commentf("hung %s past the timeout", time.Since(start)))
+
+	start = time.Now()
+	_, res := runExternalStdinBytes(ctx, t.TempDir(), "slowtool", nil, []byte("x"))
+	qt.Check(t, qt.Not(qt.Equals(res.Diagnostic, "")))
+	qt.Check(t, qt.IsTrue(time.Since(start) < 5*time.Second), qt.Commentf("stdin path hung %s", time.Since(start)))
 }

@@ -110,6 +110,7 @@ func (e *toolRunError) Error() string { return e.err.Error() }
 func runToolStdout(ctx context.Context, dir, name string, args []string, stdin []byte) ([]byte, error) {
 	cmd := exec.CommandContext(ctx, name, args...) //nolint:gosec // name is gofumpt or goimports; args are fixed flags plus the source path
 	cmd.Dir = dir
+	cmd.WaitDelay = pipeGrace
 	if stdin != nil {
 		cmd.Stdin = bytes.NewReader(stdin)
 	}

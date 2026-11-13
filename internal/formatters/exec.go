@@ -8,6 +8,7 @@ import (
 	"os/exec"
 	"path/filepath"
 	"strings"
+	"time"
 	"unicode/utf8"
 )
 
@@ -20,6 +21,12 @@ func exampleStdinFilePath(abs string) string {
 	}
 	return filepath.Join(filepath.Dir(abs), base[:len(base)-len(".example")])
 }
+
+// pipeGrace bounds how long a killed formatter's leftover children may keep
+// its output pipes open. bunx and node wrappers spawn grandchildren that
+// survive the kill, and without it Wait blocks until they exit, past the
+// hook's own timeout.
+const pipeGrace = 250 * time.Millisecond
 
 // runExternal runs name with args in dir and, on failure, truncates its
 // combined output to a safe diagnostic size.
@@ -41,6 +48,7 @@ func runExternal(ctx context.Context, dir, name string, args []string) (ok bool,
 func runExternalOutput(ctx context.Context, dir, name string, args []string) (ok bool, diagnostic, raw string) {
 	cmd := exec.CommandContext(ctx, name, args...) //nolint:gosec // running an external formatter by design; args are our own construction, never a shell
 	cmd.Dir = dir
+	cmd.WaitDelay = pipeGrace
 	out, err := cmd.CombinedOutput()
 	if err == nil {
 		return true, "", ""
@@ -98,6 +106,7 @@ func runExternalStdin(ctx context.Context, dir, name string, args []string, abs 
 func runExternalStdinBytes(ctx context.Context, dir, name string, args []string, src []byte) ([]byte, Result) {
 	cmd := exec.CommandContext(ctx, name, args...) //nolint:gosec // running an external formatter by design; args are our own construction, never a shell
 	cmd.Dir = dir
+	cmd.WaitDelay = pipeGrace
 	cmd.Stdin = bytes.NewReader(src)
 	var stdout, stderr bytes.Buffer
 	cmd.Stdout = &stdout

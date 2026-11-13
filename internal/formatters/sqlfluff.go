@@ -122,6 +122,7 @@ func cachedSQLFluffSettings(ctx context.Context, projectRoot, abs string) sqlflu
 func readSQLFluffSettings(ctx context.Context, projectRoot, abs string) sqlfluffSettings {
 	render := exec.CommandContext(ctx, "sqlfluff", "render", "-vv", "--", abs) //nolint:gosec // external formatter by design; args are our own construction, never a shell
 	render.Dir = projectRoot
+	render.WaitDelay = pipeGrace
 	// A failed render (no dialect, bad config) still yields the defaults
 	// below, and the fix call then reports the real error.
 	rendered, _ := render.CombinedOutput()
@@ -157,6 +158,7 @@ func sqlfluffFixExample(ctx context.Context, projectRoot, abs, exclude string) R
 	}
 	cmd := exec.CommandContext(ctx, "sqlfluff", "fix", "--exclude-rules", exclude, "--stdin-filename", abs, "-") //nolint:gosec // external formatter by design; args are our own construction, never a shell
 	cmd.Dir = projectRoot
+	cmd.WaitDelay = pipeGrace
 	cmd.Stdin = bytes.NewReader(src)
 	var stdout, stderr bytes.Buffer
 	cmd.Stdout = &stdout
