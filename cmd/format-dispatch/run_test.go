@@ -658,7 +658,7 @@ func TestRunRealExtensionsSkipWithoutShebangPeek(t *testing.T) {
 			t.Setenv("CLAUDE_PROJECT_DIR", projectRoot)
 			t.Setenv("CLAUDE_FORMAT_HOOKS_LOG", logPath)
 			qt.Check(t, qt.Equals(run(strings.NewReader(payload(abs))), 0))
-			qt.Check(t, qt.StringContains(readFile(t, logPath), "skip: stat failed or is a directory"))
+			qt.Check(t, qt.StringContains(readFile(t, logPath), "skip: stat failed or not a regular file"))
 		})
 	}
 }

@@ -483,8 +483,8 @@ func resolveTarget(path string, cfg config.Config) (abs, projectRoot, skipReason
 		}
 	}
 
-	if info, err := os.Stat(abs); err != nil || info.IsDir() {
-		return abs, "", "skip: stat failed or is a directory"
+	if !regularFile(abs) {
+		return abs, "", "skip: stat failed or not a regular file"
 	}
 
 	projectRoot = projectRootEnv()
@@ -618,6 +618,14 @@ func within(abs, root string) bool {
 		return false
 	}
 	return rel == "." || (rel != ".." && !strings.HasPrefix(rel, ".."+string(filepath.Separator)))
+}
+
+// regularFile reports whether path, followed through symlinks, is a regular
+// file. Reading a FIFO blocks until a writer appears and a device can be
+// endless, and neither is a document a formatter could rewrite.
+func regularFile(path string) bool {
+	info, err := os.Stat(path)
+	return err == nil && info.Mode().IsRegular()
 }
 
 // resolveSymlinks returns path with all symlinks resolved, or path

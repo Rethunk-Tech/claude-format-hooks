@@ -683,7 +683,7 @@ func (t *targetSet) add(root, p string) {
 		return
 	}
 	abs, err := filepath.Abs(p)
-	if err != nil {
+	if err != nil || !regularFile(abs) {
 		return
 	}
 	bound := t.projectRoot

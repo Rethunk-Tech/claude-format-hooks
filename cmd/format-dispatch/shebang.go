@@ -9,6 +9,9 @@ import (
 const shebangPeekLimit = 256
 
 func shebangExt(path string) (string, bool) {
+	if !regularFile(path) {
+		return "", false
+	}
 	f, err := os.Open(filepath.Clean(path))
 	if err != nil {
 		return "", false

@@ -75,7 +75,7 @@ func TestResolveTarget(t *testing.T) {
 				t.Helper()
 				t.Setenv("CLAUDE_PROJECT_DIR", "")
 				path := filepath.Join(t.TempDir(), "missing.json")
-				return path, path, "", "skip: stat failed or is a directory"
+				return path, path, "", "skip: stat failed or not a regular file"
 			},
 		},
 		{
@@ -84,7 +84,7 @@ func TestResolveTarget(t *testing.T) {
 				t.Helper()
 				t.Setenv("CLAUDE_PROJECT_DIR", "")
 				path := t.TempDir()
-				return path, path, "", "skip: stat failed or is a directory"
+				return path, path, "", "skip: stat failed or not a regular file"
 			},
 		},
 		{
