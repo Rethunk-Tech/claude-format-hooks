@@ -483,11 +483,19 @@ func (s *restoreSet) restoreAll() {
 	}
 }
 
-// restoreOriginal writes original back over abs. A nil source forces the
-// write: the file's current content is the formatter's, and it is being
-// discarded on purpose.
+// restoreOriginal writes original back over abs unless abs already holds it:
+// rewriting an untouched file replaces its inode and mtime for nothing. The
+// bytes just read are the write's source guard, so an edit landing between
+// that read and the rename is kept.
 func restoreOriginal(abs string, original []byte) error {
-	return formatters.WriteFormatted(abs, nil, original, 0o644)
+	current, err := os.ReadFile(filepath.Clean(abs))
+	if err != nil {
+		return formatters.WriteFormatted(abs, nil, original, 0o644)
+	}
+	if bytes.Equal(current, original) {
+		return nil
+	}
+	return formatters.WriteFormatted(abs, current, original, 0o644)
 }
 
 // restoreOnSignal puts every in-flight file back when the operator interrupts

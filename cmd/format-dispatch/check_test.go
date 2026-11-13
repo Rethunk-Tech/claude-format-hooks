@@ -66,6 +66,23 @@ func TestCheckNeverModifiesTheFilesItInspects(t *testing.T) {
 	qt.Check(t, qt.Equals(string(after), unformattedJSON))
 }
 
+// Replacing an already formatted file with a copy of itself still changes its
+// inode and mtime: hardlinks split, make-style builds rebuild, and an edit a
+// sibling lands while the formatter runs is overwritten by the "restore".
+func TestCheckDoesNotReplaceAFileTheFormatterLeftAlone(t *testing.T) {
+	dir := t.TempDir()
+	path := writeCheckFile(t, dir, "ok.json", formattedJSON)
+	before, err := os.Stat(path)
+	qt.Assert(t, qt.IsNil(err))
+
+	var out, errOut bytes.Buffer
+	qt.Assert(t, qt.Equals(runCheck([]string{dir}, &out, &errOut), 0))
+
+	after, err := os.Stat(path)
+	qt.Assert(t, qt.IsNil(err))
+	qt.Check(t, qt.IsTrue(os.SameFile(before, after)))
+}
+
 func TestCheckLeavesNoScratchFilesBehind(t *testing.T) {
 	// The scratch copy lands in the file's own directory (so config
 	// discovery still works), which makes cleanup load-bearing -- a leaked
