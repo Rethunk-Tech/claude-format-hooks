@@ -116,7 +116,7 @@ func TestShellFormatterPicksDialect(t *testing.T) {
 			res := NewShell(config.Default()).Format(t.Context(), "", path)
 			qt.Assert(t, qt.IsNil(res.Err))
 			qt.Check(t, qt.IsFalse(res.Skipped))
-			got, err := os.ReadFile(path)
+			got, err := os.ReadFile(filepath.Clean(path))
 			qt.Assert(t, qt.IsNil(err))
 			qt.Check(t, qt.Equals(string(got), tc.want))
 		})
