@@ -99,11 +99,11 @@ func TestFindUpwardStopsAtSymlinkedRoot(t *testing.T) {
 // The found directory keeps the caller's spelling: resolving it would turn a
 // Windows 8.3 short name into the long name, which callers compare against.
 func TestFindUpwardKeepsTheCallersSpelling(t *testing.T) {
-	real := t.TempDir()
-	qt.Assert(t, qt.IsNil(os.MkdirAll(filepath.Join(real, "a", "b"), 0o750)))
-	qt.Assert(t, qt.IsNil(os.WriteFile(filepath.Join(real, "a", "biome.json"), []byte("{}"), 0o600)))
+	target := t.TempDir()
+	qt.Assert(t, qt.IsNil(os.MkdirAll(filepath.Join(target, "a", "b"), 0o750)))
+	qt.Assert(t, qt.IsNil(os.WriteFile(filepath.Join(target, "a", "biome.json"), []byte("{}"), 0o600)))
 	link := filepath.Join(t.TempDir(), "link")
-	qt.Assert(t, qt.IsNil(os.Symlink(real, link)))
+	qt.Assert(t, qt.IsNil(os.Symlink(target, link)))
 
 	qt.Check(t, qt.Equals(findUpward(filepath.Join(link, "a", "b"), link, biomeConfigNames...), filepath.Join(link, "a")))
 }
