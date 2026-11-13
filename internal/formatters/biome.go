@@ -161,10 +161,13 @@ func resolvedClean(p string) string {
 }
 
 // findUpward walks from dir up to (and including) root looking for any of
-// names. Returns the containing directory, or "" if none is found.
+// names. Returns the containing directory in the caller's spelling of dir, or
+// "" if none is found. Only the stop test resolves symlinks: on Windows the
+// resolved form also expands 8.3 short names, which callers never passed in.
 func findUpward(dir, root string, names ...string) string {
-	root = resolvedClean(root)
-	dir = resolvedClean(dir)
+	root = filepath.Clean(root)
+	realRoot := resolvedClean(root)
+	dir = filepath.Clean(dir)
 	for {
 		if slices.ContainsFunc(names, func(n string) bool {
 			_, err := os.Stat(filepath.Join(dir, n))
@@ -172,7 +175,7 @@ func findUpward(dir, root string, names ...string) string {
 		}) {
 			return dir
 		}
-		if dir == root || dir == "/" || dir == "." {
+		if dir == root || dir == "/" || dir == "." || resolvedClean(dir) == realRoot {
 			break
 		}
 		parent := filepath.Dir(dir)
