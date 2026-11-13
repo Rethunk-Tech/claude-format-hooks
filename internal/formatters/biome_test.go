@@ -107,3 +107,17 @@ func TestFindUpwardKeepsTheCallersSpelling(t *testing.T) {
 
 	qt.Check(t, qt.Equals(findUpward(filepath.Join(link, "a", "b"), link, biomeConfigNames...), filepath.Join(link, "a")))
 }
+
+// A file reached through a symlink that lives outside the project resolves
+// inside it, so the hook formats it; the walk up from that spelling must not
+// pick up a config beside the link instead of the project's.
+func TestFindUpwardIgnoresConfigBesideAnOutsideLink(t *testing.T) {
+	root := t.TempDir()
+	qt.Assert(t, qt.IsNil(os.MkdirAll(filepath.Join(root, "sub"), 0o750)))
+	outside := t.TempDir()
+	qt.Assert(t, qt.IsNil(os.WriteFile(filepath.Join(outside, "biome.json"), []byte("{}"), 0o600)))
+	link := filepath.Join(outside, "s")
+	qt.Assert(t, qt.IsNil(os.Symlink(filepath.Join(root, "sub"), link)))
+
+	qt.Check(t, qt.Equals(findUpward(link, root, biomeConfigNames...), ""))
+}

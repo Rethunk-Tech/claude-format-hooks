@@ -169,13 +169,19 @@ func findUpward(dir, root string, names ...string) string {
 	realRoot := resolvedClean(root)
 	dir = filepath.Clean(dir)
 	for {
+		realDir := resolvedClean(dir)
+		// A spelling through a link outside root climbs into that link's
+		// parents, which never belong to the project.
+		if rel, err := filepath.Rel(realRoot, realDir); err != nil || rel == ".." || strings.HasPrefix(rel, ".."+string(filepath.Separator)) {
+			break
+		}
 		if slices.ContainsFunc(names, func(n string) bool {
 			_, err := os.Stat(filepath.Join(dir, n))
 			return err == nil
 		}) {
 			return dir
 		}
-		if dir == root || dir == "/" || dir == "." || resolvedClean(dir) == realRoot {
+		if dir == root || dir == "/" || dir == "." || realDir == realRoot {
 			break
 		}
 		parent := filepath.Dir(dir)
