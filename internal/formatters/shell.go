@@ -57,10 +57,12 @@ func (f shellFormatter) Format(_ context.Context, _, abs string) Result {
 // dialect picks the parser language from the extension, else the shebang;
 // everything else stays bash.
 func dialect(abs string, src []byte) syntax.LangVariant {
-	if strings.HasSuffix(abs, ".zsh") || strings.HasSuffix(abs, ".zsh.example") {
+	// Dispatch already lowercases the extension; suffix checks must too or FILE.ZSH is bash.
+	lower := strings.ToLower(abs)
+	if strings.HasSuffix(lower, ".zsh") || strings.HasSuffix(lower, ".zsh.example") {
 		return syntax.LangZsh
 	}
-	if strings.HasSuffix(abs, ".ksh") || strings.HasSuffix(abs, ".ksh.example") {
+	if strings.HasSuffix(lower, ".ksh") || strings.HasSuffix(lower, ".ksh.example") {
 		return syntax.LangMirBSDKorn
 	}
 	line, _, _ := bytes.Cut(src, []byte("\n"))
