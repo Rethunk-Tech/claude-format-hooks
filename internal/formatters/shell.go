@@ -69,7 +69,18 @@ func dialect(abs string, src []byte) syntax.LangVariant {
 		if len(f) == 0 {
 			return syntax.LangBash
 		}
-		interp := filepath.Base(f[len(f)-1]) // "#!/usr/bin/env zsh" names the shell last.
+		interp := filepath.Base(f[0])
+		if interp == "env" {
+			// env -S and other flags wrap the interpreter; -u after zsh is not the shell.
+			interp = ""
+			for _, tok := range f[1:] {
+				if strings.HasPrefix(tok, "-") {
+					continue
+				}
+				interp = filepath.Base(tok)
+				break
+			}
+		}
 		switch interp {
 		case "zsh":
 			return syntax.LangZsh

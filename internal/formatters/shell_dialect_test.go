@@ -1,0 +1,35 @@
+package formatters
+
+import (
+	"bytes"
+	"context"
+	"os"
+	"path/filepath"
+	"testing"
+
+	"github.com/Rethunk-Tech/claude-format-hooks/internal/config"
+)
+
+func TestFormatEnvDashSZshShebang(t *testing.T) {
+	t.Parallel()
+	dir := t.TempDir()
+	path := filepath.Join(dir, "envS.sh")
+	src := []byte("#!/usr/bin/env -S zsh -u\n() { echo hi }\n")
+	if err := os.WriteFile(path, src, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	res := NewShell(config.Config{}).Format(context.Background(), dir, path)
+	if res.Err != nil {
+		t.Fatal(res.Err)
+	}
+	if res.Skipped {
+		t.Fatal(`formatter declined #!/usr/bin/env -S zsh -u`)
+	}
+	out, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !bytes.Contains(out, []byte("() { echo hi; }")) {
+		t.Fatalf("formatted = %q, want zsh-formatted anonymous function", out)
+	}
+}
