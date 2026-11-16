@@ -32,7 +32,9 @@ Single package: `go test -race -v ./internal/formatters/...`.
 | [`internal/installer/`](internal/installer/) | Wire, upgrade, bunx |
 
 Traps in `dispatch.NewRegistry`: `.json` uses biome only with a project
-biome config and a usable launcher (else native Indent); `.json.example`
+biome config and a usable launcher (else native Indent);
+`tsconfig*.json`/`jsconfig*.json`/`.vscode/*.json` native-format as JSONC
+and any other `.json` that fails to parse is a quiet no-op; `.json.example`
 always native; `go.mod`/`go.work` only under those names; `gofumpt` else
 native `gofmt`, with `goimports` first when PATH has it and a parent
 `.golangci.yml` lists it; prettier only with a project prettier config
