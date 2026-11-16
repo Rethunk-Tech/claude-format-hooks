@@ -6,6 +6,7 @@ import (
 	"context"
 	"iter"
 	"maps"
+	"os"
 	"path"
 	"path/filepath"
 	"slices"
@@ -376,18 +377,28 @@ func AllKnownExtensions() []string {
 // one needing a release.
 func InSkippedDir(relPath string, extra []string) bool {
 	segs := strings.Split(filepath.ToSlash(relPath), "/")
-	// Filename is not a directory: scripts/build must format; build/ok.sh must not.
-	if len(segs) > 0 {
-		segs = segs[:len(segs)-1]
+	if len(segs) == 0 {
+		return false
 	}
-	return slices.ContainsFunc(segs, func(seg string) bool {
+	match := func(seg string) bool {
 		if skipDirs[seg] {
 			return true
 		}
 		return slices.ContainsFunc(extra, func(e string) bool {
 			return strings.EqualFold(strings.TrimSpace(e), seg)
 		})
-	})
+	}
+	if slices.ContainsFunc(segs[:len(segs)-1], match) {
+		return true
+	}
+	last := segs[len(segs)-1]
+	if !match(last) {
+		return false
+	}
+	// Last segment names a skip directory, but scripts/build is a file.
+	// A missing path still skips so --check node_modules prunes with no cwd.
+	fi, err := os.Stat(filepath.Clean(relPath))
+	return err != nil || fi.IsDir()
 }
 
 // Dispatch routes abs to the formatter registered for ext.
