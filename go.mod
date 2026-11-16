@@ -5,6 +5,7 @@ go 1.27.4
 require (
 	github.com/Rethunk-Tech/go-safefs v0.9.1
 	github.com/go-quicktest/qt v1.102.0
+	github.com/tailscale/hujson v0.0.0-20260727124030-b80ff77dac4f
 	mvdan.cc/editorconfig v0.3.0
 	mvdan.cc/sh/v3 v3.14.1
 )
