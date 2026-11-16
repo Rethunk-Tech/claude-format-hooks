@@ -376,6 +376,10 @@ func AllKnownExtensions() []string {
 // one needing a release.
 func InSkippedDir(relPath string, extra []string) bool {
 	segs := strings.Split(filepath.ToSlash(relPath), "/")
+	// Filename is not a directory: scripts/build must format; build/ok.sh must not.
+	if len(segs) > 0 {
+		segs = segs[:len(segs)-1]
+	}
 	return slices.ContainsFunc(segs, func(seg string) bool {
 		if skipDirs[seg] {
 			return true
