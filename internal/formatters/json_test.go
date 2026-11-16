@@ -3,6 +3,7 @@ package formatters
 import (
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 
 	"github.com/go-quicktest/qt"
@@ -44,14 +45,57 @@ func TestJSONFormatterReadErrorIsNotSkipped(t *testing.T) {
 	assertDirectoryIsAReadError(t, NewJSON(config.Default()))
 }
 
-func TestJSONFormatterInvalidJSONIsDiagnostic(t *testing.T) {
-	dir, path := sourceFile(t, "t.json", `{"a": `)
+func TestJSONFormatterJSONCNamedFilesFormatAsJSONC(t *testing.T) {
+	src := "{\n// keep\n\"a\":1\n}"
+	cases := []struct {
+		name string
+		rel  string
+	}{
+		{"tsconfig", "tsconfig.json"},
+		{"tsconfig star", "tsconfig.build.json"},
+		{"jsconfig", "jsconfig.json"},
+		{"jsconfig star", "jsconfig.app.json"},
+		{"vscode", filepath.Join(".vscode", "settings.json")},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			dir := t.TempDir()
+			path := filepath.Join(dir, tc.rel)
+			qt.Assert(t, qt.IsNil(os.MkdirAll(filepath.Dir(path), 0o700)))
+			qt.Assert(t, qt.IsNil(os.WriteFile(path, []byte(src), 0o600)))
 
-	res := NewJSON(config.Default()).Format(t.Context(), dir, path)
+			res := NewJSON(config.Default()).Format(t.Context(), dir, path)
+			qt.Check(t, qt.IsNil(res.Err))
+			qt.Check(t, qt.Equals(res.Diagnostic, ""))
+			qt.Check(t, qt.IsFalse(res.Skipped))
 
-	qt.Check(t, qt.IsFalse(res.Skipped), qt.Commentf("syntax decline must not look like a missing tool"))
-	qt.Check(t, qt.Not(qt.Equals(res.Diagnostic, "")))
-	qt.Check(t, qt.Equals(string(readSource(t, path)), `{"a": `))
+			got := string(readSource(t, path))
+			qt.Check(t, qt.IsTrue(strings.Contains(got, "// keep")), qt.Commentf("got %q", got))
+			qt.Check(t, qt.Not(qt.Equals(got, src)))
+		})
+	}
+}
+
+func TestJSONFormatterInvalidJSONIsSkippedQuietly(t *testing.T) {
+	cases := []struct {
+		name string
+		src  string
+	}{
+		{"comments", "{\n// comment\n\"a\":1\n}\n"},
+		{"truncated", `{"a": `},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			dir, path := sourceFile(t, "t.json", tc.src)
+
+			res := NewJSON(config.Default()).Format(t.Context(), dir, path)
+
+			qt.Check(t, qt.IsNil(res.Err))
+			qt.Check(t, qt.Equals(res.Diagnostic, ""))
+			qt.Check(t, qt.IsFalse(res.Skipped), qt.Commentf("quiet skip must not look like a missing tool"))
+			qt.Check(t, qt.Equals(string(readSource(t, path)), tc.src))
+		})
+	}
 }
 
 func TestJSONFormatterClampsHugeIndentSize(t *testing.T) {
