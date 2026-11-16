@@ -103,23 +103,18 @@ func (f jsonFormatter) Format(_ context.Context, _, abs string) Result {
 	if err != nil {
 		return Result{Err: fmt.Errorf("read: %w", err)}
 	}
-	out, res := f.format(src, abs)
-	if res != (Result{}) {
-		return res
-	}
-	return writeIfChanged(abs, src, out, 0o644)
+	return writeIfChanged(abs, src, f.format(src, abs), 0o644)
 }
 
 // FormatStdin formats src as JSON for abs. Only the indent resolution needs
 // the path, so this answers --check's question without a scratch copy beside
 // the file.
 func (f jsonFormatter) FormatStdin(_ context.Context, _, abs string, src []byte) ([]byte, Result, bool) {
-	out, res := f.format(src, abs)
-	return out, res, true
+	return f.format(src, abs), Result{}, true
 }
 
 // format is the in-process formatting both Format and FormatStdin apply.
-func (f jsonFormatter) format(src []byte, abs string) ([]byte, Result) {
+func (f jsonFormatter) format(src []byte, abs string) []byte {
 	spec := config.ResolveJSONIndent(f.cfg, abs)
 	indent := "\t"
 	if !spec.UseTabs {
@@ -131,12 +126,12 @@ func (f jsonFormatter) format(src []byte, abs string) ([]byte, Result) {
 		if jsonCNamedJSON(abs) {
 			buf.Reset()
 			if err := indentJSONC(&buf, src, "", indent); err == nil {
-				return append(bytes.TrimRight(buf.Bytes(), "\n\t \r"), '\n'), Result{}
+				return append(bytes.TrimRight(buf.Bytes(), "\n\t \r"), '\n')
 			}
 		}
 		// Comments or malformed JSON must not surface as a fixer failure;
 		// the hook would put stderr in the model's context.
-		return src, Result{}
+		return src
 	}
 
 	// json.Indent passes through any insignificant whitespace already
@@ -144,7 +139,7 @@ func (f jsonFormatter) format(src []byte, abs string) ([]byte, Result) {
 	// it). Trim before appending exactly one newline, or a file that
 	// already ends in "}\n" would gain an extra blank line every single
 	// time it's formatted — a non-idempotent, ever-growing bug.
-	return append(bytes.TrimRight(buf.Bytes(), "\n\t \r"), '\n'), Result{}
+	return append(bytes.TrimRight(buf.Bytes(), "\n\t \r"), '\n')
 }
 
 // maxIndentWidth caps spaces taken from untrusted config / .editorconfig.
@@ -198,30 +193,12 @@ func lexJSONC(src []byte) ([]jtok, error) {
 		case c == ' ' || c == '\t' || c == '\n' || c == '\r':
 			i++
 		case c == '/' && i+1 < len(src) && (src[i+1] == '/' || src[i+1] == '*'):
-			trail := commentIsTrailing(src, i)
-			if src[i+1] == '/' {
-				j := i + 2
-				for j < len(src) && src[j] != '\n' {
-					j++
-				}
-				raw := src[i:j]
-				if n := len(raw); n > 0 && raw[n-1] == '\r' {
-					raw = raw[:n-1]
-				}
-				toks = append(toks, jtok{kind: '/', raw: raw, trail: trail})
-				i = j
-			} else {
-				j := i + 2
-				for j+1 < len(src) && !(src[j] == '*' && src[j+1] == '/') {
-					j++
-				}
-				if j+1 >= len(src) {
-					return nil, fmt.Errorf("unterminated comment")
-				}
-				j += 2
-				toks = append(toks, jtok{kind: '*', raw: src[i:j], trail: trail})
-				i = j
+			tok, next, err := lexJSONCComment(src, i)
+			if err != nil {
+				return nil, err
 			}
+			toks = append(toks, tok)
+			i = next
 		case c == '"':
 			j, err := scanJSONCString(src, i)
 			if err != nil {
@@ -242,6 +219,30 @@ func lexJSONC(src []byte) ([]jtok, error) {
 		}
 	}
 	return toks, nil
+}
+
+func lexJSONCComment(src []byte, i int) (jtok, int, error) {
+	trail := commentIsTrailing(src, i)
+	if src[i+1] == '/' {
+		j := i + 2
+		for j < len(src) && src[j] != '\n' {
+			j++
+		}
+		raw := src[i:j]
+		if n := len(raw); n > 0 && raw[n-1] == '\r' {
+			raw = raw[:n-1]
+		}
+		return jtok{kind: '/', raw: raw, trail: trail}, j, nil
+	}
+	j := i + 2
+	for j+1 < len(src) && (src[j] != '*' || src[j+1] != '/') {
+		j++
+	}
+	if j+1 >= len(src) {
+		return jtok{}, 0, fmt.Errorf("unterminated comment")
+	}
+	j += 2
+	return jtok{kind: '*', raw: src[i:j], trail: trail}, j, nil
 }
 
 func commentIsTrailing(src []byte, i int) bool {
@@ -270,18 +271,27 @@ func scanJSONCString(src []byte, i int) (int, error) {
 }
 
 func scanJSONCLiteral(src []byte, i int) (int, error) {
-	start := i
 	if src[i] == 't' || src[i] == 'f' || src[i] == 'n' {
-		for i < len(src) && src[i] >= 'a' && src[i] <= 'z' {
-			i++
-		}
-		switch string(src[start:i]) {
-		case "true", "false", "null":
-			return i, nil
-		default:
-			return 0, fmt.Errorf("invalid character %q looking for beginning of value", src[start])
-		}
+		return scanJSONCKeyword(src, i)
 	}
+	return scanJSONCNumber(src, i)
+}
+
+func scanJSONCKeyword(src []byte, i int) (int, error) {
+	start := i
+	for i < len(src) && src[i] >= 'a' && src[i] <= 'z' {
+		i++
+	}
+	switch string(src[start:i]) {
+	case "true", "false", "null":
+		return i, nil
+	default:
+		return 0, fmt.Errorf("invalid character %q looking for beginning of value", src[start])
+	}
+}
+
+func scanJSONCNumber(src []byte, i int) (int, error) {
+	start := i
 	if src[i] == '-' {
 		i++
 		if i >= len(src) {
@@ -294,32 +304,45 @@ func scanJSONCLiteral(src []byte, i int) (int, error) {
 	if src[i] == '0' {
 		i++
 	} else {
-		for i < len(src) && src[i] >= '0' && src[i] <= '9' {
-			i++
-		}
+		i = scanDigits(src, i)
 	}
-	if i < len(src) && src[i] == '.' {
+	var err error
+	if i, err = scanJSONCFraction(src, i); err != nil {
+		return 0, err
+	}
+	return scanJSONCExponent(src, i)
+}
+
+func scanDigits(src []byte, i int) int {
+	for i < len(src) && src[i] >= '0' && src[i] <= '9' {
 		i++
-		if i >= len(src) || src[i] < '0' || src[i] > '9' {
-			return 0, fmt.Errorf("invalid character in number")
-		}
-		for i < len(src) && src[i] >= '0' && src[i] <= '9' {
-			i++
-		}
 	}
-	if i < len(src) && (src[i] == 'e' || src[i] == 'E') {
+	return i
+}
+
+func scanJSONCFraction(src []byte, i int) (int, error) {
+	if i >= len(src) || src[i] != '.' {
+		return i, nil
+	}
+	i++
+	if i >= len(src) || src[i] < '0' || src[i] > '9' {
+		return 0, fmt.Errorf("invalid character in number")
+	}
+	return scanDigits(src, i), nil
+}
+
+func scanJSONCExponent(src []byte, i int) (int, error) {
+	if i >= len(src) || (src[i] != 'e' && src[i] != 'E') {
+		return i, nil
+	}
+	i++
+	if i < len(src) && (src[i] == '+' || src[i] == '-') {
 		i++
-		if i < len(src) && (src[i] == '+' || src[i] == '-') {
-			i++
-		}
-		if i >= len(src) || src[i] < '0' || src[i] > '9' {
-			return 0, fmt.Errorf("invalid character in number")
-		}
-		for i < len(src) && src[i] >= '0' && src[i] <= '9' {
-			i++
-		}
 	}
-	return i, nil
+	if i >= len(src) || src[i] < '0' || src[i] > '9' {
+		return 0, fmt.Errorf("invalid character in number")
+	}
+	return scanDigits(src, i), nil
 }
 
 type jsoncPrinter struct {
@@ -412,16 +435,16 @@ func (p *jsoncPrinter) value() error {
 	}
 }
 
-func (p *jsoncPrinter) container(close rune, object bool) error {
+func (p *jsoncPrinter) container(closer rune, object bool) error {
 	p.writeIndent()
-	if close == '}' {
+	if closer == '}' {
 		p.dst.WriteByte('{')
 	} else {
 		p.dst.WriteByte('[')
 	}
-	if p.peek() == close && !p.hasCommentBefore(close) {
-		_ = p.take(close)
-		p.dst.WriteRune(close)
+	if p.peek() == closer && !p.hasCommentBefore() {
+		_ = p.take(closer)
+		p.dst.WriteRune(closer)
 		p.emitComments(true)
 		return nil
 	}
@@ -429,7 +452,7 @@ func (p *jsoncPrinter) container(close rune, object bool) error {
 	p.depth++
 	for {
 		p.emitComments(false)
-		if p.peek() == close {
+		if p.peek() == closer {
 			break
 		}
 		if object {
@@ -451,7 +474,7 @@ func (p *jsoncPrinter) container(close rune, object bool) error {
 			}
 			p.dst.WriteByte(',')
 			p.emitComments(true)
-			if p.peek() == close {
+			if p.peek() == closer {
 				break
 			}
 			if !p.atLine {
@@ -467,26 +490,16 @@ func (p *jsoncPrinter) container(close rune, object bool) error {
 	p.emitComments(false)
 	p.depth--
 	p.writeIndent()
-	if err := p.take(close); err != nil {
+	if err := p.take(closer); err != nil {
 		return err
 	}
-	p.dst.WriteRune(close)
+	p.dst.WriteRune(closer)
 	p.emitComments(true)
 	return nil
 }
 
-func (p *jsoncPrinter) hasCommentBefore(kind rune) bool {
-	for j := p.i; j < len(p.toks); j++ {
-		k := p.toks[j].kind
-		if k == kind {
-			return false
-		}
-		if k != '/' && k != '*' {
-			return false
-		}
-		return true
-	}
-	return false
+func (p *jsoncPrinter) hasCommentBefore() bool {
+	return p.i < len(p.toks) && (p.toks[p.i].kind == '/' || p.toks[p.i].kind == '*')
 }
 
 func (p *jsoncPrinter) key() error {

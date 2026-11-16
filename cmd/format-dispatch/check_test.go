@@ -137,29 +137,27 @@ func TestWouldReformatComparesFormattedCopies(t *testing.T) {
 	}
 }
 
-func TestWouldReformatFailsOnFormatterDiagnostic(t *testing.T) {
+func TestWouldReformatSkipsInvalidJSONQuietly(t *testing.T) {
 	dir := t.TempDir()
 	path := writeCheckFile(t, dir, "bad.json", "{\"a\": ")
 	registry := dispatch.NewRegistry(config.Default())
 
 	changed, skipped, err := wouldReformat(t.Context(), registry, dir, path, ".json", false)
 
+	qt.Check(t, qt.IsNil(err))
 	qt.Check(t, qt.IsFalse(changed))
 	qt.Check(t, qt.IsFalse(skipped), qt.Commentf("a syntax decline is not a missing tool"))
-	if err == nil {
-		t.Fatal("wouldReformat must fail --check when Dispatch returns a diagnostic")
-	}
 }
 
-func TestCheckFailsOnInvalidJSON(t *testing.T) {
+func TestCheckSkipsInvalidJSONQuietly(t *testing.T) {
 	dir := t.TempDir()
 	writeCheckFile(t, dir, "bad.json", "{\"a\": ")
 
 	var out, errOut bytes.Buffer
-	qt.Check(t, qt.Equals(runCheck([]string{dir}, &out, &errOut), 2))
+	qt.Check(t, qt.Equals(runCheck([]string{dir}, &out, &errOut), 0))
 	qt.Check(t, qt.Not(qt.StringContains(out.String(), "no tool")),
 		qt.Commentf("invalid JSON must not be tallied as a missing formatter"))
-	qt.Check(t, qt.Not(qt.Equals(errOut.String(), "")))
+	qt.Check(t, qt.Equals(errOut.String(), ""))
 }
 
 // A read-only checkout (archive mount, chmod 555) offers nowhere to put the
@@ -191,13 +189,13 @@ func TestCheckWorksInAReadOnlyTree(t *testing.T) {
 // them.
 func TestCheckReportsEveryFailure(t *testing.T) {
 	dir := t.TempDir()
-	first := writeCheckFile(t, dir, "a.json", "{\"a\": ")
-	second := writeCheckFile(t, dir, "b.json", "{\"b\": ")
+	first := writeCheckFile(t, dir, "a.json", unformattedJSON)
+	second := writeCheckFile(t, dir, "b.json", unformattedJSON)
 
 	var out, errOut strings.Builder
-	qt.Check(t, qt.Equals(runCheck([]string{dir}, &out, &errOut), 2))
-	qt.Check(t, qt.StringContains(errOut.String(), first))
-	qt.Check(t, qt.StringContains(errOut.String(), second))
+	qt.Check(t, qt.Equals(runCheck([]string{dir}, &out, &errOut), 1))
+	qt.Check(t, qt.StringContains(out.String(), first))
+	qt.Check(t, qt.StringContains(out.String(), second))
 }
 
 // prettier, biome and taplo decide which files are theirs by path, so a
@@ -583,12 +581,11 @@ func TestCheckProjectConfigMalformedWarnsAndContinues(t *testing.T) {
 	t.Setenv("CLAUDE_FORMAT_HOOKS_CONFIG", configPath)
 
 	var out, errOut bytes.Buffer
-	// The project config is itself a .json file. A syntax decline used to
-	// tally as a missing tool and let bad.json decide the exit; --check now
-	// fails that file the way the hook reports a formatter diagnostic.
-	qt.Check(t, qt.Equals(runCheck([]string{projectRoot}, &out, &errOut), 2))
+	// The project config is itself a .json file. A syntax decline is a
+	// quiet no-op, so --check continues and reports would-reformat on
+	// bad.json.
+	qt.Check(t, qt.Equals(runCheck([]string{projectRoot}, &out, &errOut), 1))
 	qt.Check(t, qt.StringContains(errOut.String(), "project config:"))
-	qt.Check(t, qt.StringContains(errOut.String(), projectConfigFile))
 	qt.Check(t, qt.Equals(readFile(t, path), unformattedJSON))
 }
 
