@@ -36,10 +36,10 @@ func TestResolvedCleanFollowsSymlinks(t *testing.T) {
 		t.Skip("Windows symlink creation requires elevated privileges")
 	}
 	dir := t.TempDir()
-	real := filepath.Join(dir, "real")
-	qt.Assert(t, qt.IsNil(os.Mkdir(real, 0o750)))
+	target := filepath.Join(dir, "real")
+	qt.Assert(t, qt.IsNil(os.Mkdir(target, 0o750)))
 	link := filepath.Join(dir, "link")
-	qt.Assert(t, qt.IsNil(os.Symlink(real, link)))
+	qt.Assert(t, qt.IsNil(os.Symlink(target, link)))
 
 	got, err := filepath.EvalSymlinks(link)
 	qt.Assert(t, qt.IsNil(err))

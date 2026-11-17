@@ -261,7 +261,7 @@ func TestGetRecordsAPruneStampAfterSweeping(t *testing.T) {
 	_, ok := Get(dir, key, time.Minute)
 	qt.Assert(t, qt.IsTrue(ok))
 
-	raw, err := os.ReadFile(filepath.Join(dir, pruneStampName))
+	raw, err := os.ReadFile(filepath.Clean(filepath.Join(dir, pruneStampName)))
 	qt.Assert(t, qt.IsNil(err), qt.Commentf("a sweep must record when it ran"))
 	stamped, err := strconv.ParseInt(string(bytes.TrimSpace(raw)), 10, 64)
 	qt.Assert(t, qt.IsNil(err))
