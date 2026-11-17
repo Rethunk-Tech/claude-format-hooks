@@ -5,10 +5,29 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"sync"
 	"testing"
 
 	"github.com/go-quicktest/qt"
 )
+
+func resetMarkdownlintConfigForTest() {
+	markdownlintConfigOnce = sync.Once{}
+	markdownlintConfigPath = ""
+}
+
+func TestMarkdownPassesUserConfigWhenResolved(t *testing.T) {
+	resetMarkdownlintConfigForTest()
+	t.Cleanup(resetMarkdownlintConfigForTest)
+	home := t.TempDir()
+	t.Setenv("HOME", home)
+	abs := filepath.Join(t.TempDir(), "f.md")
+
+	args := NewMarkdown().pathArgs(abs)
+
+	cfg := filepath.Join(home, ".claude", userMarkdownlintConfigFile)
+	qt.Check(t, qt.DeepEquals(args, []string{"--config", cfg, "--fix", "--", abs}))
+}
 
 func TestResolveMarkdownlintConfigMaterializesDefaults(t *testing.T) {
 	home := t.TempDir()

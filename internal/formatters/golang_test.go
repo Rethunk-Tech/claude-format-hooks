@@ -2,6 +2,7 @@ package formatters
 
 import (
 	"context"
+	"errors"
 	"go/format"
 	"os"
 	"path/filepath"
@@ -284,6 +285,11 @@ printf 'package changed\n'`,
 	qt.Check(t, qt.IsTrue(os.IsNotExist(err)), qt.Commentf("gofumpt must not be started for invalid Go"))
 }
 
+func TestToolDiagnosticUsesProcessErrorWhenStderrIsEmpty(t *testing.T) {
+	err := &toolRunError{err: errors.New("exit status 1")}
+	qt.Check(t, qt.Equals(toolDiagnostic(t.Context(), err), "exit status 1"))
+}
+
 func TestGoFormatterReportsGofumptFailure(t *testing.T) {
 	isolateDiskCache(t)
 	writeFakeTools(t, map[string]string{
@@ -344,6 +350,11 @@ func TestParseGolangciFormatters(t *testing.T) {
         group-params: false
 `,
 			goimports: true,
+		},
+		{
+			name:        "group-params directly under gofumpt",
+			src:         "formatters:\n  settings:\n    gofumpt:\n      group-params: true\n",
+			groupParams: true,
 		},
 		{
 			name: "commented flag",
@@ -433,6 +444,24 @@ func TestParseGolangciFormatters(t *testing.T) {
 			qt.Check(t, qt.Equals(opts.groupParams, tc.groupParams))
 		})
 	}
+}
+
+func TestPopDeeperEmptiesWhenEveryFrameIsDeeper(t *testing.T) {
+	stack := []yamlFrame{{indent: 2, key: "a"}, {indent: 4, key: "b"}}
+	qt.Check(t, qt.HasLen(popDeeper(stack, 0), 0))
+}
+
+func TestPopAtOrDeeperDropsTheSameIndent(t *testing.T) {
+	stack := []yamlFrame{{indent: 0, key: "a"}, {indent: 2, key: "b"}}
+	got := popAtOrDeeper(stack, 2)
+	qt.Assert(t, qt.HasLen(got, 1))
+	qt.Check(t, qt.Equals(got[0].key, "a"))
+	qt.Check(t, qt.Equals(got[0].indent, 0))
+}
+
+func TestUnquoteYAMLEmptyQuotedString(t *testing.T) {
+	qt.Check(t, qt.Equals(unquoteYAML(`""`), ""))
+	qt.Check(t, qt.Equals(unquoteYAML(`''`), ""))
 }
 
 func TestGolangciGoFormatUsesNearestParent(t *testing.T) {

@@ -36,6 +36,32 @@ func TestTruncateLineLimit(t *testing.T) {
 	qt.Check(t, qt.Equals(got, "one\ntwo\nthree"))
 }
 
+func TestTruncateKeepsExactlyMaxLines(t *testing.T) {
+	out := []byte("1\n2\n3\n4\n5\n6\n7\n8\n9\n10")
+	qt.Check(t, qt.Equals(truncate(out, 10, 500), string(out)))
+}
+
+func TestTruncateKeepsExactlyMaxChars(t *testing.T) {
+	out := []byte(strings.Repeat("a", 500))
+	qt.Check(t, qt.Equals(truncate(out, 10, 500), string(out)))
+}
+
+func TestRunExternalStdinEmptyFileEmptyStdoutIsNotASkip(t *testing.T) {
+	isolateDiskCache(t)
+	writeFakeTool(t, "taplo", `exit 0`)
+	dir, abs := sourceFile(t, "empty.toml", "")
+	res := runExternalStdin(t.Context(), dir, "taplo", []string{"format", "-"}, abs)
+	qt.Check(t, qt.IsFalse(res.Skipped), qt.Commentf("an empty document that stays empty was formatted"))
+	qt.Check(t, qt.Equals(res.Diagnostic, ""))
+}
+
+func TestRunExternalStdinEmptyStderrUsesProcessError(t *testing.T) {
+	isolateDiskCache(t)
+	writeFakeTool(t, "taplo", `exit 1`)
+	_, res := runExternalStdinBytes(t.Context(), t.TempDir(), "taplo", nil, []byte("x"))
+	qt.Check(t, qt.Not(qt.Equals(res.Diagnostic, "")), qt.Commentf("a silent non-zero exit must still surface the process error"))
+}
+
 func TestTruncateCharLimitIsUTF8Safe(t *testing.T) {
 	// "é" is 2 bytes (0xC3 0xA9); repeat it so a byte-level cut at an even
 	// offset would land mid-rune.

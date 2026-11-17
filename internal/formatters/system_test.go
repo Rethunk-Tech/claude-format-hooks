@@ -89,6 +89,28 @@ func TestSystemFormatterFallsThroughToAlternative(t *testing.T) {
 	}
 }
 
+func TestPHPPintOmitsTheFixSubcommand(t *testing.T) {
+	isolateDiskCache(t)
+	dir, path := sourceFile(t, "src.php", "<?php\n")
+	argv := filepath.Join(dir, "argv")
+	writeFakeTool(t, "pint", `printf '%s' "$*" > `+argv)
+
+	res := NewPHP().Format(t.Context(), dir, path)
+	assertFormatted(t, res)
+	qt.Check(t, qt.Equals(string(readSource(t, argv)), "--quiet "+path))
+}
+
+func TestPHPCSFixerUsesTheFixSubcommand(t *testing.T) {
+	isolateDiskCache(t)
+	dir, path := sourceFile(t, "src.php", "<?php\n")
+	argv := filepath.Join(dir, "argv")
+	writeFakeTool(t, "php-cs-fixer", `printf '%s' "$*" > `+argv)
+
+	res := NewPHP().Format(t.Context(), dir, path)
+	assertFormatted(t, res)
+	qt.Check(t, qt.Equals(string(readSource(t, argv)), "fix --quiet "+path))
+}
+
 func TestGoModAndWorkEditOnlyTheirOwnFile(t *testing.T) {
 	isolateDiskCache(t)
 	dir := t.TempDir()

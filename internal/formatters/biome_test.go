@@ -3,6 +3,8 @@ package formatters
 import (
 	"os"
 	"path/filepath"
+	"runtime"
+	"strings"
 	"testing"
 
 	"github.com/go-quicktest/qt"
@@ -11,6 +13,37 @@ import (
 func TestBiomeExampleCopyIncludesMarkdown(t *testing.T) {
 	qt.Check(t, qt.IsTrue(biomeExampleCopy("README.md.example")))
 	qt.Check(t, qt.Equals(exampleStdinFilePath("README.md.example"), "README.md"))
+}
+
+func TestBiomeRunsFromTheNearestConfigDirectory(t *testing.T) {
+	isolateDiskCache(t)
+	root := t.TempDir()
+	pkg := filepath.Join(root, "pkg")
+	qt.Assert(t, qt.IsNil(os.Mkdir(pkg, 0o750)))
+	qt.Assert(t, qt.IsNil(os.WriteFile(filepath.Join(pkg, "biome.json"), []byte("{}"), 0o600)))
+	abs := filepath.Join(pkg, "f.ts")
+	qt.Assert(t, qt.IsNil(os.WriteFile(abs, []byte("export const x=1\n"), 0o600)))
+	cwdPath := filepath.Join(t.TempDir(), "cwd")
+	writeFakeTool(t, "biome", "pwd > "+cwdPath+"; exit 0")
+
+	res := NewBiome().Format(t.Context(), root, abs)
+	assertFormatted(t, res)
+	qt.Check(t, qt.Equals(strings.TrimSpace(string(readSource(t, cwdPath))), pkg))
+}
+
+func TestResolvedCleanFollowsSymlinks(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("Windows symlink creation requires elevated privileges")
+	}
+	dir := t.TempDir()
+	real := filepath.Join(dir, "real")
+	qt.Assert(t, qt.IsNil(os.Mkdir(real, 0o750)))
+	link := filepath.Join(dir, "link")
+	qt.Assert(t, qt.IsNil(os.Symlink(real, link)))
+
+	got, err := filepath.EvalSymlinks(link)
+	qt.Assert(t, qt.IsNil(err))
+	qt.Check(t, qt.Equals(resolvedClean(link), got))
 }
 
 func TestBiomeUsesFormatSubcommand(t *testing.T) {

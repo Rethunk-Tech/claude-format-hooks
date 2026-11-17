@@ -72,6 +72,10 @@ cat`)
 	res := NewSQLFluff().Format(t.Context(), dir, small)
 	assertFormatted(t, res)
 
+	exact := filepath.Join(dir, "exact.sql.example")
+	qt.Assert(t, qt.IsNil(os.WriteFile(exact, []byte(strings.Repeat("a", 16)), 0o600)))
+	assertFormatted(t, NewSQLFluff().Format(t.Context(), dir, exact))
+
 	// A second file in the same project must reuse the cached dump rather
 	// than paying for another render.
 	other := filepath.Join(dir, "other.sql")
@@ -125,6 +129,16 @@ fi`)
 	qt.Check(t, qt.Equals(nested.excludeRules, "LT02,RF03"))
 }
 
+func TestParseSQLFluffSettingsRejectsNonPositiveLimit(t *testing.T) {
+	for _, cached := range []string{"LT01\n0", "LT01\n-1", "\n20000"} {
+		_, ok := parseSQLFluffSettings(cached)
+		qt.Check(t, qt.IsFalse(ok), qt.Commentf("%q", cached))
+	}
+	got, ok := parseSQLFluffSettings("LT01\n20000")
+	qt.Check(t, qt.IsTrue(ok))
+	qt.Check(t, qt.Equals(got.largeFileSkipByteLimit, int64(20000)))
+}
+
 func TestSQLFluffLargeFileSkipByteLimit(t *testing.T) {
 	tests := []struct {
 		name string
@@ -135,6 +149,7 @@ func TestSQLFluffLargeFileSkipByteLimit(t *testing.T) {
 		{name: "absent key uses sqlfluff's default", dump: "  exclude_rules: LT01\n", want: sqlfluffDefaultLargeFileSkipByteLimit},
 		{name: "top-level text is not config", dump: "large_file_skip_byte_limit: 1\n", want: sqlfluffDefaultLargeFileSkipByteLimit},
 		{name: "non-numeric value uses the default", dump: "  large_file_skip_byte_limit: none\n", want: sqlfluffDefaultLargeFileSkipByteLimit},
+		{name: "zero uses the default", dump: "  large_file_skip_byte_limit: 0\n", want: sqlfluffDefaultLargeFileSkipByteLimit},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
