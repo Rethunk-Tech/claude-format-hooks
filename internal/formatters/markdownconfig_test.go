@@ -21,6 +21,9 @@ func TestMarkdownPassesUserConfigWhenResolved(t *testing.T) {
 	t.Cleanup(resetMarkdownlintConfigForTest)
 	home := t.TempDir()
 	t.Setenv("HOME", home)
+	// os.UserHomeDir reads %USERPROFILE% on Windows and ignores $HOME, so
+	// setting only HOME there would leave the real home in the expected path.
+	t.Setenv("USERPROFILE", home)
 	abs := filepath.Join(t.TempDir(), "f.md")
 
 	args := NewMarkdown().pathArgs(abs)
