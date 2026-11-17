@@ -6,6 +6,7 @@ import (
 	"encoding/hex"
 	"errors"
 	"fmt"
+	"io"
 	"net/http"
 	"net/http/httptest"
 	"os"
@@ -253,6 +254,39 @@ func TestFetchHTTPStopsARedirectLoop(t *testing.T) {
 	qt.Assert(t, qt.ErrorMatches(err, `.*stopped after 10 redirects`))
 }
 
+func TestFetchHTTPFollowsNineRedirects(t *testing.T) {
+	var hops atomic.Int32
+	var server *httptest.Server
+	server = httptest.NewTLSServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if hops.Add(1) <= 9 {
+			http.Redirect(w, r, server.URL+"/ok", http.StatusFound)
+			return
+		}
+		_, _ = w.Write([]byte("ok"))
+	}))
+	defer server.Close()
+
+	body, err := fetchHTTP(server.Client(), server.URL, server.URL)
+	qt.Assert(t, qt.IsNil(err))
+	qt.Check(t, qt.Equals(string(body), "ok"))
+}
+
+func TestFetchHTTPRejectsTheTenthRedirect(t *testing.T) {
+	var hops atomic.Int32
+	var server *httptest.Server
+	server = httptest.NewTLSServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if hops.Add(1) <= 10 {
+			http.Redirect(w, r, server.URL+"/ok", http.StatusFound)
+			return
+		}
+		_, _ = w.Write([]byte("ok"))
+	}))
+	defer server.Close()
+
+	_, err := fetchHTTP(server.Client(), server.URL, server.URL)
+	qt.Assert(t, qt.ErrorMatches(err, `.*stopped after 10 redirects`))
+}
+
 type errBody struct{}
 
 func (errBody) Read([]byte) (int, error) { return 0, errors.New("read body failed") }
@@ -276,6 +310,37 @@ func TestFetchHTTPReportsErrorBodyReadFailure(t *testing.T) {
 	if err == nil || !strings.Contains(err.Error(), "read body failed") {
 		t.Fatalf("fetchHTTP error = %v, want body read failure", err)
 	}
+}
+
+func TestFetchHTTPAcceptsContentLengthAtTheDownloadCap(t *testing.T) {
+	client := &http.Client{Transport: exactLengthTransport{n: maxUpgradeDownloadBytes, body: []byte("ok")}}
+	got, err := fetchHTTP(client, "https://api.github.com/", releaseAPIBaseURL)
+	qt.Assert(t, qt.IsNil(err))
+	qt.Check(t, qt.Equals(string(got), "ok"))
+}
+
+func TestFetchHTTPAcceptsBodyAtTheDownloadCap(t *testing.T) {
+	body := bytes.Repeat([]byte("x"), maxUpgradeDownloadBytes)
+	client := &http.Client{Transport: exactLengthTransport{n: int64(len(body)), body: body}}
+	got, err := fetchHTTP(client, "https://api.github.com/", releaseAPIBaseURL)
+	qt.Assert(t, qt.IsNil(err))
+	qt.Check(t, qt.Equals(len(got), maxUpgradeDownloadBytes))
+}
+
+type exactLengthTransport struct {
+	n    int64
+	body []byte
+}
+
+func (t exactLengthTransport) RoundTrip(req *http.Request) (*http.Response, error) {
+	return &http.Response{
+		Status:        "200 OK",
+		StatusCode:    http.StatusOK,
+		Body:          io.NopCloser(bytes.NewReader(t.body)),
+		ContentLength: t.n,
+		Header:        make(http.Header),
+		Request:       req,
+	}, nil
 }
 
 func TestFetchHTTPRejectsOversizedContentLength(t *testing.T) {
@@ -350,6 +415,7 @@ func TestFetchHTTPReportsNon2xx(t *testing.T) {
 	}{
 		{name: "forbidden", status: http.StatusForbidden, body: "access denied"},
 		{name: "not found", status: http.StatusNotFound, body: "missing release"},
+		{name: "multiple choices", status: http.StatusMultipleChoices, body: "pick one"},
 	} {
 		t.Run(tt.name, func(t *testing.T) {
 			server := httptest.NewTLSServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {

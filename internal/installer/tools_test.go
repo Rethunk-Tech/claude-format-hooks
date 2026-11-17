@@ -1,10 +1,11 @@
 package installer
 
 import (
-	"io"
+	"bytes"
 	"os"
 	"path/filepath"
 	"runtime"
+	"strings"
 	"testing"
 
 	"github.com/go-quicktest/qt"
@@ -28,14 +29,34 @@ func TestProvisionToolsIsANoOpWithoutBun(t *testing.T) {
 	// A machine with no bun is a supported configuration -- those formatters
 	// are simply skipped at format time -- so --install must not complain.
 	t.Setenv("PATH", t.TempDir())
-	qt.Check(t, qt.IsNil(ProvisionTools(io.Discard)))
+	var buf bytes.Buffer
+	qt.Check(t, qt.IsNil(ProvisionTools(&buf)))
+	qt.Check(t, qt.Equals(buf.String(), ""), qt.Commentf("absent bun must not announce an install"))
+}
+
+func TestProvisionToolsAnnouncesInstallWhenBunExists(t *testing.T) {
+	fakeBun(t, `exit 0`)
+	var buf bytes.Buffer
+	qt.Check(t, qt.IsNil(ProvisionTools(&buf)))
+	qt.Check(t, qt.StringContains(buf.String(), "Installing formatters globally"))
 }
 
 func TestProvisionToolsSurvivesAFailedInstall(t *testing.T) {
 	// The settings.json wiring already succeeded by this point. A registry
 	// outage must not turn that into a failed install.
 	fakeBun(t, `echo "registry unreachable" >&2; exit 1`)
-	qt.Check(t, qt.IsNil(ProvisionTools(io.Discard)))
+	var buf bytes.Buffer
+	qt.Check(t, qt.IsNil(ProvisionTools(&buf)))
+	qt.Check(t, qt.StringContains(buf.String(), "skipped"))
+	qt.Check(t, qt.StringContains(buf.String(), "registry unreachable"))
+}
+
+func TestProvisionToolsFailedInstallWithEmptyOutputOmitsToolStderr(t *testing.T) {
+	fakeBun(t, `exit 1`)
+	var buf bytes.Buffer
+	qt.Check(t, qt.IsNil(ProvisionTools(&buf)))
+	qt.Check(t, qt.StringContains(buf.String(), "skipped"))
+	qt.Check(t, qt.Equals(strings.Count(buf.String(), "\n"), 2), qt.Commentf("%q", buf.String()))
 }
 
 func TestFirstLineTruncatesAtTheNewline(t *testing.T) {
