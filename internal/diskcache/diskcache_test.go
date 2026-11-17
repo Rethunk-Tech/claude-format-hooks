@@ -1,6 +1,7 @@
 package diskcache
 
 import (
+	"bytes"
 	"os"
 	"path/filepath"
 	"runtime"
@@ -231,6 +232,40 @@ func TestCacheEntryExpiredRejectsUnreadableAndMalformedEntries(t *testing.T) {
 			qt.Check(t, qt.IsFalse(cacheEntryExpired(tc.path, time.Minute)))
 		})
 	}
+}
+
+func TestCacheNamespacePrefixKeepsTheDashAndRejectsLeadingDash(t *testing.T) {
+	cases := []struct {
+		name, key, want string
+	}{
+		{"keeps trailing dash", "ns-abc", "ns-"},
+		{"first dash of hyphenated name", "missing-current-binary", "missing-"},
+		{"leading dash is not a namespace", "-leading", ""},
+		{"no dash", "nodash", ""},
+		{"dash only", "-", ""},
+		{"empty", "", ""},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			qt.Check(t, qt.Equals(cacheNamespacePrefix(tc.key), tc.want))
+		})
+	}
+}
+
+func TestGetRecordsAPruneStampAfterSweeping(t *testing.T) {
+	dir := t.TempDir()
+	resetPruneStateForTest()
+	key := Key("stamp", "fresh")
+	Set(dir, key, "fresh")
+
+	_, ok := Get(dir, key, time.Minute)
+	qt.Assert(t, qt.IsTrue(ok))
+
+	raw, err := os.ReadFile(filepath.Join(dir, pruneStampName))
+	qt.Assert(t, qt.IsNil(err), qt.Commentf("a sweep must record when it ran"))
+	stamped, err := strconv.ParseInt(string(bytes.TrimSpace(raw)), 10, 64)
+	qt.Assert(t, qt.IsNil(err))
+	qt.Check(t, qt.IsTrue(time.Since(time.Unix(stamped, 0)) < time.Minute))
 }
 
 func TestPruneLeavesEntryWithoutNamespace(t *testing.T) {
