@@ -396,3 +396,107 @@ func TestSetLeavesNoTempFiles(t *testing.T) {
 		qt.Check(t, qt.IsFalse(strings.HasPrefix(e.Name(), ".")), qt.Commentf("%s", e.Name()))
 	}
 }
+
+// A stamp from a crashed writer can be garbage. Get must still sweep, matching
+// a missing stamp: never recording a successful sweep is not a reason to keep
+// expired entries forever.
+func TestGetSweepsWhenPruneStampIsUnparseable(t *testing.T) {
+	dir := t.TempDir()
+	resetPruneStateForTest()
+	stalePath := filepath.Join(dir, Key("stamp", "stale"))
+	stale := strconv.FormatInt(time.Now().Add(-time.Hour).Unix(), 10) + "\nvalue"
+	qt.Assert(t, qt.IsNil(os.WriteFile(stalePath, []byte(stale), 0o600)))
+	qt.Assert(t, qt.IsNil(os.WriteFile(filepath.Join(dir, pruneStampName), []byte("not-a-unix-seconds"), 0o600)))
+
+	_, _ = Get(dir, Key("stamp", "fresh"), time.Minute)
+
+	_, err := os.Stat(stalePath)
+	qt.Check(t, qt.IsTrue(os.IsNotExist(err)), qt.Commentf("an unreadable sweep clock must not freeze pruning"))
+}
+
+func TestSetSwallowsCreateTempAndRenameFailures(t *testing.T) {
+	t.Run("unwritable directory", func(t *testing.T) {
+		if runtime.GOOS == "windows" {
+			t.Skip("Windows does not model POSIX directory permissions")
+		}
+		dir := t.TempDir()
+		qt.Assert(t, qt.IsNil(os.Chmod(dir, 0o555))) //nolint:gosec // test must make the directory unwritable
+		t.Cleanup(func() {
+			if err := os.Chmod(dir, 0o700); err != nil { //nolint:gosec // cleanup restores directory access
+				t.Errorf("restore directory permissions: %v", err)
+			}
+		})
+		probe, probeErr := os.CreateTemp(dir, ".chmod-probe-*")
+		if probeErr == nil {
+			_ = probe.Close()
+			_ = os.Remove(probe.Name())
+			t.Skip("directory still writable after chmod 0555")
+		}
+
+		Set(dir, Key("ns", "blocked"), "value")
+	})
+
+	t.Run("key is a directory", func(t *testing.T) {
+		dir := t.TempDir()
+		key := Key("ns", "dir")
+		qt.Assert(t, qt.IsNil(os.Mkdir(filepath.Join(dir, key), 0o700)))
+
+		Set(dir, key, "value")
+
+		info, err := os.Stat(filepath.Join(dir, key))
+		qt.Assert(t, qt.IsNil(err))
+		qt.Check(t, qt.IsTrue(info.IsDir()), qt.Commentf("a failed rename must leave the directory in place"))
+		assertNoDottedTemps(t, dir, 1)
+	})
+}
+
+func TestWritePruneStampSwallowsFailures(t *testing.T) {
+	t.Run("parent is a file", func(t *testing.T) {
+		parent := filepath.Join(t.TempDir(), "not-a-dir")
+		qt.Assert(t, qt.IsNil(os.WriteFile(parent, []byte("x"), 0o600)))
+		writePruneStamp(filepath.Join(parent, "sub"))
+	})
+
+	t.Run("unwritable directory", func(t *testing.T) {
+		if runtime.GOOS == "windows" {
+			t.Skip("Windows does not model POSIX directory permissions")
+		}
+		dir := t.TempDir()
+		qt.Assert(t, qt.IsNil(os.Chmod(dir, 0o555))) //nolint:gosec // test must make the directory unwritable
+		t.Cleanup(func() {
+			if err := os.Chmod(dir, 0o700); err != nil { //nolint:gosec // cleanup restores directory access
+				t.Errorf("restore directory permissions: %v", err)
+			}
+		})
+		probe, probeErr := os.CreateTemp(dir, ".chmod-probe-*")
+		if probeErr == nil {
+			_ = probe.Close()
+			_ = os.Remove(probe.Name())
+			t.Skip("directory still writable after chmod 0555")
+		}
+
+		writePruneStamp(dir)
+	})
+
+	t.Run("stamp path is a directory", func(t *testing.T) {
+		dir := t.TempDir()
+		qt.Assert(t, qt.IsNil(os.Mkdir(filepath.Join(dir, pruneStampName), 0o700)))
+
+		writePruneStamp(dir)
+
+		info, err := os.Stat(filepath.Join(dir, pruneStampName))
+		qt.Assert(t, qt.IsNil(err))
+		qt.Check(t, qt.IsTrue(info.IsDir()), qt.Commentf("a failed rename must leave the directory in place"))
+		assertNoDottedTemps(t, dir, 1)
+	})
+}
+
+func assertNoDottedTemps(t *testing.T, dir string, want int) {
+	t.Helper()
+	entries, err := os.ReadDir(dir)
+	qt.Assert(t, qt.IsNil(err))
+	qt.Check(t, qt.HasLen(entries, want))
+	for _, e := range entries {
+		qt.Check(t, qt.IsFalse(strings.HasPrefix(e.Name(), ".") && e.Name() != pruneStampName), qt.Commentf("%s", e.Name()))
+	}
+}
