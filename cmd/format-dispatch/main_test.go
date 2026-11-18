@@ -26,8 +26,8 @@ func TestWithin(t *testing.T) {
 		},
 		{"trailing slash on root is normalized", "/a/b/c.go", "/a/b/", true},
 		{"traversal above root is not within", "/a/b/../c", "/a/b", false},
-		// A "/" root used to build "//" as its prefix and match nothing, so
-		// every file was skipped as outside the project.
+		// A "/" root must not join into a "//" prefix: that matches nothing, so
+		// every file would be skipped as outside the project.
 		{"volume root contains everything on it", "/tmp/project/f.json", "/", true},
 	}
 	for _, tc := range cases {
