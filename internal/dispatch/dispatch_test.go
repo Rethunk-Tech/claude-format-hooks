@@ -372,6 +372,62 @@ func TestDispatchSkipsMissingFormatter(t *testing.T) {
 	qt.Check(t, qt.IsNil(result.Err))
 }
 
+func TestFormatStdinReportsSkipNoStdinAndFormatsNativeJSON(t *testing.T) {
+	dir := t.TempDir()
+	r := NewRegistry(config.Default())
+
+	t.Run("unknown extension is a skip the caller can treat as answered", func(t *testing.T) {
+		out, res, ok := r.FormatStdin(t.Context(), dir, filepath.Join(dir, "x.xyz"), ".xyz", []byte("x"))
+		qt.Check(t, qt.IsTrue(ok))
+		qt.Check(t, qt.IsTrue(res.Skipped))
+		qt.Check(t, qt.HasLen(out, 0))
+	})
+
+	t.Run("notebook has no stdin mode", func(t *testing.T) {
+		src := []byte(`{"cells":[]}`)
+		out, res, ok := r.FormatStdin(t.Context(), dir, filepath.Join(dir, "n.ipynb"), ".ipynb", src)
+		qt.Check(t, qt.IsFalse(ok))
+		qt.Check(t, qt.Equals(res.Diagnostic, ""))
+		qt.Check(t, qt.HasLen(out, 0))
+	})
+
+	t.Run("markdownlint-cli2 has no stdin mode", func(t *testing.T) {
+		out, res, ok := r.FormatStdin(t.Context(), dir, filepath.Join(dir, "README.md"), ".md", []byte("#Title\n"))
+		qt.Check(t, qt.IsFalse(ok), qt.Commentf("the router implements StdinFormatter so it can refuse, not so it can guess"))
+		qt.Check(t, qt.Equals(res.Diagnostic, ""))
+		qt.Check(t, qt.HasLen(out, 0))
+	})
+
+	t.Run("native json indents without writing the path", func(t *testing.T) {
+		path := filepath.Join(dir, "t.json")
+		src := []byte(`{"b":1,"a":2}`)
+		out, res, ok := r.FormatStdin(t.Context(), dir, path, ".JSON", src)
+		qt.Assert(t, qt.IsTrue(ok))
+		qt.Check(t, qt.IsNil(res.Err))
+		qt.Check(t, qt.IsFalse(res.Skipped))
+		qt.Check(t, qt.Equals(string(out), "{\n  \"b\": 1,\n  \"a\": 2\n}\n"))
+		_, err := os.Stat(path)
+		qt.Check(t, qt.IsTrue(os.IsNotExist(err)), qt.Commentf("stdin mode must not create the named file"))
+	})
+}
+
+func TestAllOmitsDisabledExtensions(t *testing.T) {
+	cfg := config.Default()
+	cfg.Disabled = []string{".sql"}
+	r := NewRegistry(cfg)
+
+	seen := map[string]bool{}
+	for ext, f := range r.All() {
+		seen[ext] = true
+		qt.Check(t, qt.Equals(f.Name(), r.Name(ext)), qt.Commentf("ext=%q", ext))
+	}
+	qt.Check(t, qt.IsFalse(seen[".sql"]))
+	qt.Check(t, qt.IsFalse(seen[".SQL"]))
+	qt.Check(t, qt.IsTrue(seen[".json"]))
+	qt.Check(t, qt.IsTrue(r.Supported(".json")))
+	qt.Check(t, qt.IsFalse(r.Supported(".sql")))
+}
+
 func TestInSkippedDir(t *testing.T) {
 	cases := []struct {
 		path string

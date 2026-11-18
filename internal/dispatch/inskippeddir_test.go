@@ -26,3 +26,26 @@ func TestInSkippedDirIgnoresFilenameSegment(t *testing.T) {
 		}
 	}
 }
+
+// --check node_modules with no cwd still has to prune: a last segment that
+// names a skip directory is skipped when it is a directory or is missing.
+func TestInSkippedDirLastSegmentDirectoryOrMissing(t *testing.T) {
+	dir := t.TempDir()
+	t.Chdir(dir)
+
+	if !InSkippedDir("node_modules", nil) {
+		t.Error(`InSkippedDir("node_modules") = false, want true for a missing skip directory`)
+	}
+	if err := os.Mkdir("node_modules", 0o700); err != nil {
+		t.Fatal(err)
+	}
+	if !InSkippedDir("node_modules", nil) {
+		t.Error(`InSkippedDir("node_modules") = false, want true for an existing skip directory`)
+	}
+	if err := os.Mkdir("generated", 0o700); err != nil {
+		t.Fatal(err)
+	}
+	if !InSkippedDir("generated", []string{"generated"}) {
+		t.Error(`InSkippedDir("generated") = false, want true for a configured skip directory`)
+	}
+}
