@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- CI's gate step no longer fails on the formatting check; setup-go already runs it there.
+
 ## [0.5.6] - 2026-11-21
 
 ### Added
