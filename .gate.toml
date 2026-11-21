@@ -23,3 +23,7 @@ bin=$(mktemp -d "${TMPDIR:-/tmp}/fd.XXXXXX")
 trap 'rm -rf "$bin"' EXIT
 go build -o "$bin/format-dispatch" ./cmd/format-dispatch && "$bin/format-dispatch" --check .
 '''
+
+# CI's setup-go run-fmt step; the exact golangci-lint formatter set, not whatever formatters are on PATH.
+[gates.fmt]
+run = "golangci-lint fmt --diff ./..."
