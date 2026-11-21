@@ -7,6 +7,25 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.5.6] - 2026-11-21
+
+### Added
+
+- Releases ship `SHA256SUMS` signed with the Rethunk.Tech release key.
+
+### Fixed
+
+- A large Write payload (over 1 MiB) is streamed instead of dropped, so the file still gets formatted.
+- `--install` keeps sibling hook commands, blank settings files and another bin directory's hook command instead of overwriting them.
+- `--check` formats the real file so path-scoped rules match the hook, judges read-only files on stdin, reports every failure, leaves an unchanged file alone, skips invalid JSON quietly, and stops its signal watcher without a data race.
+- tsconfig-like JSON (`tsconfig*.json`, `jsconfig*.json`, `.vscode/*.json`) is formatted as JSONC, now through hujson.
+- Skip-dir names only skip directory path segments; a file with such a name is formatted. FIFOs and other non-regular files are skipped instead of blocking the hook.
+- Shell: zsh and ksh parse with their own dialect, dialect suffixes match case-insensitively, and the shebang interpreter is picked after `env` flags.
+- A timed-out formatter no longer hangs the hook on its pipes, and the config walk stays bounded when the project root is a symlink spelling or a directory resolves outside it.
+- sqlfluff caches its config dump and exclude rules per directory, honours the large-file limit, and treats empty stdout (including `.sql.example`) as a skip.
+- Markdown: a project Biome disable is honoured, markdownlint's diagnostic stays ahead of Biome's, and Biome formats `.md.example` copies. Editorconfig globs match `.example` copies.
+- The disk cache sweeps expired entries at most once per interval, `--doctor` output no longer depends on map order, and the volume root counts as containing every file on it.
+
 ## [0.5.5] - 2026-11-08
 
 ### Fixed
@@ -663,7 +682,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 Initial release.
 
-[Unreleased]: https://github.com/Rethunk-Tech/claude-format-hooks/compare/v0.5.5...HEAD
+[Unreleased]: https://github.com/Rethunk-Tech/claude-format-hooks/compare/v0.5.6...HEAD
+[0.5.6]: https://github.com/Rethunk-Tech/claude-format-hooks/compare/v0.5.5...v0.5.6
 [0.5.5]: https://github.com/Rethunk-Tech/claude-format-hooks/compare/v0.5.4...v0.5.5
 [0.5.1]: https://github.com/Rethunk-Tech/claude-format-hooks/compare/v0.5.0...v0.5.1
 [0.5.0]: https://github.com/Rethunk-Tech/claude-format-hooks/compare/v0.4.0...v0.5.0
