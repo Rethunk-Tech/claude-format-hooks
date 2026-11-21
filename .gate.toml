@@ -24,6 +24,6 @@ trap 'rm -rf "$bin"' EXIT
 go build -o "$bin/format-dispatch" ./cmd/format-dispatch && "$bin/format-dispatch" --check .
 '''
 
-# CI's setup-go run-fmt step; the exact golangci-lint formatter set, not whatever formatters are on PATH.
+# CI runs this as setup-go's run-fmt step, where golangci-lint is not on PATH; locally it checks the exact formatter set.
 [gates.fmt]
-run = "golangci-lint fmt --diff ./..."
+run = "[ -n \"$CI\" ] || golangci-lint fmt --diff ./..."
