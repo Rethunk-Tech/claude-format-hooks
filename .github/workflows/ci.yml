@@ -109,7 +109,7 @@ jobs:
 
       - name: gate
         if: ${{ !cancelled() }}
-        run: gate --tail 400
+        run: gate --tail 400 --timeout 15m
 
   # One required check for branch protection to point at. Without it, a
   # matrix leg that never ran reads as "not failing" rather than "not run".
