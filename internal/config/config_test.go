@@ -200,7 +200,7 @@ func TestResolveIndentRechecksAfterTTLExpires(t *testing.T) {
 
 	cacheDir, ok := diskcache.Dir()
 	qt.Assert(t, qt.IsTrue(ok))
-	key := diskcache.Key("editorconfig", abs, strconv.Itoa(fallback.Size), strconv.FormatBool(fallback.UseTabs))
+	key := diskcache.Key("editorconfig", abs, encodeIndentSpec(fallback))
 	stalePath := filepath.Join(cacheDir, key)
 	stale := time.Now().Add(-2 * editorconfigCacheTTL).Unix()
 	qt.Assert(t, qt.IsNil(os.MkdirAll(cacheDir, 0o700)))
