@@ -37,28 +37,42 @@ func NewGo() goFormatter { return goFormatter{} }
 
 func (goFormatter) Name() string { return "gofmt" }
 
-func (goFormatter) Format(ctx context.Context, _, abs string) Result {
+func (f goFormatter) Format(ctx context.Context, _, abs string) Result {
 	src, err := os.ReadFile(filepath.Clean(abs))
 	if err != nil {
 		return Result{Err: fmt.Errorf("read: %w", err)}
 	}
+	out, res := f.format(ctx, abs, src)
+	if res != (Result{}) {
+		return res
+	}
+	return writeIfChanged(abs, src, out, 0o644)
+}
 
+// FormatStdin formats src as Go for abs without writing. Native
+// go/format.Source is the fallback; gofumpt still prints to stdout.
+func (f goFormatter) FormatStdin(ctx context.Context, _, abs string, src []byte) ([]byte, Result, bool) {
+	out, res := f.format(ctx, abs, src)
+	return out, res, true
+}
+
+func (goFormatter) format(ctx context.Context, abs string, src []byte) ([]byte, Result) {
 	// Same parser gofmt uses. A syntax error must stay a silent skip even
 	// when an external tool would print the parse error on stderr.
 	native, err := format.Source(src)
 	if err != nil {
-		return Result{Skipped: true}
+		return nil, Result{Skipped: true}
 	}
 
 	if _, lookErr := lookPath("gofumpt"); lookErr != nil {
-		return writeIfChanged(abs, src, native, 0o644)
+		return native, Result{}
 	}
 
 	out, diag := formatGoTools(ctx, abs, golangciGoFormat(abs))
 	if diag != "" {
-		return Result{Diagnostic: diag}
+		return nil, Result{Diagnostic: diag}
 	}
-	return writeIfChanged(abs, src, out, 0o644)
+	return out, Result{}
 }
 
 // formatGoTools runs goimports (when opts and PATH say so) and then gofumpt.

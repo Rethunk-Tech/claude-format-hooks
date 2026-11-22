@@ -41,6 +41,26 @@ func TestGoFormatterReadErrorIsNotSkipped(t *testing.T) {
 	assertDirectoryIsAReadError(t, NewGo())
 }
 
+func TestGoFormatStdinDoesNotWrite(t *testing.T) {
+	withoutGofumpt(t)
+	dir := t.TempDir()
+	path := filepath.Join(dir, "t.go")
+	src := []byte("package main\nfunc main(){\nprintln(\"hi\")\n}\n")
+	qt.Assert(t, qt.IsNil(os.WriteFile(path, src, 0o600)))
+
+	sf, ok := any(NewGo()).(StdinFormatter)
+	qt.Assert(t, qt.IsTrue(ok), qt.Commentf("gofmt must answer --check without a writable sibling"))
+	out, res, stdinOK := sf.FormatStdin(t.Context(), dir, path, src)
+	qt.Assert(t, qt.IsTrue(stdinOK))
+	qt.Check(t, qt.IsNil(res.Err))
+	qt.Check(t, qt.IsFalse(res.Skipped))
+	want, err := format.Source(src)
+	qt.Assert(t, qt.IsNil(err))
+	qt.Check(t, qt.Equals(string(out), string(want)))
+	qt.Check(t, qt.Equals(string(readSource(t, path)), string(src)),
+		qt.Commentf("stdin mode must not rewrite the file"))
+}
+
 func TestGoFormatterReformatsIndentation(t *testing.T) {
 	withoutGofumpt(t)
 	dir := t.TempDir()

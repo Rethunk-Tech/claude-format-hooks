@@ -268,6 +268,39 @@ printf 'SELECT 1\n'
 	qt.Check(t, qt.StringContains(got, "LT01,RF03"))
 }
 
+func TestSQLFluffFormatStdinUsesStdinFilename(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("fake shell-script tools are POSIX-shell only")
+	}
+	isolateDiskCache(t)
+	t.Setenv("HOME", t.TempDir())
+	dir := t.TempDir()
+	argsLog := filepath.Join(dir, "args")
+	abs := filepath.Join(dir, "query.sql")
+	src := []byte("SELECT  1\n")
+	qt.Assert(t, qt.IsNil(os.WriteFile(abs, src, 0o600)))
+	writeFakeTool(t, "sqlfluff", `if [ "$1" = render ]; then
+printf '    exclude_rules: LT01\n'
+exit 0
+fi
+printf '%s\n' "$@" > "`+argsLog+`"
+printf 'SELECT 1\n'
+`)
+
+	sf, ok := any(NewSQLFluff()).(StdinFormatter)
+	qt.Assert(t, qt.IsTrue(ok), qt.Commentf("sqlfluff must answer --check without a writable sibling"))
+	out, res, stdinOK := sf.FormatStdin(t.Context(), dir, abs, src)
+	qt.Assert(t, qt.IsTrue(stdinOK))
+	assertFormatted(t, res)
+	qt.Check(t, qt.Equals(string(out), "SELECT 1\n"))
+	qt.Check(t, qt.Equals(string(readSource(t, abs)), string(src)),
+		qt.Commentf("stdin mode must not rewrite the file"))
+	got := string(readSource(t, argsLog))
+	qt.Check(t, qt.StringContains(got, "--stdin-filename"))
+	qt.Check(t, qt.StringContains(got, abs))
+	qt.Check(t, qt.StringContains(got, "LT01,RF03"))
+}
+
 func TestSQLFluffExampleKeepsUnfixableRewrite(t *testing.T) {
 	isolateDiskCache(t)
 	t.Setenv("HOME", t.TempDir())

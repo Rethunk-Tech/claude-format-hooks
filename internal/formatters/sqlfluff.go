@@ -60,14 +60,7 @@ func (sqlfluffFormatter) Format(ctx context.Context, projectRoot, abs string) Re
 	// is .example is named on the command line and then skipped. Stdin is
 	// parsed as SQL; --stdin-filename keeps config lookup on the real file.
 	if sqlExampleCopy(abs) {
-		// The stdin path bypasses sqlfluff's own large_file_skip_byte_limit,
-		// so a big .sql.example spent the whole formatter budget and then
-		// reported a timeout on every single write of it. Skipping is what
-		// sqlfluff itself would have done with the file.
-		if info, err := os.Stat(filepath.Clean(abs)); err == nil && info.Size() > settings.largeFileSkipByteLimit {
-			return Result{Skipped: true}
-		}
-		return sqlfluffFixExample(ctx, projectRoot, abs, settings.excludeRules)
+		return sqlfluffFixExample(ctx, projectRoot, abs, settings)
 	}
 	// No --force: it is the default as of sqlfluff 4, and passing it prints
 	// a deprecation warning that would itself become diagnostic noise.
@@ -151,29 +144,54 @@ func sqlExampleCopy(abs string) bool {
 	return strings.HasSuffix(strings.ToLower(filepath.Base(abs)), ".sql.example")
 }
 
-func sqlfluffFixExample(ctx context.Context, projectRoot, abs, exclude string) Result {
+func (f sqlfluffFormatter) FormatStdin(ctx context.Context, projectRoot, abs string, src []byte) ([]byte, Result, bool) {
+	if _, err := lookPath("sqlfluff"); err != nil {
+		return nil, Result{Skipped: true}, true
+	}
+	userSQLFluffConfig()
+	settings := cachedSQLFluffSettings(ctx, projectRoot, abs)
+	out, res := sqlfluffFixStdin(ctx, projectRoot, abs, settings, src)
+	return out, res, true
+}
+
+func sqlfluffFixExample(ctx context.Context, projectRoot, abs string, settings sqlfluffSettings) Result {
 	src, err := os.ReadFile(filepath.Clean(abs))
 	if err != nil {
 		return Result{Err: fmt.Errorf("read: %w", err)}
 	}
-	cmd := exec.CommandContext(ctx, "sqlfluff", "fix", "--exclude-rules", exclude, "--stdin-filename", abs, "-") //nolint:gosec // external formatter by design; args are our own construction, never a shell
+	out, res := sqlfluffFixStdin(ctx, projectRoot, abs, settings, src)
+	if res != (Result{}) {
+		return res
+	}
+	return writeIfChanged(abs, src, out, 0o644)
+}
+
+func sqlfluffFixStdin(ctx context.Context, projectRoot, abs string, settings sqlfluffSettings, src []byte) ([]byte, Result) {
+	// The stdin path bypasses sqlfluff's own large_file_skip_byte_limit,
+	// so a big file spent the whole formatter budget and then reported a
+	// timeout on every write of it. Skipping is what sqlfluff itself
+	// would have done with the file.
+	if int64(len(src)) > settings.largeFileSkipByteLimit {
+		return nil, Result{Skipped: true}
+	}
+	cmd := exec.CommandContext(ctx, "sqlfluff", "fix", "--exclude-rules", settings.excludeRules, "--stdin-filename", abs, "-") //nolint:gosec // external formatter by design; args are our own construction, never a shell
 	cmd.Dir = projectRoot
 	cmd.WaitDelay = pipeGrace
 	cmd.Stdin = bytes.NewReader(src)
 	var stdout, stderr bytes.Buffer
 	cmd.Stdout = &stdout
 	cmd.Stderr = &stderr
-	err = cmd.Run()
+	err := cmd.Run()
 	if err == nil {
 		// sqlfluff prints nothing on a no-op success; writing that would
 		// wipe a .sql.example the in-place path never touches.
 		if stdout.Len() == 0 && len(src) != 0 {
-			return Result{Skipped: true}
+			return nil, Result{Skipped: true}
 		}
-		return writeIfChanged(abs, src, stdout.Bytes(), 0o644)
+		return stdout.Bytes(), Result{}
 	}
 	if ctx.Err() != nil {
-		return Result{Diagnostic: context.Cause(ctx).Error()}
+		return nil, Result{Diagnostic: context.Cause(ctx).Error()}
 	}
 	raw := stderr.String()
 	diag := err.Error()
@@ -185,9 +203,9 @@ func sqlfluffFixExample(ctx context.Context, projectRoot, abs, exclude string) R
 	// has not written the file yet.
 	outcome := sqlfluffOutcome(projectRoot, false, diag, raw)
 	if outcome.Diagnostic != "" || stdout.Len() == 0 {
-		return outcome
+		return nil, outcome
 	}
-	return writeIfChanged(abs, src, stdout.Bytes(), 0o644)
+	return stdout.Bytes(), Result{}
 }
 
 func sqlfluffOutcome(projectRoot string, ok bool, diag, raw string) Result {
