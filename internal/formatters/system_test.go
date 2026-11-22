@@ -144,17 +144,16 @@ func TestGoModAndWorkEditOnlyTheirOwnFile(t *testing.T) {
 	_, err = os.Stat(argv)
 	qt.Check(t, qt.IsTrue(os.IsNotExist(err)))
 
-	// --check copies beside the original as .fmtcheck-<8 hex>-<base>.
-	// That copy is the file the command must rewrite; a lookalike name is not.
+	// --check formats the real path; a leftover sibling is not go.mod.
 	scratch := filepath.Join(dir, ".fmtcheck-0123abcd-go.mod")
 	qt.Assert(t, qt.IsNil(os.WriteFile(scratch, []byte("x\n"), 0o600)))
 	res = NewGoMod().Format(t.Context(), dir, scratch)
-	assertFormatted(t, res)
-	assertArgv(t, argv, "mod edit -fmt "+scratch)
+	qt.Check(t, qt.IsTrue(res.Skipped))
+	_, err = os.Stat(argv)
+	qt.Check(t, qt.IsTrue(os.IsNotExist(err)))
 
 	exampleMod := filepath.Join(dir, "go.mod.example")
 	qt.Assert(t, qt.IsNil(os.WriteFile(exampleMod, []byte("x\n"), 0o600)))
-	qt.Assert(t, qt.IsNil(os.Remove(argv)))
 	res = NewGoMod().Format(t.Context(), dir, exampleMod)
 	assertFormatted(t, res)
 	assertArgv(t, argv, "mod edit -fmt "+exampleMod)
@@ -206,8 +205,8 @@ func TestGoModAndWorkFormatInPlace(t *testing.T) {
 	scratch := filepath.Join(root, ".fmtcheck-0123abcd-go.mod")
 	qt.Assert(t, qt.IsNil(os.WriteFile(scratch, []byte(messyMod), 0o600)))
 	res = NewGoMod().Format(t.Context(), root, scratch)
-	assertFormatted(t, res)
-	qt.Check(t, qt.StringContains(string(readSource(t, scratch)), "\texample.com/a v1.0.0\n"))
+	qt.Check(t, qt.IsTrue(res.Skipped))
+	qt.Check(t, qt.Equals(string(readSource(t, scratch)), messyMod))
 	qt.Check(t, qt.Equals(string(readSource(t, parentMod)), messyMod))
 }
 

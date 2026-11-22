@@ -22,8 +22,7 @@ type systemFormatter struct {
 	// go mod edit and go work edit rewrite the path they are given, and
 	// with no path they rewrite the module or workspace file found from
 	// the working directory, so the name check is what keeps them off
-	// every other file. A --check sibling copy
-	// (.fmtcheck-<8 hex>-<base>) still counts as that basename.
+	// every other file.
 	onlyBase string
 }
 
@@ -44,40 +43,12 @@ func (s systemFormatter) Format(ctx context.Context, projectRoot, abs string) Re
 	return Result{Skipped: true}
 }
 
-// originalBase is the file's basename. --check formats a sibling named
-// .fmtcheck-<8 hex>-<original> (cmd/format-dispatch copyBeside) so the
-// tool still sees the extension; that copy has to count as the original
-// name or the check reports the tool as missing and never compares bytes.
 func matchesOnlyBase(abs, onlyBase string) bool {
-	base := originalBase(abs)
+	base := filepath.Base(abs)
 	if base == onlyBase {
 		return true
 	}
 	return strings.EqualFold(base, onlyBase+".example")
-}
-
-func originalBase(abs string) string {
-	base := filepath.Base(abs)
-	rest, ok := strings.CutPrefix(base, ".fmtcheck-")
-	if !ok {
-		return base
-	}
-	hexPart, orig, ok := strings.Cut(rest, "-")
-	if !ok || len(hexPart) != 8 || !isLowerHex(hexPart) {
-		return base
-	}
-	return orig
-}
-
-func isLowerHex(s string) bool {
-	for _, c := range s {
-		switch {
-		case c >= '0' && c <= '9', c >= 'a' && c <= 'f':
-		default:
-			return false
-		}
-	}
-	return true
 }
 
 // inPlace is the argv shape shared by every formatter here that takes one
