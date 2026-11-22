@@ -91,12 +91,12 @@ and, for Claude payloads, hook context to the model. Skips stay silent.
 
 `--upgrade` refreshes bunx formatters with the binary. It checks
 `.sha256`, then a build-provenance attestation bound to
-`.github/workflows/release.yml`; anything else is refused. Authenticated
-`gh` also runs `gh attestation verify --signer-workflow` (DSSE, Fulcio,
-Rekor) and that verdict decides. Without `gh` (token required even for
-a public repo) the attestation check trusts TLS to `api.github.com`.
-`--upgrade` says which applied. A custom `CLAUDE_FORMAT_HOOKS_RELEASE_API`
-skips `gh`. `--dry-run` prints asset and path, no network.
+`.github/workflows/release.yml`; anything else is refused. github.com
+upgrades then require authenticated `gh` (`gh attestation verify
+--signer-workflow`; DSSE, Fulcio, Rekor) — install `gh` and run
+`gh auth login`. A custom `CLAUDE_FORMAT_HOOKS_RELEASE_API` skips `gh`
+and trusts TLS to that host. `--upgrade` says which applied.
+`--dry-run` prints asset and path, no network.
 
 **Config** (`$CLAUDE_FORMAT_HOOKS_CONFIG` or
 `~/.claude/claude-format-hooks.json`; same shape as project
