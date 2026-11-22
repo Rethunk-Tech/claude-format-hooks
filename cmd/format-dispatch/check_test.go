@@ -551,6 +551,27 @@ func TestCheckUserDisableMixedWithEnabledExtension(t *testing.T) {
 	}
 }
 
+// A's skipDirs must not hide B's generated/ when --check walks both.
+func TestCheckSkipDirsStayScopedToTheirProject(t *testing.T) {
+	a := t.TempDir()
+	b := t.TempDir()
+	writeCheckFile(t, a, projectConfigFile, "{\n  \"skipDirs\": [\n    \"generated\"\n  ]\n}\n")
+	writeCheckFile(t, filepath.Join(a, "generated"), "x.json", unformattedJSON)
+	bPath := writeCheckFile(t, filepath.Join(b, "generated"), "x.json", unformattedJSON)
+	configPath := filepath.Join(t.TempDir(), "claude-format-hooks.json")
+	writeFile(t, configPath, `{}`)
+
+	t.Setenv("CLAUDE_PROJECT_DIR", "")
+	t.Setenv("CLAUDE_FORMAT_HOOKS_CONFIG", configPath)
+
+	var out, errOut bytes.Buffer
+	qt.Assert(t, qt.Equals(runCheck([]string{a, b}, &out, &errOut), 1))
+	qt.Check(t, qt.StringContains(out.String(), bPath),
+		qt.Commentf("B/generated must still be checked; A's skipDirs apply only under A"))
+	qt.Check(t, qt.Equals(strings.Contains(out.String(), filepath.Join(a, "generated")), false),
+		qt.Commentf("A/generated must stay skipped"))
+}
+
 func TestCheckResolvesProjectRootPerPathArgument(t *testing.T) {
 	firstRoot := t.TempDir()
 	secondRoot := t.TempDir()

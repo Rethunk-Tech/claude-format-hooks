@@ -9,6 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- `--check` applies each project's `skipDirs`/`skipFiles` only to files under that root, so one tree cannot hide another.
 - Skip-dir last-segment probes stat under the project root, so a file named `build` (or `dist`, `out`, …) is formatted when the hook's cwd is not the project.
 - CI's gate step no longer fails on the formatting check; setup-go already runs it there.
 

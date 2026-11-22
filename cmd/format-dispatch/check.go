@@ -595,8 +595,9 @@ func inSkipped(abs, projectRoot, workingRoot, fallbackRoot string, skip skipConf
 	if err != nil {
 		rel = filepath.Base(abs)
 	}
-	return dispatch.InSkippedDir(relRoot, rel, skip.dirs) ||
-		dispatch.InSkippedFile(filepath.Base(abs), skip.files)
+	dirs, files := skip.extras(abs)
+	return dispatch.InSkippedDir(relRoot, rel, dirs) ||
+		dispatch.InSkippedFile(filepath.Base(abs), files)
 }
 
 // checkSkipDirs is the extra skip list --check honors while collecting
@@ -606,16 +607,17 @@ func inSkipped(abs, projectRoot, workingRoot, fallbackRoot string, skip skipConf
 // a broken config.
 func checkSkipConfig(rootCandidates []string) skipConfig {
 	var skip skipConfig
-	add := func(cfg config.Config) {
+	if cfg, err := config.Load(configPath()); err == nil {
 		skip.dirs = append(skip.dirs, cfg.SkipDirs...)
 		skip.files = append(skip.files, cfg.SkipFiles...)
 	}
-	if cfg, err := config.Load(configPath()); err == nil {
-		add(cfg)
-	}
 	for _, root := range rootCandidates {
 		if cfg, err := config.Load(filepath.Join(root, projectConfigFile)); err == nil {
-			add(cfg)
+			skip.perRoot = append(skip.perRoot, rootedSkip{
+				root:  root,
+				dirs:  cfg.SkipDirs,
+				files: cfg.SkipFiles,
+			})
 		}
 	}
 	return skip
@@ -623,9 +625,36 @@ func checkSkipConfig(rootCandidates []string) skipConfig {
 
 // skipConfig is the config-supplied half of the skip rules, carried
 // together because every site that consults one consults the other.
+// User-level dirs/files apply everywhere; perRoot extras apply only
+// under that project, so --check A B cannot let A's skipDirs hide B.
 type skipConfig struct {
+	dirs    []string
+	files   []string
+	perRoot []rootedSkip
+}
+
+type rootedSkip struct {
+	root  string
 	dirs  []string
 	files []string
+}
+
+func (s skipConfig) extras(abs string) (dirs, files []string) {
+	dirs = append([]string{}, s.dirs...)
+	files = append([]string{}, s.files...)
+	best := -1
+	bestLen := -1
+	for i, r := range s.perRoot {
+		if within(abs, r.root) && len(r.root) > bestLen {
+			best = i
+			bestLen = len(r.root)
+		}
+	}
+	if best >= 0 {
+		dirs = append(dirs, s.perRoot[best].dirs...)
+		files = append(files, s.perRoot[best].files...)
+	}
+	return dirs, files
 }
 
 // collectCheckTargets expands the given paths into a sorted, deduplicated
@@ -731,7 +760,8 @@ func (t *targetSet) addDir(p string) error {
 		if d.IsDir() {
 			// Prune rather than filter per-file: skipping a non-source
 			// tree at its root avoids walking node_modules at all.
-			if rel != "." && dispatch.InSkippedDir(p, rel, t.skip.dirs) {
+			dirs, _ := t.skip.extras(path)
+			if rel != "." && dispatch.InSkippedDir(p, rel, dirs) {
 				return fs.SkipDir
 			}
 			return nil
