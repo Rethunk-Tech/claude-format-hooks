@@ -128,6 +128,21 @@ func TestBunxFormatterSuccessAndFailure(t *testing.T) {
 	})
 }
 
+func TestTOMLFormatStdinUsesBunxPackageName(t *testing.T) {
+	isolateDiskCache(t)
+	argvPath := filepath.Join(t.TempDir(), "argv")
+	t.Setenv("TAPLO_ARGV", argvPath)
+	writeFakeTool(t, "bunx", `printf '%s\n' "$@" > "$TAPLO_ARGV"; printf 'a = 1\n'`)
+
+	dir := t.TempDir()
+	abs := filepath.Join(dir, "f.toml")
+	out, res, ok := NewTOML().FormatStdin(t.Context(), dir, abs, []byte("a=1\n"))
+	qt.Assert(t, qt.IsTrue(ok))
+	assertFormatted(t, res)
+	qt.Check(t, qt.Equals(string(out), "a = 1\n"))
+	assertArgv(t, argvPath, "@taplo/cli\nformat\n--stdin-filepath\n"+abs+"\n-\n")
+}
+
 func TestTOMLFormatterSuccess(t *testing.T) {
 	isolateDiskCache(t)
 	writeFakeTool(t, "bunx", "exit 0")

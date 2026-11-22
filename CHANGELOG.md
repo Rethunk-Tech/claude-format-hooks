@@ -9,6 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- `--check` on an unwritable tree runs `bunx @taplo/cli` for TOML stdin, matching the in-place bunx argv.
 - HUMANS.md no longer claims github.com `--upgrade` trusts TLS without `gh`; those upgrades require authenticated `gh`.
 - Shell dialect follows `env -u` and `NAME=VALUE` the way shebang peek already did, so `#!/usr/bin/env -u FOO zsh` formats as zsh.
 - `--check` applies each project's `skipDirs`/`skipFiles` only to files under that root, so one tree cannot hide another.

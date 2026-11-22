@@ -243,11 +243,16 @@ func (b bunxFormatter) FormatStdin(ctx context.Context, projectRoot, abs string,
 	if b.configured != nil && !b.configured(projectRoot, abs) {
 		return nil, Result{Skipped: true}, true
 	}
-	command, args := "bunx", append([]string{b.name}, b.stdinArgs(abs)...)
+	stdin := b.stdinArgs(abs)
+	command, args := "bunx", append([]string{b.name}, stdin...)
 	if path, err := lookPath(b.name); err == nil {
-		command, args = path, b.stdinArgs(abs)
+		command, args = path, stdin
 	} else if _, err := lookPath("bunx"); err != nil {
 		return nil, Result{Skipped: true}, true
+	} else if b.bunxArgs != nil {
+		if bunx := b.bunxArgs(abs); len(bunx) > 0 {
+			args = append([]string{bunx[0]}, stdin...)
+		}
 	}
 	out, res := runExternalStdinBytes(ctx, projectRoot, command, args, src)
 	if b.skipIf != nil && res.Diagnostic != "" && b.skipIf(res.Diagnostic) {
