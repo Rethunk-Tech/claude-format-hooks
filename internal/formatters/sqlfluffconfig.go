@@ -13,23 +13,19 @@ var sqlfluffDefaults = []byte(`[sqlfluff]
 dialect = ansi
 `)
 
-var (
-	sqlfluffConfigOnce sync.Once
-	sqlfluffConfigPath string
-)
+var sqlfluffConfigOnce sync.Once
 
 // userSQLFluffConfig materializes a user-level default once per process.
 // SQLFluff loads ~/.sqlfluff before project config, so project settings still
 // override this dialect through the tool's native configuration merge.
-func userSQLFluffConfig() string {
+func userSQLFluffConfig() {
 	sqlfluffConfigOnce.Do(func() {
 		home, err := os.UserHomeDir()
 		if err != nil {
 			return
 		}
-		sqlfluffConfigPath = resolveSQLFluffConfig(home)
+		resolveSQLFluffConfig(home)
 	})
-	return sqlfluffConfigPath
 }
 
 func resolveSQLFluffConfig(home string) string {

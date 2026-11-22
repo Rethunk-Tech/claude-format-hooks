@@ -98,5 +98,4 @@ func TestSQLFluffFormatPreservesExistingUserConfig(t *testing.T) {
 
 func resetSQLFluffConfigForTest() {
 	sqlfluffConfigOnce = sync.Once{}
-	sqlfluffConfigPath = ""
 }
