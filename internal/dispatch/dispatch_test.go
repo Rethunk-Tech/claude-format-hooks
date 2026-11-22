@@ -435,6 +435,7 @@ func TestInSkippedDir(t *testing.T) {
 	}{
 		{"src/app.ts", false},
 		{"node_modules/pkg/index.js", true},
+		{"Node_Modules/pkg/index.js", true},
 		{"src/node_modules/pkg/index.js", true},
 		{".next/cache/foo.json", true},
 		{".yarn/releases/yarn.js", true},

@@ -383,8 +383,10 @@ func InSkippedDir(projectRoot, relPath string, extra []string) bool {
 		return false
 	}
 	match := func(seg string) bool {
-		if skipDirs[seg] {
-			return true
+		for name := range skipDirs {
+			if strings.EqualFold(name, seg) {
+				return true
+			}
 		}
 		return slices.ContainsFunc(extra, func(e string) bool {
 			return strings.EqualFold(strings.TrimSpace(e), seg)
