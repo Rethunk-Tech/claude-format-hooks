@@ -377,7 +377,7 @@ func run(stdin io.Reader) int {
 	// to move this check would not make it any cheaper -- projectDisables
 	// loads that same file either way.
 	if rel, relErr := filepath.Rel(projectRoot, abs); relErr == nil &&
-		dispatch.InSkippedDir(rel, projectCfg.SkipDirs) {
+		dispatch.InSkippedDir(projectRoot, rel, projectCfg.SkipDirs) {
 		logOutcome = "skip: non-source directory (project config)"
 		return 0
 	}
@@ -503,7 +503,7 @@ func resolveTarget(path string, cfg config.Config) (abs, projectRoot, skipReason
 	if err != nil {
 		return abs, projectRoot, "skip: relative path error"
 	}
-	if dispatch.InSkippedDir(rel, cfg.SkipDirs) {
+	if dispatch.InSkippedDir(projectRoot, rel, cfg.SkipDirs) {
 		return abs, projectRoot, "skip: non-source directory"
 	}
 	if dispatch.InSkippedFile(filepath.Base(abs), cfg.SkipFiles) {

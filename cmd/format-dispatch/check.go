@@ -595,7 +595,7 @@ func inSkipped(abs, projectRoot, workingRoot, fallbackRoot string, skip skipConf
 	if err != nil {
 		rel = filepath.Base(abs)
 	}
-	return dispatch.InSkippedDir(rel, skip.dirs) ||
+	return dispatch.InSkippedDir(relRoot, rel, skip.dirs) ||
 		dispatch.InSkippedFile(filepath.Base(abs), skip.files)
 }
 
@@ -731,7 +731,7 @@ func (t *targetSet) addDir(p string) error {
 		if d.IsDir() {
 			// Prune rather than filter per-file: skipping a non-source
 			// tree at its root avoids walking node_modules at all.
-			if rel != "." && dispatch.InSkippedDir(rel, t.skip.dirs) {
+			if rel != "." && dispatch.InSkippedDir(p, rel, t.skip.dirs) {
 				return fs.SkipDir
 			}
 			return nil

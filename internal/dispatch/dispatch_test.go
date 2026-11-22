@@ -469,7 +469,7 @@ func TestInSkippedDir(t *testing.T) {
 		{"outbound/handler.ts", false},
 	}
 	for _, tc := range cases {
-		qt.Check(t, qt.Equals(InSkippedDir(tc.path, nil), tc.want), qt.Commentf("path=%q", tc.path))
+		qt.Check(t, qt.Equals(InSkippedDir("", tc.path, nil), tc.want), qt.Commentf("path=%q", tc.path))
 	}
 }
 
@@ -543,12 +543,12 @@ func TestRegisteredSuffixesLongestFirst(t *testing.T) {
 func TestInSkippedDirHonorsConfiguredSegments(t *testing.T) {
 	extra := []string{"generated", "  Bazel-Out  "}
 
-	qt.Check(t, qt.IsTrue(InSkippedDir("src/generated/api.ts", extra)))
-	qt.Check(t, qt.IsTrue(InSkippedDir("bazel-out/x.go", extra)), qt.Commentf("trimmed and case-insensitive, like the other config lists"))
-	qt.Check(t, qt.IsTrue(InSkippedDir("node_modules/x.js", extra)), qt.Commentf("built-ins still apply"))
-	qt.Check(t, qt.IsFalse(InSkippedDir("src/app.ts", extra)))
+	qt.Check(t, qt.IsTrue(InSkippedDir("", "src/generated/api.ts", extra)))
+	qt.Check(t, qt.IsTrue(InSkippedDir("", "bazel-out/x.go", extra)), qt.Commentf("trimmed and case-insensitive, like the other config lists"))
+	qt.Check(t, qt.IsTrue(InSkippedDir("", "node_modules/x.js", extra)), qt.Commentf("built-ins still apply"))
+	qt.Check(t, qt.IsFalse(InSkippedDir("", "src/app.ts", extra)))
 	// A segment must match whole, not as a substring of a real directory.
-	qt.Check(t, qt.IsFalse(InSkippedDir("src/generated-docs/a.md", extra)))
+	qt.Check(t, qt.IsFalse(InSkippedDir("", "src/generated-docs/a.md", extra)))
 }
 
 // The directory skip list never sees a generated file that sits in a

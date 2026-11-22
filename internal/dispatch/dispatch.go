@@ -369,13 +369,15 @@ func AllKnownExtensions() []string {
 	return slices.Sorted(maps.Keys(knownExtensions))
 }
 
-// InSkippedDir reports whether relPath (relative to the project root)
-// passes through a directory that should never be auto-formatted. extra
-// names additional segments from config, on top of the built-in list:
-// three separate fixes have had to extend skipDirs for a generated
-// directory nobody had hit yet, and a config key is what stops the next
-// one needing a release.
-func InSkippedDir(relPath string, extra []string) bool {
+// InSkippedDir reports whether relPath (relative to projectRoot) passes
+// through a directory that should never be auto-formatted. extra names
+// additional segments from config, on top of the built-in list: three
+// separate fixes have had to extend skipDirs for a generated directory
+// nobody had hit yet, and a config key is what stops the next one
+// needing a release. The last-segment file-vs-directory probe stats
+// under projectRoot so a file named "build" is not skipped when the
+// process cwd is elsewhere; an empty projectRoot stats relPath as-is.
+func InSkippedDir(projectRoot, relPath string, extra []string) bool {
 	segs := strings.Split(filepath.ToSlash(relPath), "/")
 	if len(segs) == 0 {
 		return false
@@ -397,7 +399,11 @@ func InSkippedDir(relPath string, extra []string) bool {
 	}
 	// Last segment names a skip directory, but scripts/build is a file.
 	// A missing path still skips so --check node_modules prunes with no cwd.
-	fi, err := os.Stat(filepath.Clean(relPath))
+	probe := relPath
+	if projectRoot != "" {
+		probe = filepath.Join(projectRoot, relPath)
+	}
+	fi, err := os.Stat(filepath.Clean(probe))
 	return err != nil || fi.IsDir()
 }
 
