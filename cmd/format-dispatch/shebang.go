@@ -4,6 +4,8 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+
+	"github.com/Rethunk-Tech/claude-format-hooks/internal/formatters"
 )
 
 const shebangPeekLimit = 256
@@ -61,60 +63,6 @@ func shebangExt(path string) (string, bool) {
 	}
 }
 
-// shebangInterpreter returns the program a #! line will exec. env's own
-// flags (--split-string/-S, -u, -i, NAME=VALUE) sit between env and that
-// program; treating the first token after env as the interpreter misses
-// every `#!/usr/bin/env -S python3 -u` script.
 func shebangInterpreter(line string) string {
-	if !strings.HasPrefix(line, "#!") {
-		return ""
-	}
-	fields := strings.Fields(line[2:])
-	if len(fields) == 0 {
-		return ""
-	}
-	if filepath.Base(fields[0]) != "env" {
-		return fields[0]
-	}
-	fields = fields[1:]
-	for len(fields) > 0 {
-		f := fields[0]
-		if f == "-" {
-			fields = fields[1:]
-			continue
-		}
-		if strings.HasPrefix(f, "-") {
-			name, val, eq := strings.Cut(f, "=")
-			switch name {
-			case "-S", "--split-string":
-				fields = fields[1:]
-				if eq {
-					fields = append(strings.Fields(val), fields...)
-				}
-				if len(fields) == 0 {
-					return ""
-				}
-				return fields[0]
-			case "-u", "--unset", "-C", "--chdir":
-				if eq {
-					fields = fields[1:]
-					continue
-				}
-				if len(fields) < 2 {
-					return ""
-				}
-				fields = fields[2:]
-				continue
-			default:
-				fields = fields[1:]
-				continue
-			}
-		}
-		if strings.Contains(f, "=") {
-			fields = fields[1:]
-			continue
-		}
-		return f
-	}
-	return ""
+	return formatters.ShebangInterpreter(line)
 }

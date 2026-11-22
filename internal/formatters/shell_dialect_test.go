@@ -33,6 +33,38 @@ func TestFormatEnvDashSZshShebang(t *testing.T) {
 	}
 }
 
+func TestFormatEnvUnsetAndAssignZshShebang(t *testing.T) {
+	t.Parallel()
+	for _, shebang := range []string{
+		"#!/usr/bin/env -u FOO zsh",
+		"#!/usr/bin/env FOO=bar zsh",
+	} {
+		t.Run(shebang, func(t *testing.T) {
+			t.Parallel()
+			dir := t.TempDir()
+			path := filepath.Join(dir, "env.sh")
+			src := []byte(shebang + "\n() { echo hi }\n")
+			if err := os.WriteFile(path, src, 0o600); err != nil {
+				t.Fatal(err)
+			}
+			res := NewShell(config.Config{}).Format(t.Context(), dir, path)
+			if res.Err != nil {
+				t.Fatal(res.Err)
+			}
+			if res.Skipped {
+				t.Fatalf("formatter declined %s", shebang)
+			}
+			out, err := os.ReadFile(filepath.Clean(path))
+			if err != nil {
+				t.Fatal(err)
+			}
+			if !bytes.Contains(out, []byte("() { echo hi; }")) {
+				t.Fatalf("formatted = %q, want zsh-formatted anonymous function", out)
+			}
+		})
+	}
+}
+
 func TestFormatUppercaseZshSuffix(t *testing.T) {
 	t.Parallel()
 	dir := t.TempDir()

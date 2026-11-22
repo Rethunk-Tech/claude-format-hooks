@@ -66,29 +66,70 @@ func dialect(abs string, src []byte) syntax.LangVariant {
 		return syntax.LangMirBSDKorn
 	}
 	line, _, _ := bytes.Cut(src, []byte("\n"))
-	if bytes.HasPrefix(line, []byte("#!")) {
-		f := strings.Fields(string(line[2:]))
-		if len(f) == 0 {
-			return syntax.LangBash
-		}
-		interp := filepath.Base(f[0])
-		if interp == "env" {
-			// env -S and other flags wrap the interpreter; -u after zsh is not the shell.
-			interp = ""
-			for _, tok := range f[1:] {
-				if strings.HasPrefix(tok, "-") {
-					continue
-				}
-				interp = filepath.Base(tok)
-				break
-			}
-		}
-		switch interp {
-		case "zsh":
-			return syntax.LangZsh
-		case "ksh", "mksh":
-			return syntax.LangMirBSDKorn
-		}
+	interp := filepath.Base(ShebangInterpreter(string(line)))
+	switch interp {
+	case "zsh":
+		return syntax.LangZsh
+	case "ksh", "mksh":
+		return syntax.LangMirBSDKorn
 	}
 	return syntax.LangBash
+}
+
+// ShebangInterpreter returns the program a #! line will exec. env's own
+// flags (--split-string/-S, -u, -i, NAME=VALUE) sit between env and that
+// program; treating the first token after env as the interpreter misses
+// every `#!/usr/bin/env -S python3 -u` script.
+func ShebangInterpreter(line string) string {
+	if !strings.HasPrefix(line, "#!") {
+		return ""
+	}
+	fields := strings.Fields(line[2:])
+	if len(fields) == 0 {
+		return ""
+	}
+	if filepath.Base(fields[0]) != "env" {
+		return fields[0]
+	}
+	fields = fields[1:]
+	for len(fields) > 0 {
+		f := fields[0]
+		if f == "-" {
+			fields = fields[1:]
+			continue
+		}
+		if strings.HasPrefix(f, "-") {
+			name, val, eq := strings.Cut(f, "=")
+			switch name {
+			case "-S", "--split-string":
+				fields = fields[1:]
+				if eq {
+					fields = append(strings.Fields(val), fields...)
+				}
+				if len(fields) == 0 {
+					return ""
+				}
+				return fields[0]
+			case "-u", "--unset", "-C", "--chdir":
+				if eq {
+					fields = fields[1:]
+					continue
+				}
+				if len(fields) < 2 {
+					return ""
+				}
+				fields = fields[2:]
+				continue
+			default:
+				fields = fields[1:]
+				continue
+			}
+		}
+		if strings.Contains(f, "=") {
+			fields = fields[1:]
+			continue
+		}
+		return f
+	}
+	return ""
 }
