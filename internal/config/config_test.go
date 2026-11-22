@@ -132,6 +132,16 @@ func TestResolveIndentEditorConfigLayering(t *testing.T) {
 		qt.Check(t, qt.IsTrue(spec.UseTabs))
 	})
 
+	t.Run("editorconfig indent_size without indent_style still applies", func(t *testing.T) {
+		isolateDiskCache(t)
+		dir := t.TempDir()
+		writeEditorConfig(t, dir, "root = true\n\n[*.json]\nindent_size = 4\n")
+
+		spec := ResolveJSONIndent(Default(), filepath.Join(dir, "t.json"))
+		qt.Check(t, qt.Equals(spec, IndentSpec{Size: 4, UseTabs: false}),
+			qt.Commentf("a covering section that sets only indent_size must not be ignored"))
+	})
+
 	t.Run("editorconfig indent_size overrides without switching to tabs", func(t *testing.T) {
 		isolateDiskCache(t)
 		dir := t.TempDir()
@@ -158,6 +168,16 @@ func TestResolveIndentEditorConfigLayering(t *testing.T) {
 
 		spec := ResolveJSONIndent(Default(), filepath.Join(dir, "t.json"))
 		qt.Check(t, qt.Equals(spec, IndentSpec{Size: 2, UseTabs: true}))
+	})
+
+	t.Run("editorconfig switch_case_indent without indent_style still applies", func(t *testing.T) {
+		isolateDiskCache(t)
+		dir := t.TempDir()
+		writeEditorConfig(t, dir, "root = true\n\n[*.sh]\nswitch_case_indent = true\n")
+		cfg := Default()
+		cfg.Shell.SwitchCaseIndent = false
+
+		qt.Check(t, qt.IsTrue(ResolveShellIndent(cfg, filepath.Join(dir, "t.sh")).CaseIndent))
 	})
 
 	t.Run("an editorconfig section decides shell case indent, off when unset as in shfmt", func(t *testing.T) {

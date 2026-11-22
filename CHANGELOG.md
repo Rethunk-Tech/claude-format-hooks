@@ -9,6 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- A covering EditorConfig section that sets only `indent_size` or `switch_case_indent` is applied; native JSON/shell no longer keep the user default in that case.
 - Built-in skip-dir names match case-insensitively, like extra `skipDirs` and `skipFiles`, so `Node_Modules` is skipped on case-insensitive volumes.
 - EditorConfig indent TTL tests hash the same cache key production writes, so an expired hit is actually ignored.
 - `--check` on an unwritable tree formats Go and SQL on stdin, matching the hook, instead of exiting 2.

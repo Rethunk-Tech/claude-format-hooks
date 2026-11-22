@@ -186,21 +186,20 @@ func resolveIndentUncached(abs string, fallback IndentSpec) IndentSpec {
 	if err != nil {
 		return fallback
 	}
-	style := section.Get("indent_style")
-	if style == "" {
-		// No EditorConfig section covers this file — the user's own
-		// preference (or the built-in default) stands.
-		return fallback
-	}
 	spec := fallback
-	spec.UseTabs = style == "tab"
+	style := section.Get("indent_style")
+	if style != "" {
+		spec.UseTabs = style == "tab"
+		// shfmt itself reads switch_case_indent from the same section and treats
+		// it as off when unset, so a project's .editorconfig, not the user's
+		// preference, decides how its case branches sit.
+		spec.CaseIndent = section.Get("switch_case_indent") == "true"
+	} else if v := section.Get("switch_case_indent"); v != "" {
+		spec.CaseIndent = v == "true"
+	}
 	if size := section.IndentSize(); size > 0 {
 		spec.Size = size
 	}
-	// shfmt itself reads switch_case_indent from the same section and treats
-	// it as off when unset, so a project's .editorconfig, not the user's
-	// preference, decides how its case branches sit.
-	spec.CaseIndent = section.Get("switch_case_indent") == "true"
 	return spec
 }
 
