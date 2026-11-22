@@ -400,11 +400,15 @@ func wouldReformat(ctx context.Context, registry *dispatch.Registry, projectRoot
 	// The copy is the undo record and the writability probe in one: if it
 	// cannot be written beside the file, nothing there can be, and the file
 	// has to be judged on stdin instead.
-	_, cleanup, copyErr := copyBeside(abs, original)
+	copyPath, cleanup, copyErr := copyBeside(abs, original)
 	if copyErr != nil {
 		return wouldReformatStdin(ctx, registry, projectRoot, abs, ext, original, write)
 	}
-	defer cleanup()
+	pendingRestores.addCopy(copyPath)
+	defer func() {
+		cleanup()
+		pendingRestores.removeCopy(copyPath)
+	}()
 
 	// A check changes nothing, so every way out of here -- a formatter
 	// failure, a panic, an interrupt -- has to put the file back.
@@ -455,11 +459,12 @@ func wouldReformat(ctx context.Context, registry *dispatch.Registry, projectRoot
 // formatter's write and the caller's restore, so the undo record has to be
 // visible outside the goroutine doing the work.
 type restoreSet struct {
-	mu    sync.Mutex
-	files map[string][]byte
+	mu     sync.Mutex
+	files  map[string][]byte
+	copies map[string]struct{}
 }
 
-var pendingRestores = restoreSet{files: map[string][]byte{}}
+var pendingRestores = restoreSet{files: map[string][]byte{}, copies: map[string]struct{}{}}
 
 func (s *restoreSet) add(abs string, original []byte) {
 	s.mu.Lock()
@@ -473,13 +478,31 @@ func (s *restoreSet) remove(abs string) {
 	delete(s.files, abs)
 }
 
-// restoreAll puts every in-flight file back, for the signal handler.
+func (s *restoreSet) addCopy(path string) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.copies[path] = struct{}{}
+}
+
+func (s *restoreSet) removeCopy(path string) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	delete(s.copies, path)
+}
+
+// restoreAll puts every in-flight file back and removes outstanding
+// .fmtcheck-* probes, for the signal handler. os.Exit skips copyBeside's
+// defer, so the copies have to be tracked here too.
 func (s *restoreSet) restoreAll() {
 	s.mu.Lock()
 	pending := maps.Clone(s.files)
+	copies := maps.Clone(s.copies)
 	s.mu.Unlock()
 	for abs, original := range pending {
 		_ = restoreOriginal(abs, original)
+	}
+	for path := range copies {
+		_ = os.Remove(path)
 	}
 }
 

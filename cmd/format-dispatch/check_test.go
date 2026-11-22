@@ -363,6 +363,29 @@ func TestWouldReformatReportsFormattedCopyReadError(t *testing.T) {
 	}
 }
 
+func TestRestoreAllRemovesCheckCopies(t *testing.T) {
+	t.Cleanup(func() {
+		pendingRestores.mu.Lock()
+		pendingRestores.files = map[string][]byte{}
+		pendingRestores.copies = map[string]struct{}{}
+		pendingRestores.mu.Unlock()
+	})
+	dir := t.TempDir()
+	abs := filepath.Join(dir, "target.json")
+	content := []byte(unformattedJSON)
+	qt.Assert(t, qt.IsNil(os.WriteFile(abs, content, 0o600)))
+
+	path, cleanup, err := copyBeside(abs, content)
+	qt.Assert(t, qt.IsNil(err))
+	t.Cleanup(cleanup)
+	pendingRestores.addCopy(path)
+
+	pendingRestores.restoreAll()
+	_, statErr := os.Stat(path)
+	qt.Check(t, qt.IsTrue(os.IsNotExist(statErr)),
+		qt.Commentf("SIGINT must remove .fmtcheck-* probes; os.Exit skips copyBeside's defer"))
+}
+
 func TestCopyBesideCreatesAndCleansSibling(t *testing.T) {
 	dir := t.TempDir()
 	abs := filepath.Join(dir, "target.json")

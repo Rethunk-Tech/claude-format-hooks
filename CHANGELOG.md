@@ -9,6 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- `--check` interrupted by SIGINT/SIGTERM removes outstanding `.fmtcheck-*` probe files; `os.Exit` used to skip their cleanup.
 - `go.mod`/`go.work` formatters no longer treat a leftover `.fmtcheck-*` sibling as the real module file; `--check` formats the original path.
 - A covering EditorConfig section that sets only `indent_size` or `switch_case_indent` is applied; native JSON/shell no longer keep the user default in that case.
 - Built-in skip-dir names match case-insensitively, like extra `skipDirs` and `skipFiles`, so `Node_Modules` is skipped on case-insensitive volumes.
